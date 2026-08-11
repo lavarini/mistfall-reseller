@@ -13,6 +13,9 @@ venv/
 # macOS
 .DS_Store
 
+# Config pessoal do Claude Code (settings.json e versionado)
+.claude/settings.local.json
+
 # Saída do bot (log de Compras, capturas de depuração)
 *.log
 /out/
