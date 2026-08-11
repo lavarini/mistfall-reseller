@@ -211,9 +211,15 @@ escritos à mão: empate, preço exatamente igual ao Preço-alvo, lista vazia.
 **2. Visão contra o corpus de prints.** Cada PNG ganha um arquivo de expectativa: qual
 Item-alvo em qual slot, a qual Preço-unitário.
 
-A convenção de nomes já existente (`broche-tres-adaga-lanterna-rede-padrao.png` declara
-três Broches, uma Adaga, uma Lanterna e uma Rede) serve de verificação cruzada gratuita
-contra o arquivo de expectativa.
+A convenção de nomes dos prints codifica **distância até o corte**, não quantidade de itens:
+`<item>-<numero>` significa que aquele Item-alvo está tantos ouros **acima do Preço-alvo**, e
+um item citado **sem** número está exatamente no corte. Itens presentes mas longe do corte
+não aparecem no nome. Verificado: Broche a 188 aparece sem número, a 190 como `broche-dois`
+e a 191 como `broche-tres` — corte 188, consistente nos três prints. O mesmo para a Adaga,
+corte 199.
+
+Isso torna os nomes uma **verificação cruzada dos Preços-alvo**, e não do conteúdo dos slots.
+O rótulo de cada print continua precisando ser explícito no arquivo de expectativa.
 
 O trabalho manual inevitável aqui é **rotular os Preços-unitários verdadeiros** de cada
 print — é a fonte da verdade do OCR. A ferramenta de anotação torna isso rápido: desenha o
