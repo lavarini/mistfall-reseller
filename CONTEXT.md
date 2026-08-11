@@ -37,7 +37,10 @@ _Avoid_: Quantidade disponível.
 A ação de adquirir unidades de uma Listagem. Fluxo: clicar na Listagem abre a Janela de
 Confirmação (após um pequeno delay); apertar Espaço aciona o botão "Comprar". Sempre
 compramos 1 unidade e sempre pelo Preço-unitário exibido na Listagem (nunca por outro
-valor). Por ora compramos 1 unidade por Compra, para maximizar a velocidade.
+valor). Por ora compramos 1 unidade por Compra, para manter a interação com a Janela de
+Confirmação simples na v1 — alterar a Quantidade é interação nova e não testada, e não
+queremos isso no mesmo passo em que estamos provando a detecção. Velocidade não é o motivo:
+ritmo humano basta, e comprar mais unidades por Compra é candidato natural a v2.
 _Avoid_: Transação, Aquisição.
 
 **Janela de Confirmação**:
