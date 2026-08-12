@@ -1155,7 +1155,11 @@ insumo do piso de Ouro dos guardrails."
 
 **Interfaces:**
 - Consumes: `EstadoTela` (Task 1), `ler_ouro` (Task 8)
-- Produces: `identificar_estado(img: np.ndarray) -> EstadoTela`; `categoria_selecionada(img) -> str | None`
+- Produces: `identificar_estado(img: np.ndarray) -> EstadoTela`
+
+Uma versão anterior deste plano também prometia `categoria_selecionada(img) -> str | None`. Foi **removida**: nenhum step a construía e ela não tem consumidor. O Reset só precisa saber "estou em Material de Construção?", que `identificar_estado` já responde via `OUTRA_CATEGORIA`; ler o **nome** da Categoria exigiria OCR de fonte estilizada, que o ADR-0002 rejeita.
+
+**O fallback é `DESCONHECIDO`, não `LISTA`.** Cada estado exige evidência positiva; o que não casar com nenhuma faixa é desconhecido. Uma versão anterior devolvia `LISTA` como `else` final, o que fazia qualquer tela imprevista (popup, loading, reconexão) passar por lista utilizável e deixava `EstadoTela.DESCONHECIDO` inalcançável — quebrando, silenciosamente, o guardrail de "parar após três telas irreconhecíveis" que a spec exige. A Janela também exige evidência positiva no menu, senão uma tela preta seria classificada como Janela de Confirmação e o bot apertaria Espaço no escuro.
 
 Prints de referência: `janela.png` é a Janela de Confirmação aberta; `reset-forja.png` e `reset-chave.png` estão em outra Categoria; os demais são a lista utilizável.
 
@@ -1218,21 +1222,31 @@ from mistfall.tipos import EstadoTela
 REGIAO_JANELA = (900, 500, 1700, 950)
 REGIAO_MENU = (80, 380, 360, 720)
 
-# Janela de Confirmacao escurece o centro: 4.9 contra 11.5-13.3 do resto.
-LIMIAR_JANELA = 8.0
-# Material de Construcao selecionada da 37.1; outra Categoria da 32.9.
-LIMIAR_MENU = 35.0
+# Faixas medidas nos dez prints. Cada estado exige evidencia positiva;
+# o que nao casar com nenhuma faixa e DESCONHECIDO, nunca LISTA.
+CENTRO_JANELA_MAX = 8.0              # janela mede 4.9; lista e reset, 11.5-13.3
+MENU_JANELA = (12.0, 25.0)           # janela mede 18.3
+CENTRO_LISTA = (9.0, 18.0)           # lista e reset medem 11.5-13.3
+MENU_MATERIAL = (35.0, 40.0)         # Material de Construcao mede 37.1
+MENU_OUTRA_CATEGORIA = (28.0, 35.0)  # outra Categoria mede 32.9
 
 def _brilho(img: np.ndarray, regiao: tuple[int, int, int, int]) -> float:
     x0, y0, x1, y1 = regiao
     return float(cv2.cvtColor(img[y0:y1, x0:x1], cv2.COLOR_BGR2GRAY).mean())
 
+def _dentro(valor: float, faixa: tuple[float, float]) -> bool:
+    return faixa[0] <= valor <= faixa[1]
+
 def identificar_estado(img: np.ndarray) -> EstadoTela:
-    if _brilho(img, REGIAO_JANELA) < LIMIAR_JANELA:
+    centro = _brilho(img, REGIAO_JANELA)
+    menu = _brilho(img, REGIAO_MENU)
+    if centro < CENTRO_JANELA_MAX and _dentro(menu, MENU_JANELA):
         return EstadoTela.JANELA_CONFIRMACAO
-    if _brilho(img, REGIAO_MENU) < LIMIAR_MENU:
+    if _dentro(centro, CENTRO_LISTA) and _dentro(menu, MENU_MATERIAL):
+        return EstadoTela.LISTA
+    if _dentro(centro, CENTRO_LISTA) and _dentro(menu, MENU_OUTRA_CATEGORIA):
         return EstadoTela.OUTRA_CATEGORIA
-    return EstadoTela.LISTA
+    return EstadoTela.DESCONHECIDO
 ```
 
 - [ ] **Step 4: Rodar e confirmar que passa**
