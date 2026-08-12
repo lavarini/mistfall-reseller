@@ -1,11 +1,17 @@
 import cv2
 import numpy as np
-from ferramentas.anotar import VERDE, VERMELHO, anotar
+from ferramentas.anotar import anotar
 from mistfall.geometria import caixa_slot
 from mistfall.leilao import varrer
 from mistfall.tipos import ItemAlvo, Listagem
 
 PRINT = "images/broche-tres-adaga-lanterna-rede-padrao.png"
+
+# Literais de proposito: importar VERDE/VERMELHO de ferramentas.anotar tornaria
+# a asserção tautológica — se a implementação trocar as cores, a expectativa
+# trocaria junto e o teste continuaria passando.
+VERDE_ESPERADO = (0, 220, 0)      # BGR
+VERMELHO_ESPERADO = (0, 0, 220)   # BGR
 
 def _imagem_sintetica():
     return np.zeros((1440, 2560, 3), dtype=np.uint8)
@@ -35,10 +41,10 @@ def test_cor_indica_item_alvo_ou_nao():
     saida = anotar(img, listagens)
 
     x0, y0, _, _ = caixa_slot(0, 0)
-    assert tuple(saida[y0, x0 + 50]) == VERDE
+    assert tuple(saida[y0, x0 + 50]) == VERDE_ESPERADO
 
     x0, y0, _, _ = caixa_slot(0, 1)
-    assert tuple(saida[y0, x0 + 50]) == VERMELHO
+    assert tuple(saida[y0, x0 + 50]) == VERMELHO_ESPERADO
 
 def test_preco_ausente_nao_quebra_e_usa_o_placeholder():
     img = _imagem_sintetica()
@@ -48,14 +54,14 @@ def test_preco_ausente_nao_quebra_e_usa_o_placeholder():
 
     esperado = img.copy()
     x0, y0, x1, y1 = caixa_slot(0, 0)
-    cv2.rectangle(esperado, (x0, y0), (x1, y1), VERDE, 2)
+    cv2.rectangle(esperado, (x0, y0), (x1, y1), VERDE_ESPERADO, 2)
     cv2.putText(
         esperado,
         "broche ??",
         (x0 + 200, y0 + 34),
         cv2.FONT_HERSHEY_SIMPLEX,
         0.9,
-        VERDE,
+        VERDE_ESPERADO,
         2,
     )
 
