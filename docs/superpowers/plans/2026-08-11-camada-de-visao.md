@@ -1204,6 +1204,14 @@ Expected: FAIL com `ModuleNotFoundError: No module named 'mistfall.estado'`
 
 - [ ] **Step 3: Implementar estado.py**
 
+> **Corrigido depois do review final.** `REGIAO_MENU = (80, 380, 360, 720)` e as bandas
+> desta seção **estão obsoletas** — a região tinha 340 linhas com todo o sinal nas 60 de
+> baixo, então media "existe alguma linha destacada aqui", não "qual Categoria está
+> selecionada": bastava o destaque cair numa linha vizinha para dar falso `LISTA`. A região
+> foi encolhida para a linha de Material de Construção, `(80, 664, 360, 732)`, e as bandas
+> re-derivadas medindo os dez prints. Os números medidos estão em `src/mistfall/estado.py`.
+> O "não re-derivar" abaixo vale para o resto, não para o menu.
+
 Os limiares abaixo **já foram medidos** contra os dez prints; não re-derivar. Brilho médio de duas regiões:
 
 | Print | centro | menu |
