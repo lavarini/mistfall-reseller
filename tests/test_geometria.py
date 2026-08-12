@@ -1,0 +1,39 @@
+import numpy as np
+import pytest
+from mistfall.geometria import (
+    caixa_slot, regiao_icone, recorte_preco, TODOS_OS_SLOTS, RESOLUCAO,
+)
+
+def test_existem_doze_slots():
+    assert len(TODOS_OS_SLOTS) == 12
+
+def test_primeiro_slot_comeca_nas_constantes_medidas():
+    x0, y0, x1, y1 = caixa_slot(0, 0)
+    assert (x0, y0) == (459, 287)
+
+def test_colunas_nao_se_sobrepoem():
+    esquerda = caixa_slot(0, 0)
+    direita = caixa_slot(0, 1)
+    assert esquerda[2] <= direita[0]
+
+def test_linhas_avancam_pelo_passo_medido():
+    topos = [caixa_slot(i, 0)[1] for i in range(6)]
+    passos = [b - a for a, b in zip(topos, topos[1:])]
+    assert all(178 <= p <= 179 for p in passos), passos
+
+def test_todos_os_slots_cabem_na_resolucao():
+    largura, altura = RESOLUCAO
+    for linha, coluna in TODOS_OS_SLOTS:
+        x0, y0, x1, y1 = caixa_slot(linha, coluna)
+        assert 0 <= x0 < x1 <= largura
+        assert 0 <= y0 < y1 <= altura
+
+def test_recortes_tem_o_tamanho_medido():
+    img = np.zeros((1440, 2560, 3), dtype=np.uint8)
+    assert regiao_icone(img, 0, 0).shape[:2] == (116, 128)
+    assert recorte_preco(img, 0, 0).shape[:2] == (45, 80)
+
+def test_recorte_rejeita_resolucao_errada():
+    img = np.zeros((720, 1280, 3), dtype=np.uint8)
+    with pytest.raises(ValueError, match="2560x1440"):
+        regiao_icone(img, 0, 0)

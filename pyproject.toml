@@ -1,0 +1,14 @@
+[project]
+name = "mistfall-reseller"
+version = "0.1.0"
+requires-python = ">=3.14"
+dependencies = [
+    "opencv-python-headless>=5.0",
+    "numpy>=2.5",
+    "pillow>=12.3",
+    "pytesseract>=0.3.13",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
