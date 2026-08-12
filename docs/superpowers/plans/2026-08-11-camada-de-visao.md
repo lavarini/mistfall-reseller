@@ -586,8 +586,13 @@ def test_devolve_os_doze_slots(listagens):
     assert len(listagens) == 12
 
 def test_vem_em_ordem_de_leitura(listagens):
+    # Lista literal de propósito: comparar com sorted(posicoes) seria
+    # tautológico, porque TODOS_OS_SLOTS já nasce ordenado por construção.
     posicoes = [(l.linha, l.coluna) for l in listagens]
-    assert posicoes == sorted(posicoes)
+    assert posicoes == [
+        (0, 0), (0, 1), (1, 0), (1, 1), (2, 0), (2, 1),
+        (3, 0), (3, 1), (4, 0), (4, 1), (5, 0), (5, 1),
+    ]
 
 def test_encontra_os_sete_itens_alvo(listagens):
     achados = {l.item for l in listagens if l.item is not None}
