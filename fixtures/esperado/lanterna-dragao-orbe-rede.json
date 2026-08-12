@@ -10,7 +10,8 @@
       "linha": 0,
       "coluna": 1,
       "item": null,
-      "preco_unitario": 293
+      "preco_unitario": 223,
+      "ocr_lido_atual": 293
     },
     {
       "linha": 1,

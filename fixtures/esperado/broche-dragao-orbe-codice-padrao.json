@@ -22,13 +22,15 @@
       "linha": 1,
       "coluna": 1,
       "item": null,
-      "preco_unitario": null
+      "preco_unitario": 237,
+      "ocr_lido_atual": null
     },
     {
       "linha": 2,
       "coluna": 0,
       "item": null,
-      "preco_unitario": 24
+      "preco_unitario": 241,
+      "ocr_lido_atual": 24
     },
     {
       "linha": 2,
