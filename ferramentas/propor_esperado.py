@@ -7,6 +7,7 @@ import glob
 import json
 import pathlib
 import cv2
+from mistfall.geometria import conferir_resolucao
 from mistfall.leilao import varrer
 
 def main() -> None:
@@ -14,8 +15,12 @@ def main() -> None:
     destino.mkdir(parents=True, exist_ok=True)
     for caminho in sorted(glob.glob("images/*.png")):
         img = cv2.imread(caminho)
-        if img.shape[:2] != (1440, 2560):
-            print("pulando (resolucao diferente):", caminho)
+        # O contrato de resolucao mora em geometria; nada de repetir o literal
+        # aqui, ainda por cima na convencao invertida (altura, largura).
+        try:
+            conferir_resolucao(img)
+        except ValueError as erro:
+            print("pulando:", caminho, "-", erro)
             continue
         nome = pathlib.Path(caminho).stem
         slots = [

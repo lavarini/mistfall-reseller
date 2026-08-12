@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+from mistfall.geometria import conferir_resolucao
 from mistfall.tipos import EstadoTela
 
 REGIAO_CENTRO = (900, 500, 1700, 950)
@@ -25,6 +26,9 @@ def _dentro_faixa(valor: float, faixa: tuple[float, float]) -> bool:
     return faixa[0] <= valor <= faixa[1]
 
 def identificar_estado(img: np.ndarray) -> EstadoTela:
+    # Resolucao errada e erro, nao DESCONHECIDO: DESCONHECIDO significa "tela
+    # 2560x1440 que nao reconheci", e o guardrail conta essas telas.
+    conferir_resolucao(img)
     centro = _brilho(img, REGIAO_CENTRO)
     menu = _brilho(img, REGIAO_MENU)
 

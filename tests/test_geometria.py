@@ -1,7 +1,8 @@
 import numpy as np
 import pytest
 from mistfall.geometria import (
-    caixa_slot, regiao_icone, recorte_preco, TODOS_OS_SLOTS, RESOLUCAO,
+    caixa_slot, conferir_resolucao, regiao_icone, recorte_preco,
+    TODOS_OS_SLOTS, RESOLUCAO,
 )
 
 def test_existem_doze_slots():
@@ -37,3 +38,15 @@ def test_recorte_rejeita_resolucao_errada():
     img = np.zeros((720, 1280, 3), dtype=np.uint8)
     with pytest.raises(ValueError, match="2560x1440"):
         regiao_icone(img, 0, 0)
+
+def test_conferir_resolucao_aceita_a_resolucao_medida():
+    # Literal escrito a mao: 2560 de largura por 1440 de altura, nessa ordem.
+    conferir_resolucao(np.zeros((1440, 2560, 3), dtype=np.uint8))
+
+@pytest.mark.parametrize("largura,altura", [(3840, 2160), (1920, 1080), (1440, 2560)])
+def test_conferir_resolucao_recusa_qualquer_outra(largura, altura):
+    # (1440, 2560) na lista de proposito: e a resolucao certa com largura e
+    # altura trocadas, e tambem tem de ser recusada.
+    img = np.zeros((altura, largura, 3), dtype=np.uint8)
+    with pytest.raises(ValueError, match=f"recebi {largura}x{altura}"):
+        conferir_resolucao(img)
