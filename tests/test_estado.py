@@ -25,3 +25,18 @@ def test_os_estados_sao_mutuamente_exclusivos():
             continue
         vistos[pathlib.Path(caminho).stem] = identificar_estado(img)
     assert EstadoTela.DESCONHECIDO not in vistos.values(), vistos
+
+def test_imagem_preta_e_desconhecida():
+    import numpy as np
+    img = np.zeros((1440, 2560, 3), dtype=np.uint8)
+    assert identificar_estado(img) is EstadoTela.DESCONHECIDO
+
+def test_imagem_cinza_media_e_desconhecida():
+    import numpy as np
+    img = np.full((1440, 2560, 3), 128, dtype=np.uint8)
+    assert identificar_estado(img) is EstadoTela.DESCONHECIDO
+
+def test_imagem_branca_e_desconhecida():
+    import numpy as np
+    img = np.full((1440, 2560, 3), 255, dtype=np.uint8)
+    assert identificar_estado(img) is EstadoTela.DESCONHECIDO
