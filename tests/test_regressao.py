@@ -3,7 +3,7 @@ import json
 import pathlib
 import cv2
 import pytest
-from mistfall.leilao import varrer
+from mistfall.leilao import varrer, varrer_bruto
 
 CASOS = sorted(glob.glob("fixtures/esperado/*.json"))
 
@@ -75,6 +75,11 @@ def _compara_slots(nome_print, esperado_slots, obtido_slots):
 
 @pytest.mark.parametrize("caminho_json", CASOS, ids=lambda p: pathlib.Path(p).stem)
 def test_deteccao_bate_com_o_corpus_rotulado(caminho_json):
+    # Compara contra varrer_bruto de proposito: o corpus documenta o que o OCR
+    # entrega, sem a conferencia de ordenacao por cima. A conferencia tem testes
+    # proprios (tests/test_ordenacao.py e o teste de corpus logo abaixo); se ela
+    # entrasse aqui, os slots que ela invalida virariam gap de OCR no JSON e o
+    # corpus perderia o registro do que o pipeline de leitura realmente faz.
     nome = pathlib.Path(caminho_json).stem
     esperado = json.loads(pathlib.Path(caminho_json).read_text(encoding="utf-8"))["slots"]
     img = cv2.imread(f"images/{nome}.png")
@@ -85,7 +90,7 @@ def test_deteccao_bate_com_o_corpus_rotulado(caminho_json):
             "item": l.item.value if l.item else None,
             "preco_unitario": l.preco_unitario,
         }
-        for l in varrer(img)
+        for l in varrer_bruto(img)
     ]
 
     erros = _compara_slots(nome, esperado, obtido)
@@ -95,6 +100,73 @@ def test_deteccao_bate_com_o_corpus_rotulado(caminho_json):
 
 def test_o_corpus_nao_esta_vazio():
     assert len(CASOS) >= 7
+
+# Slots cujo Preco-unitario a conferencia de ordenacao derruba em cada print,
+# escritos a mao a partir da leitura crua registrada no corpus. Print que nao
+# aparece aqui sai da conferencia com os doze precos intactos.
+#
+# broche-dragao-orbe-codice: o OCR le 24 em (2,0), onde a verdade e 241. O 24
+#   derruba a si mesmo e tudo que vem antes dele, que e maior.
+# broche-tres-dragao: o OCR le 2892 em (4,0), onde a verdade e 282. O 2892
+#   derruba a si mesmo e tudo que vem depois, que e menor.
+# lanterna-dragao-orbe-rede: o OCR le 293 em (0,1), onde a verdade e 223. Custa
+#   9 dos 12 slots — o preco do custo de nunca comprar caro por leitura errada.
+DERRUBADOS_PELA_ORDENACAO = {
+    "broche-dragao-orbe-codice-padrao": [(0, 0), (0, 1), (1, 0), (2, 0)],
+    "broche-tres-dragao-padrao": [(4, 0), (4, 1), (5, 0), (5, 1)],
+    "lanterna-dragao-orbe-rede": [
+        (0, 1), (1, 0), (1, 1), (2, 0), (2, 1), (3, 0), (3, 1), (4, 0), (4, 1),
+    ],
+}
+
+@pytest.mark.parametrize("caminho_json", CASOS, ids=lambda p: pathlib.Path(p).stem)
+def test_conferencia_de_ordenacao_derruba_exatamente_os_slots_previstos(caminho_json):
+    nome = pathlib.Path(caminho_json).stem
+    img = cv2.imread(f"images/{nome}.png")
+    brutas = {(l.linha, l.coluna): l.preco_unitario for l in varrer_bruto(img)}
+    conferidas = {(l.linha, l.coluna): l.preco_unitario for l in varrer(img)}
+
+    derrubados = sorted(
+        slot
+        for slot, preco in brutas.items()
+        if preco is not None and conferidas[slot] is None
+    )
+    assert derrubados == DERRUBADOS_PELA_ORDENACAO.get(nome, [])
+
+def test_a_verdade_humana_do_corpus_e_nao_decrescente():
+    """A premissa em que a conferencia de ordenacao se apoia.
+
+    Se algum dia um print rotulado a olho sair fora de ordem, a premissa caiu e
+    `conferir_ordenacao` passa a invalidar leitura boa — este teste avisa antes.
+    """
+    for caminho in CASOS:
+        nome = pathlib.Path(caminho).stem
+        slots = json.loads(pathlib.Path(caminho).read_text(encoding="utf-8"))["slots"]
+        verdades = [slot["preco_unitario"] for slot in slots]
+        assert all(v is not None for v in verdades), nome
+        assert verdades == sorted(verdades), (nome, verdades)
+
+def test_slot_com_gap_de_ocr_tem_verdade_humana_propria():
+    """Sem isto, editar a verdade de um slot com gap nao quebra teste nenhum.
+
+    Em slot com `ocr_lido_atual` o teste de regressao compara o obtido contra a
+    leitura falha, e o `preco_unitario` (a verdade humana) fica sem afirmacao.
+    """
+    conferidos = 0
+    for caminho in CASOS:
+        nome = pathlib.Path(caminho).stem
+        slots = json.loads(pathlib.Path(caminho).read_text(encoding="utf-8"))["slots"]
+        for slot in slots:
+            if "ocr_lido_atual" not in slot:
+                continue
+            conferidos += 1
+            onde = f"{nome} ({slot['linha']},{slot['coluna']})"
+            verdade = slot["preco_unitario"]
+            assert isinstance(verdade, int), onde
+            assert verdade > 0, onde
+            # Se fossem iguais nao haveria gap nenhum a registrar.
+            assert verdade != slot["ocr_lido_atual"], onde
+    assert conferidos == 5
 
 def test_corpus_tem_gaps_conhecidos_de_ocr():
     """Afirma quantos slots carregam falha de OCR conhecida.
