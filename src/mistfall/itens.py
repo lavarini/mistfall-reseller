@@ -5,7 +5,9 @@ import numpy as np
 from mistfall.tipos import ItemAlvo
 
 LIMIAR = 0.70
-_PASTA = pathlib.Path("templates")
+# Resolvida a partir do arquivo, nunca do diretorio corrente: a camada de visao
+# e importada por ferramentas e pelo loop, que nao rodam necessariamente da raiz.
+_PASTA = pathlib.Path(__file__).resolve().parents[2] / "templates"
 
 @functools.cache
 def _templates() -> dict[ItemAlvo, np.ndarray]:

@@ -1,5 +1,6 @@
 import cv2
 import pytest
+import mistfall.itens as itens_mod
 from mistfall.geometria import TODOS_OS_SLOTS, regiao_icone
 from mistfall.itens import identificar_item, pontuar
 from mistfall.tipos import ItemAlvo
@@ -56,6 +57,16 @@ def test_acha_os_sete_itens_alvo_no_outro_print(outro):
         for slot in TODOS_OS_SLOTS
     }
     assert {s: i for s, i in achados.items() if i} == ALVOS_OUTRO
+
+def test_acha_os_templates_rodando_de_outro_diretorio(fonte, monkeypatch, tmp_path):
+    # A pasta templates/ nao pode depender do diretorio corrente: ferramentas e
+    # o loop importam esta camada de outros lugares.
+    itens_mod._templates.cache_clear()
+    monkeypatch.chdir(tmp_path)
+    try:
+        assert identificar_item(regiao_icone(fonte, 0, 0)) is ItemAlvo.BROCHE
+    finally:
+        itens_mod._templates.cache_clear()
 
 def test_margem_sobre_o_segundo_colocado_e_folgada(outro):
     for slot in ALVOS_OUTRO:
