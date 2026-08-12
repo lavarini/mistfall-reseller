@@ -1,0 +1,10 @@
+fracao_sanidade = 0.25
+
+[precos_alvo]
+broche = 188
+adaga = 199
+lanterna = 234
+dragao = 246
+orbe = 253
+rede = 260
+codice = 281
