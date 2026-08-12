@@ -11,22 +11,36 @@ def _compara_slots(nome_print, esperado_slots, obtido_slots):
     """Compara slots respeitando gaps conhecidos de OCR (ocr_lido_atual).
 
     Retorna lista de erros encontrados, ou lista vazia se tudo bater.
-    Cada erro é uma tupla (print, slot, mensagem).
+    Cada erro é uma tupla (print, slot_id, mensagem).
     """
     erros = []
 
     if len(obtido_slots) != len(esperado_slots):
         erros.append((
             nome_print,
-            None,
-            f"quantidade de slots diferente: esperado {len(esperado_slots)}, obtido {len(obtido_slots)}"
+            "[contagem desalinhada]",
+            f"corpus e varredura divergem em contagem: esperado {len(esperado_slots)} slots, obtido {len(obtido_slots)}"
         ))
         return erros
 
-    for idx, (obtido, esperado) in enumerate(zip(obtido_slots, esperado_slots)):
-        linha = esperado.get("linha")
-        coluna = esperado.get("coluna")
-        slot_id = f"({linha},{coluna})"
+    for obtido, esperado in zip(obtido_slots, esperado_slots):
+        linha_esp = esperado.get("linha")
+        coluna_esp = esperado.get("coluna")
+        slot_id = f"({linha_esp},{coluna_esp})"
+
+        # Comparar posição (linha/coluna) antes de qualquer outro campo.
+        # Se divergir, o corpus está desalinhado com a varredura — erro crítico.
+        linha_obt = obtido.get("linha")
+        coluna_obt = obtido.get("coluna")
+        if linha_obt != linha_esp or coluna_obt != coluna_esp:
+            erros.append((
+                nome_print,
+                slot_id,
+                f"corpus desalinhado: esperado slot ({linha_esp},{coluna_esp}), "
+                f"mas varredura forneceu ({linha_obt},{coluna_obt}) nesta posição"
+            ))
+            # Continua verificando, pois há outras falhas neste mesmo slot
+            continue
 
         # Item é sempre comparado exato — nenhuma exceção
         if obtido.get("item") != esperado.get("item"):
