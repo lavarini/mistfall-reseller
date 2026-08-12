@@ -67,7 +67,7 @@ Serve de conferência dos **Preços-alvo**, nunca do conteúdo dos slots — o r
 | 5,0 | Códice do Bosque Santo | sim | 295 |
 | 5,1 | Minério de Obsidiana | não | 388 |
 
-**Atenção:** o nome dos arquivos de print **não** descreve o conteúdo de forma confiável. Este arquivo tem *um* Broche, apesar do `broche-tres` no nome. Nunca derivar expectativa de nome de arquivo.
+**Atenção:** o nome do arquivo descreve distância até o corte, **não** o conteúdo dos slots (ver seção acima). Este arquivo tem *um* Broche, apesar do `broche-tres` no nome — `tres` significa 3 ouros acima do corte. Nunca derivar expectativa de slot a partir do nome.
 
 ## Estrutura de arquivos
 
@@ -1064,9 +1064,11 @@ conteudo de forma confiavel, entao o rotulo precisa ser explicito."
 
 **Interfaces:**
 - Consumes: nada além de OpenCV/pytesseract
-- Produces: `ler_ouro(img: np.ndarray) -> int | None`; `CAIXA_OURO = (1830, 125, 1990, 165)`
+- Produces: `ler_ouro(img: np.ndarray) -> int | None`; `CAIXA_OURO = (2350, 119, 2475, 160)`
 
-O Ouro fica no topo direito do Leilão. No print de referência vale **64735**, exibido como `64,735` — a vírgula precisa ser descartada, e por isso o whitelist inclui a vírgula e ela é removida depois.
+O Ouro fica no topo direito do Leilão, exibido como `64,735` — a vírgula entra no whitelist e é removida depois.
+
+`CAIXA_OURO` **já foi medida e validada** nos nove prints em que o Ouro é legível; não re-derivar. Com a Janela de Confirmação aberta o modal escurece a tela e a leitura devolve `None` — comportamento correto, porque o Ouro é lido com a lista visível.
 
 - [ ] **Step 1: Escrever o teste que falha**
 
@@ -1079,10 +1081,23 @@ from mistfall.ouro import ler_ouro
 
 @pytest.mark.parametrize(
     "nome,esperado",
-    [("broche-tres-adaga-lanterna-rede-padrao", 64735)],
+    [
+        ("broche-tres-adaga-lanterna-rede-padrao", 64735),
+        ("adaga-tres-broche-dois-lanterna-rede-padrao", 64735),
+        ("broche-dragao-orbe-codice-padrao", 66160),
+        ("dragao-um-rede-padrao", 65234),
+        ("lanterna-dragao-orbe-rede", 65972),
+        ("reset-forja", 64735),
+        ("reset-chave", 64735),
+    ],
 )
 def test_le_o_ouro_do_topo_direito(nome, esperado):
     assert ler_ouro(cv2.imread(f"images/{nome}.png")) == esperado
+
+def test_com_a_janela_de_confirmacao_aberta_o_ouro_fica_ilegivel():
+    # O modal escurece a tela. Devolver None e correto: o Ouro e lido
+    # com a lista visivel, nunca por cima da Janela de Confirmacao.
+    assert ler_ouro(cv2.imread("images/janela.png")) is None
 ```
 
 - [ ] **Step 2: Rodar e confirmar que falha**
@@ -1090,28 +1105,15 @@ def test_le_o_ouro_do_topo_direito(nome, esperado):
 Run: `.venv/bin/python -m pytest tests/test_ouro.py -v`
 Expected: FAIL com `ModuleNotFoundError: No module named 'mistfall.ouro'`
 
-- [ ] **Step 3: Calibrar a caixa do Ouro**
-
-A caixa abaixo é um ponto de partida derivado da posição do número no print. Ajuste-a até o recorte conter só os dígitos:
-
-```bash
-.venv/bin/python - <<'PY'
-import cv2
-img = cv2.imread("images/broche-tres-adaga-lanterna-rede-padrao.png")
-x0, y0, x1, y1 = 1830, 125, 1990, 165
-cv2.imwrite("/tmp/ouro.png", img[y0:y1, x0:x1])
-PY
-open /tmp/ouro.png
-```
-
-- [ ] **Step 4: Implementar ouro.py**
+- [ ] **Step 3: Implementar ouro.py**
 
 ```python
 import cv2
 import numpy as np
 import pytesseract
 
-CAIXA_OURO = (1830, 125, 1990, 165)
+# Medida e validada nos nove prints em que o Ouro e legivel.
+CAIXA_OURO = (2350, 119, 2475, 160)
 _CONFIG = "--psm 7 -c tessedit_char_whitelist=0123456789,"
 
 def ler_ouro(img: np.ndarray) -> int | None:
@@ -1123,12 +1125,12 @@ def ler_ouro(img: np.ndarray) -> int | None:
     return int(texto) if texto.isdigit() else None
 ```
 
-- [ ] **Step 5: Rodar e confirmar que passa**
+- [ ] **Step 4: Rodar e confirmar que passa**
 
 Run: `.venv/bin/python -m pytest tests/test_ouro.py -v`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add src/mistfall/ouro.py tests/test_ouro.py
