@@ -69,6 +69,37 @@ def test_acha_os_templates_rodando_de_outro_diretorio(fonte, monkeypatch, tmp_pa
         itens_mod._templates.cache_clear()
 
 def test_margem_sobre_o_segundo_colocado_e_folgada(outro):
+    # 0.30 escrito a mao, nao importado de itens: medindo os 49 slots de
+    # Item-alvo dos 7 prints de Leilao, a pior margem real e 0.383.
     for slot in ALVOS_OUTRO:
         ranking = sorted(pontuar(regiao_icone(outro, *slot)).values(), reverse=True)
-        assert ranking[0] - ranking[1] > 0.20, slot
+        assert ranking[0] - ranking[1] > 0.30, slot
+
+# images/janela.png nao e lista utilizavel: a Janela de Confirmacao cobre o
+# Leilao e o que sobra por tras dos vidros do modal produz scores altos por
+# acidente. Sao os piores casos conhecidos de identificacao.
+JANELA = "images/janela.png"
+
+@pytest.fixture(scope="module")
+def modal():
+    return cv2.imread(JANELA)
+
+@pytest.mark.parametrize(
+    "slot,melhor,segundo",
+    [
+        # slot, score do primeiro, score do segundo colocado (medidos)
+        ((3, 0), 0.7411, 0.6459),  # dragao vs codice — margem 0.0952
+        ((0, 0), 0.7378, 0.5379),  # broche vs lanterna — margem 0.1999
+    ],
+)
+def test_recusa_quando_o_segundo_colocado_esta_colado(modal, slot, melhor, segundo):
+    # Ambos passavam do limiar absoluto de 0.70 e viravam Item-alvo. Confundir
+    # Broche (alvo 188) com Codice (alvo 281) faria o bot pagar 275 achando que
+    # comprou barato — overpay de 46% com o preco lido corretamente.
+    assert identificar_item(regiao_icone(modal, *slot)) is None
+
+def test_a_margem_exigida_nao_derruba_nenhum_item_alvo_de_verdade(fonte, outro):
+    # Contrapeso do teste acima: apertar a margem nao pode custar deteccao real.
+    for img, alvos in ((fonte, ALVOS_FONTE), (outro, ALVOS_OUTRO)):
+        for slot, item in alvos.items():
+            assert identificar_item(regiao_icone(img, *slot)) is item, slot
