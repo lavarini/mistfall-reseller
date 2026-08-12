@@ -67,7 +67,7 @@ Serve de conferência dos **Preços-alvo**, nunca do conteúdo dos slots — o r
 | 5,0 | Códice do Bosque Santo | sim | 295 |
 | 5,1 | Minério de Obsidiana | não | 388 |
 
-**Atenção:** o nome dos arquivos de print **não** descreve o conteúdo de forma confiável. Este arquivo tem *um* Broche, apesar do `broche-tres` no nome. Nunca derivar expectativa de nome de arquivo.
+**Atenção:** o nome do arquivo descreve distância até o corte, **não** o conteúdo dos slots (ver seção acima). Este arquivo tem *um* Broche, apesar do `broche-tres` no nome — `tres` significa 3 ouros acima do corte. Nunca derivar expectativa de slot a partir do nome.
 
 ## Estrutura de arquivos
 
@@ -586,8 +586,13 @@ def test_devolve_os_doze_slots(listagens):
     assert len(listagens) == 12
 
 def test_vem_em_ordem_de_leitura(listagens):
+    # Lista literal de propósito: comparar com sorted(posicoes) seria
+    # tautológico, porque TODOS_OS_SLOTS já nasce ordenado por construção.
     posicoes = [(l.linha, l.coluna) for l in listagens]
-    assert posicoes == sorted(posicoes)
+    assert posicoes == [
+        (0, 0), (0, 1), (1, 0), (1, 1), (2, 0), (2, 1),
+        (3, 0), (3, 1), (4, 0), (4, 1), (5, 0), (5, 1),
+    ]
 
 def test_encontra_os_sete_itens_alvo(listagens):
     achados = {l.item for l in listagens if l.item is not None}
@@ -1064,9 +1069,11 @@ conteudo de forma confiavel, entao o rotulo precisa ser explicito."
 
 **Interfaces:**
 - Consumes: nada além de OpenCV/pytesseract
-- Produces: `ler_ouro(img: np.ndarray) -> int | None`; `CAIXA_OURO = (1830, 125, 1990, 165)`
+- Produces: `ler_ouro(img: np.ndarray) -> int | None`; `CAIXA_OURO = (2350, 119, 2475, 160)`
 
-O Ouro fica no topo direito do Leilão. No print de referência vale **64735**, exibido como `64,735` — a vírgula precisa ser descartada, e por isso o whitelist inclui a vírgula e ela é removida depois.
+O Ouro fica no topo direito do Leilão, exibido como `64,735` — a vírgula entra no whitelist e é removida depois.
+
+`CAIXA_OURO` **já foi medida e validada** nos nove prints em que o Ouro é legível; não re-derivar. Com a Janela de Confirmação aberta o modal escurece a tela e a leitura devolve `None` — comportamento correto, porque o Ouro é lido com a lista visível.
 
 - [ ] **Step 1: Escrever o teste que falha**
 
@@ -1079,10 +1086,23 @@ from mistfall.ouro import ler_ouro
 
 @pytest.mark.parametrize(
     "nome,esperado",
-    [("broche-tres-adaga-lanterna-rede-padrao", 64735)],
+    [
+        ("broche-tres-adaga-lanterna-rede-padrao", 64735),
+        ("adaga-tres-broche-dois-lanterna-rede-padrao", 64735),
+        ("broche-dragao-orbe-codice-padrao", 66160),
+        ("dragao-um-rede-padrao", 65234),
+        ("lanterna-dragao-orbe-rede", 65972),
+        ("reset-forja", 64735),
+        ("reset-chave", 64735),
+    ],
 )
 def test_le_o_ouro_do_topo_direito(nome, esperado):
     assert ler_ouro(cv2.imread(f"images/{nome}.png")) == esperado
+
+def test_com_a_janela_de_confirmacao_aberta_o_ouro_fica_ilegivel():
+    # O modal escurece a tela. Devolver None e correto: o Ouro e lido
+    # com a lista visivel, nunca por cima da Janela de Confirmacao.
+    assert ler_ouro(cv2.imread("images/janela.png")) is None
 ```
 
 - [ ] **Step 2: Rodar e confirmar que falha**
@@ -1090,28 +1110,15 @@ def test_le_o_ouro_do_topo_direito(nome, esperado):
 Run: `.venv/bin/python -m pytest tests/test_ouro.py -v`
 Expected: FAIL com `ModuleNotFoundError: No module named 'mistfall.ouro'`
 
-- [ ] **Step 3: Calibrar a caixa do Ouro**
-
-A caixa abaixo é um ponto de partida derivado da posição do número no print. Ajuste-a até o recorte conter só os dígitos:
-
-```bash
-.venv/bin/python - <<'PY'
-import cv2
-img = cv2.imread("images/broche-tres-adaga-lanterna-rede-padrao.png")
-x0, y0, x1, y1 = 1830, 125, 1990, 165
-cv2.imwrite("/tmp/ouro.png", img[y0:y1, x0:x1])
-PY
-open /tmp/ouro.png
-```
-
-- [ ] **Step 4: Implementar ouro.py**
+- [ ] **Step 3: Implementar ouro.py**
 
 ```python
 import cv2
 import numpy as np
 import pytesseract
 
-CAIXA_OURO = (1830, 125, 1990, 165)
+# Medida e validada nos nove prints em que o Ouro e legivel.
+CAIXA_OURO = (2350, 119, 2475, 160)
 _CONFIG = "--psm 7 -c tessedit_char_whitelist=0123456789,"
 
 def ler_ouro(img: np.ndarray) -> int | None:
@@ -1123,12 +1130,12 @@ def ler_ouro(img: np.ndarray) -> int | None:
     return int(texto) if texto.isdigit() else None
 ```
 
-- [ ] **Step 5: Rodar e confirmar que passa**
+- [ ] **Step 4: Rodar e confirmar que passa**
 
 Run: `.venv/bin/python -m pytest tests/test_ouro.py -v`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add src/mistfall/ouro.py tests/test_ouro.py
@@ -1148,7 +1155,11 @@ insumo do piso de Ouro dos guardrails."
 
 **Interfaces:**
 - Consumes: `EstadoTela` (Task 1), `ler_ouro` (Task 8)
-- Produces: `identificar_estado(img: np.ndarray) -> EstadoTela`; `categoria_selecionada(img) -> str | None`
+- Produces: `identificar_estado(img: np.ndarray) -> EstadoTela`
+
+Uma versão anterior deste plano também prometia `categoria_selecionada(img) -> str | None`. Foi **removida**: nenhum step a construía e ela não tem consumidor. O Reset só precisa saber "estou em Material de Construção?", que `identificar_estado` já responde via `OUTRA_CATEGORIA`; ler o **nome** da Categoria exigiria OCR de fonte estilizada, que o ADR-0002 rejeita.
+
+**O fallback é `DESCONHECIDO`, não `LISTA`.** Cada estado exige evidência positiva; o que não casar com nenhuma faixa é desconhecido. Uma versão anterior devolvia `LISTA` como `else` final, o que fazia qualquer tela imprevista (popup, loading, reconexão) passar por lista utilizável e deixava `EstadoTela.DESCONHECIDO` inalcançável — quebrando, silenciosamente, o guardrail de "parar após três telas irreconhecíveis" que a spec exige. A Janela também exige evidência positiva no menu, senão uma tela preta seria classificada como Janela de Confirmação e o bot apertaria Espaço no escuro.
 
 Prints de referência: `janela.png` é a Janela de Confirmação aberta; `reset-forja.png` e `reset-chave.png` estão em outra Categoria; os demais são a lista utilizável.
 
@@ -1193,6 +1204,14 @@ Expected: FAIL com `ModuleNotFoundError: No module named 'mistfall.estado'`
 
 - [ ] **Step 3: Implementar estado.py**
 
+> **Corrigido depois do review final.** `REGIAO_MENU = (80, 380, 360, 720)` e as bandas
+> desta seção **estão obsoletas** — a região tinha 340 linhas com todo o sinal nas 60 de
+> baixo, então media "existe alguma linha destacada aqui", não "qual Categoria está
+> selecionada": bastava o destaque cair numa linha vizinha para dar falso `LISTA`. A região
+> foi encolhida para a linha de Material de Construção, `(80, 664, 360, 732)`, e as bandas
+> re-derivadas medindo os dez prints. Os números medidos estão em `src/mistfall/estado.py`.
+> O "não re-derivar" abaixo vale para o resto, não para o menu.
+
 Os limiares abaixo **já foram medidos** contra os dez prints; não re-derivar. Brilho médio de duas regiões:
 
 | Print | centro | menu |
@@ -1211,21 +1230,31 @@ from mistfall.tipos import EstadoTela
 REGIAO_JANELA = (900, 500, 1700, 950)
 REGIAO_MENU = (80, 380, 360, 720)
 
-# Janela de Confirmacao escurece o centro: 4.9 contra 11.5-13.3 do resto.
-LIMIAR_JANELA = 8.0
-# Material de Construcao selecionada da 37.1; outra Categoria da 32.9.
-LIMIAR_MENU = 35.0
+# Faixas medidas nos dez prints. Cada estado exige evidencia positiva;
+# o que nao casar com nenhuma faixa e DESCONHECIDO, nunca LISTA.
+CENTRO_JANELA_MAX = 8.0              # janela mede 4.9; lista e reset, 11.5-13.3
+MENU_JANELA = (12.0, 25.0)           # janela mede 18.3
+CENTRO_LISTA = (9.0, 18.0)           # lista e reset medem 11.5-13.3
+MENU_MATERIAL = (35.0, 40.0)         # Material de Construcao mede 37.1
+MENU_OUTRA_CATEGORIA = (28.0, 35.0)  # outra Categoria mede 32.9
 
 def _brilho(img: np.ndarray, regiao: tuple[int, int, int, int]) -> float:
     x0, y0, x1, y1 = regiao
     return float(cv2.cvtColor(img[y0:y1, x0:x1], cv2.COLOR_BGR2GRAY).mean())
 
+def _dentro(valor: float, faixa: tuple[float, float]) -> bool:
+    return faixa[0] <= valor <= faixa[1]
+
 def identificar_estado(img: np.ndarray) -> EstadoTela:
-    if _brilho(img, REGIAO_JANELA) < LIMIAR_JANELA:
+    centro = _brilho(img, REGIAO_JANELA)
+    menu = _brilho(img, REGIAO_MENU)
+    if centro < CENTRO_JANELA_MAX and _dentro(menu, MENU_JANELA):
         return EstadoTela.JANELA_CONFIRMACAO
-    if _brilho(img, REGIAO_MENU) < LIMIAR_MENU:
+    if _dentro(centro, CENTRO_LISTA) and _dentro(menu, MENU_MATERIAL):
+        return EstadoTela.LISTA
+    if _dentro(centro, CENTRO_LISTA) and _dentro(menu, MENU_OUTRA_CATEGORIA):
         return EstadoTela.OUTRA_CATEGORIA
-    return EstadoTela.LISTA
+    return EstadoTela.DESCONHECIDO
 ```
 
 - [ ] **Step 4: Rodar e confirmar que passa**

@@ -1,0 +1,77 @@
+{
+  "slots": [
+    {
+      "linha": 0,
+      "coluna": 0,
+      "item": "broche",
+      "preco_unitario": 191
+    },
+    {
+      "linha": 0,
+      "coluna": 1,
+      "item": null,
+      "preco_unitario": 234
+    },
+    {
+      "linha": 1,
+      "coluna": 0,
+      "item": "adaga",
+      "preco_unitario": 239
+    },
+    {
+      "linha": 1,
+      "coluna": 1,
+      "item": null,
+      "preco_unitario": 239
+    },
+    {
+      "linha": 2,
+      "coluna": 0,
+      "item": null,
+      "preco_unitario": 245
+    },
+    {
+      "linha": 2,
+      "coluna": 1,
+      "item": "dragao",
+      "preco_unitario": 246
+    },
+    {
+      "linha": 3,
+      "coluna": 0,
+      "item": "rede",
+      "preco_unitario": 274
+    },
+    {
+      "linha": 3,
+      "coluna": 1,
+      "item": "lanterna",
+      "preco_unitario": 281
+    },
+    {
+      "linha": 4,
+      "coluna": 0,
+      "item": null,
+      "preco_unitario": 282,
+      "ocr_lido_atual": 2892
+    },
+    {
+      "linha": 4,
+      "coluna": 1,
+      "item": "orbe",
+      "preco_unitario": 305
+    },
+    {
+      "linha": 5,
+      "coluna": 0,
+      "item": "codice",
+      "preco_unitario": 318
+    },
+    {
+      "linha": 5,
+      "coluna": 1,
+      "item": null,
+      "preco_unitario": 371
+    }
+  ]
+}

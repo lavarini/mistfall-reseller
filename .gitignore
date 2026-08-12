@@ -16,6 +16,9 @@ venv/
 # Config pessoal do Claude Code (settings.json e versionado)
 .claude/settings.local.json
 
+# Scratch de execucao de planos (ledger, briefs, review packages)
+.superpowers/
+
 # Saída do bot (log de Compras, capturas de depuração)
 *.log
 /out/
