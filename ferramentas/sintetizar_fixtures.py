@@ -13,6 +13,7 @@ from mistfall.janela import (
     ICONE_JANELA_REL,
     PRECO_TOTAL_REL,
     PRECO_UNITARIO_REL,
+    QUANTIDADE_REL,
 )
 from mistfall.ouro import CAIXA_OURO
 
@@ -52,10 +53,59 @@ def lista_com_ouro_debitado() -> None:
     cv2.imwrite(str(DESTINO / "lista-ouro-65914.png"), img)
 
 
+def janela_com_dragao_a_999() -> None:
+    # Item bate (Dragao), Preco diverge (999 contra os 246 decididos).
+    # Isola a conferencia de Preco Unitario.
+    img = cv2.imread(FONTE_JANELA)
+    template = cv2.imread("templates/dragao.png")
+    x0, y0, x1, y1 = ICONE_JANELA_REL
+    alvo = img[y0:y1, x0:x1]
+    dy = (alvo.shape[0] - template.shape[0]) // 2
+    dx = (alvo.shape[1] - template.shape[1]) // 2
+    alvo[dy:dy + template.shape[0], dx:dx + template.shape[1]] = template
+    _escrever_numero(img, PRECO_UNITARIO_REL, "999")
+    _escrever_numero(img, PRECO_TOTAL_REL, "999")
+    cv2.imwrite(str(DESTINO / "janela-dragao-999.png"), img)
+
+
+def janela_com_dragao_a_246_qtd_5() -> None:
+    # Item e Preco Unitario batem, Quantidade diverge (5 em vez de 1).
+    # Isola a conferencia de Quantidade.
+    img = cv2.imread(FONTE_JANELA)
+    template = cv2.imread("templates/dragao.png")
+    x0, y0, x1, y1 = ICONE_JANELA_REL
+    alvo = img[y0:y1, x0:x1]
+    dy = (alvo.shape[0] - template.shape[0]) // 2
+    dx = (alvo.shape[1] - template.shape[1]) // 2
+    alvo[dy:dy + template.shape[0], dx:dx + template.shape[1]] = template
+    _escrever_numero(img, PRECO_UNITARIO_REL, "246")
+    _escrever_numero(img, QUANTIDADE_REL, "5")
+    _escrever_numero(img, PRECO_TOTAL_REL, "1230")
+    cv2.imwrite(str(DESTINO / "janela-dragao-246-qtd-5.png"), img)
+
+
+def janela_com_orbe_a_246() -> None:
+    # Preco bate (246), Item diverge (Orbe em vez do Dragao decidido).
+    # Isola a conferencia de Item.
+    img = cv2.imread(FONTE_JANELA)
+    template = cv2.imread("templates/orbe.png")
+    x0, y0, x1, y1 = ICONE_JANELA_REL
+    alvo = img[y0:y1, x0:x1]
+    dy = (alvo.shape[0] - template.shape[0]) // 2
+    dx = (alvo.shape[1] - template.shape[1]) // 2
+    alvo[dy:dy + template.shape[0], dx:dx + template.shape[1]] = template
+    _escrever_numero(img, PRECO_UNITARIO_REL, "246")
+    _escrever_numero(img, PRECO_TOTAL_REL, "246")
+    cv2.imwrite(str(DESTINO / "janela-orbe-246.png"), img)
+
+
 def main() -> None:
     DESTINO.mkdir(parents=True, exist_ok=True)
     janela_com_dragao_a_246()
     lista_com_ouro_debitado()
+    janela_com_dragao_a_999()
+    janela_com_dragao_a_246_qtd_5()
+    janela_com_orbe_a_246()
     print("gerados em", DESTINO)
 
 

@@ -66,6 +66,7 @@ def test_item_divergente_aperta_esc_e_nunca_espaco(tmp_path):
     assert r.desfecho is Desfecho.ABORTOU
     assert "apertar_espaco" not in nomes
     assert nomes[-1] == "apertar_esc"
+    assert "modal mostra" in r.motivo
 
 def test_janela_que_nao_abre_aborta_sem_apertar_nada(tmp_path):
     # A tela nunca vira modal: fica na lista.
@@ -105,6 +106,40 @@ def test_modo_simulado_nao_toca_em_nada(tmp_path):
 def test_todo_aborto_salva_relatorio(tmp_path):
     executar(TelaFalsa([RESET]), MaoFalsa(), cfg(), tmp_path, ritmo=JA)
     assert (tmp_path / "relatorio.json").exists()
+
+JANELA_DRAGAO_999 = "fixtures/sinteticas/janela-dragao-999.png"
+JANELA_DRAGAO_QTD_5 = "fixtures/sinteticas/janela-dragao-246-qtd-5.png"
+JANELA_ORBE_246 = "fixtures/sinteticas/janela-orbe-246.png"
+
+def test_preco_divergente_isolado_aperta_esc_e_nunca_espaco(tmp_path):
+    # Item bate (Dragao), so o Preco Unitario diverge (999 contra 246).
+    mao = MaoFalsa()
+    r = executar(TelaFalsa([LISTA, JANELA_DRAGAO_999]), mao, cfg(), tmp_path, ritmo=JA)
+    nomes = [a[0] for a in mao.acoes]
+    assert r.desfecho is Desfecho.ABORTOU
+    assert "apertar_espaco" not in nomes
+    assert "apertar_esc" in nomes
+    assert "modal cobra" in r.motivo
+
+def test_quantidade_divergente_isolada_aperta_esc_e_nunca_espaco(tmp_path):
+    # Item e Preco Unitario batem, so a Quantidade diverge (5 em vez de 1).
+    mao = MaoFalsa()
+    r = executar(TelaFalsa([LISTA, JANELA_DRAGAO_QTD_5]), mao, cfg(), tmp_path, ritmo=JA)
+    nomes = [a[0] for a in mao.acoes]
+    assert r.desfecho is Desfecho.ABORTOU
+    assert "apertar_espaco" not in nomes
+    assert "apertar_esc" in nomes
+    assert "Quantidade e" in r.motivo
+
+def test_item_divergente_isolado_aperta_esc_e_nunca_espaco(tmp_path):
+    # Preco Unitario bate (246), so o Item diverge (Orbe em vez de Dragao).
+    mao = MaoFalsa()
+    r = executar(TelaFalsa([LISTA, JANELA_ORBE_246]), mao, cfg(), tmp_path, ritmo=JA)
+    nomes = [a[0] for a in mao.acoes]
+    assert r.desfecho is Desfecho.ABORTOU
+    assert "apertar_espaco" not in nomes
+    assert "apertar_esc" in nomes
+    assert "modal mostra" in r.motivo
 
 def test_ouro_que_cai_valor_inesperado_e_reportado(tmp_path):
     # Depois do Espaco a tela mostra um print real cujo Ouro e 64735, nao
