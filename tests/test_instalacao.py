@@ -25,3 +25,13 @@ def test_templates_sao_encontrados_de_fora_da_raiz(tmp_path):
     )
     assert r.returncode == 0, r.stderr
     assert r.stdout.strip() == "7"
+
+def test_piloto_cli_importa_de_fora_da_raiz(tmp_path):
+    # ferramentas/ tem de estar empacotado junto com mistfall/, senao o
+    # comando mistfall-piloto quebra assim que instalado fora do repositorio
+    # (que e exatamente onde ele vai rodar, numa maquina Windows qualquer).
+    r = subprocess.run(
+        [sys.executable, "-c", "import ferramentas.piloto_cli"],
+        cwd=tmp_path, capture_output=True, text=True, env=_ambiente_limpo(),
+    )
+    assert r.returncode == 0, r.stderr
