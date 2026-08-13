@@ -61,7 +61,7 @@ Isso é aceitável porque os frames sintéticos testam a **orquestração**, nã
 | `src/mistfall/perifericos/protocolos.py` | `Tela` e `Mao` |
 | `src/mistfall/perifericos/falso.py` | `TelaFalsa`, `MaoFalsa` |
 | `src/mistfall/perifericos/windows.py` | Único arquivo específico de Windows; sem lógica |
-| `src/mistfall/piloto.py` | `Resultado`, `Desfecho`, `executar` |
+| `src/mistfall/piloto.py` | `Resultado`, `Desfecho`, `Ritmo`, `executar` |
 | `ferramentas/piloto_cli.py` | Linha de comando |
 | `ferramentas/sintetizar_fixtures.py` | Gera os PNGs sintéticos do caminho feliz |
 | `fixtures/sinteticas/*.png` | Frames sintéticos, versionados |
@@ -611,7 +611,7 @@ provado contra janela.png e os sete prints de lista."
 
 **Interfaces:**
 - Consumes: `Tela`, `Mao`; `varrer`; `escolher`; `Config`; `identificar_estado`, `EstadoTela`; `ler_ouro`; `caixa_slot`; as quatro funções de `janela`
-- Produces: `Desfecho` (Enum: `COMPROU, NADA_COMPRAVEL, ABORTOU`); `Resultado` (dataclass); `executar(tela, mao, config, pasta, simular=False) -> Resultado`
+- Produces: `Desfecho` (Enum: `COMPROU, NADA_COMPRAVEL, ABORTOU`); `Resultado` (dataclass); `Ritmo` (dataclass frozen, com `Ritmo.instantaneo()`); `RITMO_PADRAO`; `executar(tela, mao, config, pasta, simular=False, ritmo=RITMO_PADRAO) -> Resultado`
 
 - [ ] **Step 1: Escrever o teste que falha**
 
@@ -620,7 +620,7 @@ provado contra janela.png e os sete prints de lista."
 ```python
 from mistfall.config import Config
 from mistfall.perifericos.falso import MaoFalsa, TelaFalsa
-from mistfall.piloto import Desfecho, executar
+from mistfall.piloto import Desfecho, Ritmo, executar
 from mistfall.tipos import ItemAlvo
 
 LISTA = "images/broche-dragao-orbe-codice-padrao.png"
@@ -641,31 +641,34 @@ def roteiro_feliz():
     # pre-voo, apos o clique (modal), apos o Espaco (lista com Ouro debitado)
     return TelaFalsa([LISTA, JANELA_DRAGAO, LISTA_DEBITADA])
 
+
+JA = Ritmo.instantaneo()  # nenhum teste espera de verdade
+
 def test_caminho_feliz_compra(tmp_path):
     mao = MaoFalsa()
-    r = executar(roteiro_feliz(), mao, cfg(), tmp_path)
+    r = executar(roteiro_feliz(), mao, cfg(), tmp_path, ritmo=JA)
     assert r.desfecho is Desfecho.COMPROU
 
 def test_caminho_feliz_clica_no_slot_certo(tmp_path):
     mao = MaoFalsa()
-    executar(roteiro_feliz(), mao, cfg(), tmp_path)
+    executar(roteiro_feliz(), mao, cfg(), tmp_path, ritmo=JA)
     assert mao.acoes[0] == ("clicar", 1975, 721)
 
 def test_caminho_feliz_aperta_espaco_e_nunca_esc(tmp_path):
     mao = MaoFalsa()
-    executar(roteiro_feliz(), mao, cfg(), tmp_path)
+    executar(roteiro_feliz(), mao, cfg(), tmp_path, ritmo=JA)
     nomes = [a[0] for a in mao.acoes]
     assert nomes == ["clicar", "apertar_espaco"]
 
 def test_caminho_feliz_registra_os_numeros(tmp_path):
-    r = executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path)
+    r = executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, ritmo=JA)
     assert r.ouro_antes == 66160
     assert r.ouro_depois == 65914
     assert r.preco_total_esperado == 246
     assert r.listagem.item is ItemAlvo.DRAGAO
 
 def test_caminho_feliz_salva_os_prints(tmp_path):
-    executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path)
+    executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, ritmo=JA)
     assert len(list(tmp_path.glob("*.png"))) >= 3
     assert (tmp_path / "relatorio.json").exists()
 ```
@@ -709,11 +712,35 @@ from mistfall.ouro import ler_ouro
 from mistfall.perifericos.protocolos import Mao, Tela
 from mistfall.tipos import EstadoTela, Listagem
 
-PAUSA_ANTES_DO_CLIQUE = (0.2, 0.6)
-INTERVALO_ENTRE_PERGUNTAS = 0.25
-TETO_ESPERA_JANELA = 10.0
-ESPERA_APOS_ESPACO = 2.0
-TETO_ESPERA_OURO = 5.0
+@dataclass(frozen=True)
+class Ritmo:
+    """Todos os tempos do piloto, num lugar so e injetaveis.
+
+    Existem como parametro, e nao como constante de modulo, para os testes
+    poderem rodar sem esperar de verdade. Sem isso a suite paga ~25s so em
+    sleep.
+    """
+
+    pausa_antes_do_clique: tuple[float, float] = (0.2, 0.6)
+    intervalo_entre_perguntas: float = 0.1
+    teto_espera_janela: float = 3.0
+    espera_apos_espaco: float = 2.0
+    teto_espera_ouro: float = 5.0
+
+    @classmethod
+    def instantaneo(cls) -> "Ritmo":
+        """Para testes: nao espera nada, mas mantem os tetos positivos para
+        os lacos de enquete continuarem executando ao menos uma volta."""
+        return cls(
+            pausa_antes_do_clique=(0.0, 0.0),
+            intervalo_entre_perguntas=0.0,
+            teto_espera_janela=0.05,
+            espera_apos_espaco=0.0,
+            teto_espera_ouro=0.05,
+        )
+
+
+RITMO_PADRAO = Ritmo()
 
 
 class Desfecho(Enum):
@@ -763,19 +790,22 @@ class _Diario:
         )
 
 
-def _esperar_janela(tela: Tela, diario: _Diario) -> tuple[np.ndarray | None, float]:
+def _esperar_janela(tela: Tela, diario: _Diario,
+                    ritmo: Ritmo) -> tuple[np.ndarray | None, float]:
     inicio = time.monotonic()
-    while time.monotonic() - inicio < TETO_ESPERA_JANELA:
+    primeira_volta = True
+    while primeira_volta or time.monotonic() - inicio < ritmo.teto_espera_janela:
+        primeira_volta = False
         img = tela.capturar()
         if identificar_estado(img) is EstadoTela.JANELA_CONFIRMACAO:
             diario.registrar(img, "janela")
             return img, time.monotonic() - inicio
-        time.sleep(INTERVALO_ENTRE_PERGUNTAS)
+        time.sleep(ritmo.intervalo_entre_perguntas)
     return None, time.monotonic() - inicio
 
 
-def executar(tela: Tela, mao: Mao, config: Config,
-             pasta: Path, simular: bool = False) -> Resultado:
+def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
+             simular: bool = False, ritmo: Ritmo = RITMO_PADRAO) -> Resultado:
     diario = _Diario(Path(pasta))
 
     def encerrar(r: Resultado) -> Resultado:
@@ -806,10 +836,10 @@ def executar(tela: Tela, mao: Mao, config: Config,
                                   listagem=escolhida, ouro_antes=ouro_antes))
 
     x0, y0, x1, y1 = caixa_slot(escolhida.linha, escolhida.coluna)
-    time.sleep(random.uniform(*PAUSA_ANTES_DO_CLIQUE))
+    time.sleep(random.uniform(*ritmo.pausa_antes_do_clique))
     mao.clicar((x0 + x1) // 2, (y0 + y1) // 2)
 
-    modal, demorou = _esperar_janela(tela, diario)
+    modal, demorou = _esperar_janela(tela, diario, ritmo)
     if modal is None:
         return encerrar(Resultado(Desfecho.ABORTOU,
                                   "a Janela de Confirmacao nao abriu",
@@ -840,17 +870,19 @@ def executar(tela: Tela, mao: Mao, config: Config,
                                   segundos_ate_a_janela=demorou))
 
     mao.apertar_espaco()
-    time.sleep(ESPERA_APOS_ESPACO)
+    time.sleep(ritmo.espera_apos_espaco)
 
     ouro_depois = None
     inicio = time.monotonic()
-    while time.monotonic() - inicio < TETO_ESPERA_OURO:
+    primeira_volta = True
+    while primeira_volta or time.monotonic() - inicio < ritmo.teto_espera_ouro:
+        primeira_volta = False
         depois = tela.capturar()
         ouro_depois = ler_ouro(depois)
         if ouro_depois is not None:
             diario.registrar(depois, "apos-espaco")
             break
-        time.sleep(INTERVALO_ENTRE_PERGUNTAS)
+        time.sleep(ritmo.intervalo_entre_perguntas)
 
     if ouro_depois is None:
         return encerrar(Resultado(Desfecho.ABORTOU,
@@ -911,7 +943,7 @@ def test_item_divergente_aperta_esc_e_nunca_espaco(tmp_path):
     # O modal mostra Espelho Adornado; decidimos comprar Dragao.
     mao = MaoFalsa()
     tela = TelaFalsa([LISTA, JANELA_ESPELHO])
-    r = executar(tela, mao, cfg(), tmp_path)
+    r = executar(tela, mao, cfg(), tmp_path, ritmo=JA)
     nomes = [a[0] for a in mao.acoes]
     assert r.desfecho is Desfecho.ABORTOU
     assert "apertar_espaco" not in nomes
@@ -920,7 +952,7 @@ def test_item_divergente_aperta_esc_e_nunca_espaco(tmp_path):
 def test_janela_que_nao_abre_aborta_sem_apertar_nada(tmp_path):
     # A tela nunca vira modal: fica na lista.
     mao = MaoFalsa()
-    r = executar(TelaFalsa([LISTA, LISTA]), mao, cfg(), tmp_path)
+    r = executar(TelaFalsa([LISTA, LISTA]), mao, cfg(), tmp_path, ritmo=JA)
     nomes = [a[0] for a in mao.acoes]
     assert r.desfecho is Desfecho.ABORTOU
     assert nomes == ["clicar"]
@@ -928,32 +960,32 @@ def test_janela_que_nao_abre_aborta_sem_apertar_nada(tmp_path):
 
 def test_nada_compravel_sai_limpo_sem_clicar(tmp_path):
     mao = MaoFalsa()
-    r = executar(TelaFalsa([LISTA_SEM_NADA]), mao, cfg(), tmp_path)
+    r = executar(TelaFalsa([LISTA_SEM_NADA]), mao, cfg(), tmp_path, ritmo=JA)
     assert r.desfecho is Desfecho.NADA_COMPRAVEL
     assert mao.acoes == []
 
 def test_pre_voo_em_outra_categoria_aborta(tmp_path):
     mao = MaoFalsa()
-    r = executar(TelaFalsa([RESET]), mao, cfg(), tmp_path)
+    r = executar(TelaFalsa([RESET]), mao, cfg(), tmp_path, ritmo=JA)
     assert r.desfecho is Desfecho.ABORTOU
     assert "outra_categoria" in r.motivo
     assert mao.acoes == []
 
 def test_pre_voo_com_modal_aberto_aborta(tmp_path):
     mao = MaoFalsa()
-    r = executar(TelaFalsa([JANELA_ESPELHO]), mao, cfg(), tmp_path)
+    r = executar(TelaFalsa([JANELA_ESPELHO]), mao, cfg(), tmp_path, ritmo=JA)
     assert r.desfecho is Desfecho.ABORTOU
     assert mao.acoes == []
 
 def test_modo_simulado_nao_toca_em_nada(tmp_path):
     mao = MaoFalsa()
-    r = executar(roteiro_feliz(), mao, cfg(), tmp_path, simular=True)
+    r = executar(roteiro_feliz(), mao, cfg(), tmp_path, simular=True, ritmo=JA)
     assert mao.acoes == []
     assert r.listagem.item is ItemAlvo.DRAGAO
     assert r.ouro_antes == 66160
 
 def test_todo_aborto_salva_relatorio(tmp_path):
-    executar(TelaFalsa([RESET]), MaoFalsa(), cfg(), tmp_path)
+    executar(TelaFalsa([RESET]), MaoFalsa(), cfg(), tmp_path, ritmo=JA)
     assert (tmp_path / "relatorio.json").exists()
 
 def test_ouro_que_cai_valor_inesperado_e_reportado(tmp_path):
@@ -961,7 +993,7 @@ def test_ouro_que_cai_valor_inesperado_e_reportado(tmp_path):
     # os 65914 esperados. A Compra aconteceu, mas a queda nao bate.
     OUTRA_LISTA = "images/broche-tres-adaga-lanterna-rede-padrao.png"  # Ouro 64735
     tela = TelaFalsa([LISTA, JANELA_DRAGAO, OUTRA_LISTA])
-    r = executar(tela, MaoFalsa(), cfg(), tmp_path)
+    r = executar(tela, MaoFalsa(), cfg(), tmp_path, ritmo=JA)
     assert r.desfecho is Desfecho.COMPROU
     assert r.ouro_depois == 64735
     assert "esperava 246" in r.motivo
@@ -972,7 +1004,7 @@ def test_ouro_que_cai_valor_inesperado_e_reportado(tmp_path):
 Run: `.venv/bin/python -m pytest tests/test_piloto.py -v`
 Expected: PASS, 13 testes
 
-Se `test_janela_que_nao_abre_aborta_sem_apertar_nada` demorar 10 segundos, é o teto de espera — está correto. Se incomodar, reduza `TETO_ESPERA_JANELA` via monkeypatch **no teste**, nunca no código.
+Nenhum teste espera de verdade: todos passam `ritmo=JA`, o `Ritmo.instantaneo()`. Se algum demorar, é sinal de que a chamada esqueceu o `ritmo` — corrija a chamada, nunca o código de produção.
 
 - [ ] **Step 3: Provar por mutação que os testes mordem**
 
@@ -1018,15 +1050,37 @@ import pathlib
 
 FONTE = pathlib.Path("src/mistfall/perifericos/windows.py")
 
+PROIBIDOS = {"mss", "ctypes"}
+
+def _modulos_importados(caminho: pathlib.Path) -> set[str]:
+    """Nome raiz de todo modulo importado, em qualquer forma de import.
+
+    Usa AST em vez de busca de texto: procurar a string "import ctypes"
+    deixa passar "from ctypes import wintypes", que e exatamente a forma
+    usada aqui.
+    """
+    encontrados = set()
+    for no in ast.walk(ast.parse(caminho.read_text(encoding="utf-8"))):
+        if isinstance(no, ast.Import):
+            encontrados |= {a.name.split(".")[0] for a in no.names}
+        elif isinstance(no, ast.ImportFrom) and no.module and no.level == 0:
+            encontrados.add(no.module.split(".")[0])
+    return encontrados
+
+def test_o_teste_de_import_pega_a_forma_from(tmp_path):
+    # Guarda o proprio detector: a versao anterior deste teste procurava a
+    # string "import ctypes" e nao pegava a forma abaixo.
+    arquivo = tmp_path / "vazando.py"
+    arquivo.write_text("from ctypes import wintypes\n", encoding="utf-8")
+    assert "ctypes" in _modulos_importados(arquivo)
+
 def test_nenhum_outro_arquivo_importa_windows():
     # Toda dependencia de Windows tem de estar confinada a este arquivo.
-    proibidos = ("mss", "ctypes")
-    for py in pathlib.Path("src").rglob("*.py"):
+    for py in list(pathlib.Path("src").rglob("*.py")) + list(pathlib.Path("ferramentas").rglob("*.py")):
         if py == FONTE:
             continue
-        texto = py.read_text(encoding="utf-8")
-        for nome in proibidos:
-            assert f"import {nome}" not in texto, f"{py} importa {nome}"
+        vazando = _modulos_importados(py) & PROIBIDOS
+        assert not vazando, f"{py} importa {vazando}"
 
 def test_windows_implementa_os_protocolos():
     arvore = ast.parse(FONTE.read_text(encoding="utf-8"))
@@ -1165,7 +1219,7 @@ class MaoWindows:
 - [ ] **Step 4: Rodar e confirmar que passa**
 
 Run: `.venv/bin/python -m pytest tests/test_perifericos_windows.py -v`
-Expected: PASS, 3 testes
+Expected: PASS, 4 testes
 
 - [ ] **Step 5: Commit**
 
