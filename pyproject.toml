@@ -9,6 +9,9 @@ dependencies = [
     "pytesseract>=0.3.13",
 ]
 
+[project.scripts]
+mistfall-piloto = "ferramentas.piloto_cli:main"
+
 [tool.pytest.ini_options]
 pythonpath = ["src", "."]
 testpaths = ["tests"]
