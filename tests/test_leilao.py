@@ -113,3 +113,20 @@ def test_varrer_bruto_tambem_bate_entre_paralelo_e_sequencial():
 def test_o_padrao_e_o_do_helper():
     import inspect
     assert inspect.signature(varrer).parameters["trabalhadores"].default == TRABALHADORES_PADRAO
+
+def test_varrer_repassa_os_trabalhadores_ao_helper(monkeypatch):
+    # Comparar resultado nao distingue paralelo de sequencial: eles sao
+    # identicos de proposito. Este teste garante que o parametro chega
+    # ao helper, entao forcar sequencial la dentro quebra a suite.
+    import mistfall.leilao as leilao
+    from mistfall.paralelo import mapear as mapear_real
+
+    recebidos = []
+
+    def espiao(funcao, itens, trabalhadores):
+        recebidos.append(trabalhadores)
+        return mapear_real(funcao, itens, trabalhadores)
+
+    monkeypatch.setattr(leilao, "mapear", espiao)
+    varrer(cv2.imread(LISTA), trabalhadores=7)
+    assert recebidos == [7]
