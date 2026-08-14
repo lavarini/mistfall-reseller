@@ -179,3 +179,18 @@ def test_corpus_tem_gaps_conhecidos_de_ocr():
         "Se um gap novo apareceu, o OCR regrediu — investigue antes de "
         "adicionar ocr_lido_atual de volta."
     )
+
+def test_o_print_da_maquina_do_jogo_le_o_227():
+    """A #17: a leitura recorte-a-recorte lia 297 onde a verdade e 227.
+
+    Um 2 virando 9 e a falha mais perigosa que existe aqui — nao quebra nada,
+    nao gera erro, so faz o bot pagar 70 ouros a mais. Foi a conferencia de
+    ordenacao que pegou, derrubando a tela inteira.
+
+    Este print nao tem fixture no corpus: os doze slots dele nunca foram
+    rotulados a olho, e so o (0,1) tem verdade humana — o nome do arquivo a
+    registra. Por isso o teste afirma um slot, e nao doze.
+    """
+    img = cv2.imread("images/sete-itens-ocr-227-como-297.png")
+    slots = {(l.linha, l.coluna): l.preco_unitario for l in varrer_bruto(img)}
+    assert slots[(0, 1)] == 227
