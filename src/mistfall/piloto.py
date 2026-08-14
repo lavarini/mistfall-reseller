@@ -48,11 +48,11 @@ class Ritmo:
     teto_espera_janela: float = 10.0
     # A Janela abre com animacao e e detectavel antes de terminar de se
     # expandir. Esta e a espera entre detectar e capturar o frame que vai ser
-    # validado. 400 ms e o dobro do tempo de deteccao medido na maquina do
-    # jogo (198 ms), e um ponto de partida a calibrar: o frame que falhou foi
-    # capturado a ~300 ms, entao a margem aqui e estreita. Ajustavel pela CLI
-    # com --espera-modal, para nao exigir editar Python na maquina do jogo.
-    espera_para_o_modal_assentar: float = 0.4
+    # validado. O numero esta sendo calibrado na maquina do jogo: 500 ms, com
+    # a deteccao medida em 198 ms e um frame ainda em animacao capturado a
+    # ~300 ms. Ajustavel pela CLI com --espera-modal, para nao exigir editar
+    # Python na maquina do jogo, e gravado em cada relatorio.
+    espera_para_o_modal_assentar: float = 0.5
     espera_apos_espaco: float = 2.0
     teto_espera_ouro: float = 5.0
 
