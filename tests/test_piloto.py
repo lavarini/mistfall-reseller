@@ -261,11 +261,36 @@ def test_a_conferencia_reprovaria_o_frame_em_animacao(tmp_path):
     assert divergencia is not None
     assert "ilegivel" in divergencia, divergencia
 
+def test_espera_do_modal_e_sorteada_dentro_da_faixa(tmp_path):
+    # Ritmo identico em tudo, sementes diferentes: se a espera fosse fixa os
+    # dois valores seriam iguais. O sorteio existe para o ritmo do bot nao
+    # sair sempre com o mesmo numero.
+    ritmo = dataclasses.replace(JA, espera_para_o_modal_abrir=(0.08, 0.12))
+    vistos = set()
+    for semente in range(12):
+        r = executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path / str(semente),
+                     ritmo=ritmo, sorteio=random.Random(semente))
+        vistos.add(r.espera_do_modal_ms)
+    assert len(vistos) > 1, "a espera saiu igual em 12 sementes: nao ha sorteio"
+    assert all(80 <= ms <= 120 for ms in vistos), sorted(vistos)
+
+def test_a_espera_do_modal_nunca_fica_abaixo_do_piso(tmp_path):
+    # O sorteio e para cima, nunca para baixo: curto demais faz o Espaco
+    # chegar antes de a Janela abrir, e a Compra se perde. O piso e o numero
+    # calibrado; a variacao e so enfeite por cima dele.
+    ritmo = dataclasses.replace(JA, espera_para_o_modal_abrir=(0.08, 0.12))
+    for semente in range(30):
+        r = executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path / str(semente),
+                     ritmo=ritmo, sorteio=random.Random(semente))
+        assert r.espera_do_modal_ms >= 80
+
 def test_relatorio_diz_quanto_esperou_pelo_modal(tmp_path):
     # A espera vai ser calibrada por tentativas na maquina do jogo. Sem este
     # numero gravado, as pastas de execucao viram evidencia sem etiqueta: nao
     # da para saber qual tentativa produziu qual resultado.
-    ritmo = dataclasses.replace(JA, espera_para_o_modal_abrir=0.25)
+    # Faixa degenerada, com piso e teto iguais: o sorteio so pode devolver um
+    # valor, entao o teste afirma o numero exato sem depender de semente.
+    ritmo = dataclasses.replace(JA, espera_para_o_modal_abrir=(0.25, 0.25))
     executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, ritmo=ritmo,
              sorteio=random.Random(1))
     dados = json.loads((tmp_path / "relatorio.json").read_text(encoding="utf-8"))

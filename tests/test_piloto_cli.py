@@ -18,9 +18,10 @@ def test_espera_do_modal_e_ajustavel_em_milissegundos():
     # do jogo. Calibrar nao pode exigir editar Python la.
     assert montar_parser().parse_args(["--espera-modal", "250"]).espera_modal == 250
 
-def test_espera_do_modal_chega_ao_ritmo_em_segundos(monkeypatch, tmp_path):
+def test_espera_do_modal_vira_faixa_com_piso_no_valor_pedido(monkeypatch, tmp_path):
     # O flag e em ms porque e assim que se fala de animacao; o Ritmo e em
-    # segundos. Sem este teste a conversao pode sumir e ninguem percebe.
+    # segundos. E o valor pedido e o PISO da faixa sorteada, nunca o teto: o
+    # sorteio existe para o ritmo variar, e variar para baixo perde Compra.
     import ferramentas.piloto_cli as cli
     import mistfall.perifericos.windows as windows
 
@@ -39,7 +40,9 @@ def test_espera_do_modal_chega_ao_ritmo_em_segundos(monkeypatch, tmp_path):
                                       "--pasta", str(tmp_path),
                                       "--espera-modal", "250"])
     assert cli.main() == 0
-    assert visto["ritmo"].espera_para_o_modal_abrir == 0.25
+    piso, teto = visto["ritmo"].espera_para_o_modal_abrir
+    assert piso == 0.25
+    assert teto > piso
 
 def test_comprou_sai_zero():
     assert codigo_de_saida(Resultado(Desfecho.COMPROU)) == 0

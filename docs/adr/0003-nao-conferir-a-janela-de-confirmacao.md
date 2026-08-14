@@ -5,8 +5,8 @@ falha possível: comprar caro por leitura errada, sem ninguém olhando. Depois d
 piloto esperava a Janela ser detectada e conferia **quatro** coisas nela — o Ícone, o Preço
 Unitário, a Quantidade e o Preço Total — apertando **Esc** a qualquer divergência.
 
-**Essa conferência foi desativada.** Depois do clique o piloto espera um tempo fixo e aperta
-Espaço. A Janela não é detectada, não é capturada e não é lida.
+**Essa conferência foi desativada.** Depois do clique o piloto espera um tempo sorteado numa
+faixa curta e aperta Espaço. A Janela não é detectada, não é capturada e não é lida.
 
 ## Por quê
 

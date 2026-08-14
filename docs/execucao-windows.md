@@ -138,7 +138,8 @@ mouse.
 
 ### A Janela nao e mais conferida
 
-Depois do clique o piloto **espera um tempo fixo e aperta Espaco**. A Janela nao e detectada,
+Depois do clique o piloto **espera e aperta Espaco**. A espera e sorteada a cada Compra,
+entre o valor de `--espera-modal` e 1,5x ele. A Janela nao e detectada,
 nao e capturada e nao e lida. Nenhum aborto vem mais do modal, e nenhuma string do tipo "o
 modal cobra X" ou "Preco Unitario ilegivel" existe hoje. Ver o ADR-0003.
 
@@ -152,8 +153,9 @@ A espera e ajustavel sem editar codigo, e e o numero que esta sendo calibrado:
 mistfall-piloto --pasta execucao-700 --espera-modal 700
 ```
 
-Cada `relatorio.json` grava o valor usado em `espera_do_modal_ms`, entao as pastas de
-tentativas diferentes nao se confundem.
+Cada `relatorio.json` grava em `espera_do_modal_ms` o valor **sorteado naquela Compra**, e nao
+a faixa configurada — entao ele varia entre execucoes com o mesmo `--espera-modal`, e e ele que
+diz quanto se esperou de fato.
 
 ### Se o desfecho for "abortou"
 

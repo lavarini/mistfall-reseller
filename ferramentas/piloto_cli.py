@@ -23,8 +23,8 @@ def montar_parser() -> argparse.ArgumentParser:
     # estao fora das coordenadas fixas (#18). Quanto ela dura so se descobre
     # na maquina do jogo — calibrar nao pode exigir editar Python la.
     p.add_argument("--espera-modal", type=int,
-                   default=round(RITMO_PADRAO.espera_para_o_modal_abrir * 1000),
-                   help="ms entre o clique e o Espaco, dados a Janela para abrir")
+                   default=round(RITMO_PADRAO.espera_para_o_modal_abrir[0] * 1000),
+                   help="ms entre o clique e o Espaco, dados a Janela para abrir. E o PISO: a espera de cada Compra e sorteada entre ele e 1,5x ele, para o ritmo nao sair sempre identico")
     return p
 
 
@@ -71,8 +71,11 @@ def _rodar(args: argparse.Namespace) -> int:
                   "(nao clique nele) e tire a mao do mouse", flush=True)
             time.sleep(1)
 
+    # Faixa, e nao numero: o piso e o que o operador pediu, e o sorteio vai
+    # para cima. Variar para baixo do valor calibrado perde Compra.
+    piso = args.espera_modal / 1000
     ritmo = dataclasses.replace(
-        RITMO_PADRAO, espera_para_o_modal_abrir=args.espera_modal / 1000)
+        RITMO_PADRAO, espera_para_o_modal_abrir=(piso, piso * 1.5))
     resultado = executar(TelaWindows(), MaoWindows(), config,
                          Path(args.pasta), simular=args.simular, ritmo=ritmo)
 

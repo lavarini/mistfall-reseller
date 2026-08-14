@@ -17,7 +17,8 @@ Entrada: um print da tela em 2560×1440. Saída: a decisão de qual Listagem com
 4. Lê o **Preço-unitário** de cada slot por OCR
 5. Entre as Listagens que estão **exatamente** no Preço-alvo, sorteia uma. Preço abaixo do
    Preço-alvo é leitura suspeita, não pechincha: vai para o `relatorio.json`, não gera Compra
-6. Clica, espera um tempo fixo para a **Janela de Confirmação** abrir, e aperta **Espaço**
+6. Clica, espera um tempo sorteado numa faixa curta para a **Janela de Confirmação**
+   abrir, e aperta **Espaço**
 7. Confirma que o Ouro caiu **exatamente** o Preço-unitário da Listagem escolhida
 
 **A Janela de Confirmação não é conferida.** Ela não é detectada, não é capturada e não é
@@ -32,8 +33,10 @@ clique sobra uma conferência só, a do passo 7 — ela não impede a Compra err
 ela passar calada.
 
 Velocidade não era requisito enquanto era uma Compra e para. Com a conferência do modal fora
-do caminho, a espera do passo 6 é o único tempo morto que restou, e ela está sendo calibrada
-(`--espera-modal`).
+do caminho, a espera do passo 6 é o único tempo morto que restou. Ela é **sorteada** a cada
+Compra, entre o valor calibrado e 1,5× ele, para o ritmo não sair sempre idêntico — o piso é
+`--espera-modal`, e o sorteio vai só para cima dele: variar para baixo do calibrado perde
+Compra.
 
 ## Onde roda
 

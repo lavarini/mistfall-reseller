@@ -6,8 +6,8 @@ Nao sabe se fala com o Windows ou com um duble: toda a fronteira de IO
 passa pelos protocolos Tela e Mao.
 
 A Janela de Confirmacao NAO e consultada. Nao e detectada, nao e capturada
-e nao e conferida: depois do clique o piloto espera um tempo fixo e aperta
-Espaco. Decisao do dono do projeto, por a leitura do modal ser
+e nao e conferida: depois do clique o piloto espera um tempo sorteado numa
+faixa curta e aperta Espaco. Decisao do dono do projeto, por a leitura do modal ser
 intermitente e estar custando mais do que entregava — ela derrubou Compras
 boas duas vezes (#18) e nunca pegou uma ruim.
 
@@ -73,11 +73,15 @@ class Ritmo:
     # mas ela nao vale a viagem: esperar de graca custa 10 s numa execucao
     # unica, e abortar por uma primeira carga de UI mais lenta custa o dia.
     teto_espera_janela: float = 10.0
-    # Espera entre o clique e o Espaco: o tempo dado a Janela para abrir.
-    # Ela nao e detectada nem lida, entao este numero e a unica coisa entre um
-    # e outro. Ajustavel pela CLI com --espera-modal e gravado em cada
-    # relatorio, porque so se calibra na maquina do jogo.
-    espera_para_o_modal_abrir: float = 0.15
+    # Espera entre o clique e o Espaco: o tempo dado a Janela para abrir. Ela
+    # nao e detectada nem lida, entao esta faixa e a unica coisa entre um e
+    # outro. Ajustavel pela CLI com --espera-modal e gravado em cada relatorio,
+    # porque so se calibra na maquina do jogo.
+    #
+    # E faixa, e nao numero, para o ritmo nao sair sempre identico. O piso e o
+    # valor calibrado e o sorteio vai para CIMA dele, nunca para baixo: curto
+    # demais faz o Espaco chegar antes de a Janela abrir, e a Compra se perde.
+    espera_para_o_modal_abrir: tuple[float, float] = (0.08, 0.12)
     espera_apos_espaco: float = 2.0
     teto_espera_ouro: float = 5.0
 
@@ -89,7 +93,7 @@ class Ritmo:
             pausa_antes_do_clique=(0.0, 0.0),
             intervalo_entre_perguntas=0.0,
             teto_espera_janela=0.05,
-            espera_para_o_modal_abrir=0.0,
+            espera_para_o_modal_abrir=(0.0, 0.0),
             espera_apos_espaco=0.0,
             teto_espera_ouro=0.05,
         )
@@ -132,9 +136,9 @@ class Resultado:
     # de ordenacao. Guardar so o conferido esconderia a leitura que derrubou a
     # tela; guardar so o bruto esconderia quais slots a regra invalidou.
     slots: list[dict] | None = None
-    # Quanto se esperou o modal assentar nesta execucao. Gravado porque esse
-    # numero esta sendo calibrado por tentativas na maquina do jogo: sem ele,
-    # as pastas de execucao nao dizem qual tentativa as produziu.
+    # Quanto se esperou de fato pela Janela nesta Compra — o valor sorteado,
+    # e nao a faixa configurada. E o que interessa para calibrar: sem ele, as
+    # pastas de execucao nao dizem qual espera produziu qual resultado.
     espera_do_modal_ms: float | None = None
     capturas: list[str] = field(default_factory=list)
     # Tempo de cada etapa, em milissegundos
@@ -307,7 +311,6 @@ def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
              sorteio: random.Random | None = None) -> Resultado:
     diario = _Diario(Path(pasta))
     r = Resultado(Desfecho.ABORTOU, "explodiu antes da primeira captura")
-    r.espera_do_modal_ms = round(ritmo.espera_para_o_modal_abrir * 1000, 1)
     if sorteio is None:
         sorteio = random.Random()
 
@@ -369,7 +372,9 @@ def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
         # conferida. Espera-se ela abrir e aperta-se Espaco. Ver o docstring
         # do modulo para o porque e para o que isso deixa descoberto.
         t_modal = time.monotonic()
-        time.sleep(ritmo.espera_para_o_modal_abrir)
+        espera = sorteio.uniform(*ritmo.espera_para_o_modal_abrir)
+        r.espera_do_modal_ms = round(espera * 1000, 1)
+        time.sleep(espera)
         r.tempos["modal"] = (time.monotonic() - t_modal) * 1000
 
         # Quantidade 1 e premissa, e nao leitura: o modal nao e consultado.
