@@ -9,9 +9,14 @@ LIMIAR = 0.70
 # O melhor score tambem precisa ganhar do segundo colocado por esta margem.
 # So o limiar absoluto nao basta: em images/janela.png, com a lista coberta pelo
 # modal, o slot (3,0) dava dragao=0.7411 com codice=0.6459 logo atras — margem
-# 0.0952, cara ou coroa. Confundir Broche (alvo 188) com Codice (alvo 281) faz o
-# bot pagar 275 achando que esta comprando barato: o preco foi lido certo, o item
-# e que estava errado, e a fracao de sanidade nao olha para item.
+# 0.0952, cara ou coroa. Confundir dois Itens-alvo entre si esta defusado: a
+# decisao usa "==" contra o Preco-alvo de cada um, com sete cortes distintos,
+# entao trocar Broche por Codice so gera Compra se o preco do slot bater com
+# os dois cortes ao mesmo tempo, o que nao acontece. O que ainda morde e um
+# nao-alvo identificado como Item-alvo cujo Preco-unitario real coincida por
+# acaso com o corte daquele alvo — ai o bot compra o item errado pensando que
+# e o Item-alvo, o preco pago bate exatamente, e nada no relatorio.json
+# denuncia a troca.
 #
 # Medido nos 84 slots dos 7 prints de Leilao: dos 49 slots que sao Item-alvo, o
 # de pior margem tem 0.383 e o melhor 0.477. Nenhum chega perto deste piso.

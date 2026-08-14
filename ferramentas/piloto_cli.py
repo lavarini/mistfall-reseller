@@ -85,6 +85,10 @@ def _rodar(args: argparse.Namespace) -> int:
               f"{resultado.scores_do_icone}")
     if resultado.ouro_antes is not None:
         print(f"Ouro: {resultado.ouro_antes} -> {resultado.ouro_depois}")
+    if resultado.tempos:
+        print("Tempo por etapa (ms):")
+        for etapa, ms in resultado.tempos.items():
+            print(f"  {etapa}: {ms:.1f}")
     print(f"prints e relatorio em {args.pasta}")
     return codigo_de_saida(resultado)
 

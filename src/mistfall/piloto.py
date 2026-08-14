@@ -27,8 +27,9 @@ from mistfall.janela import (
 )
 from mistfall.leilao import conferir_ordenacao, varrer_bruto
 from mistfall.ouro import ler_ouro
+from mistfall.paralelo import mapear
 from mistfall.perifericos.protocolos import Mao, Tela
-from mistfall.tipos import EstadoTela, ItemAlvo, Listagem
+from mistfall.tipos import EstadoTela, Listagem
 
 @dataclass(frozen=True)
 class Ritmo:
@@ -99,6 +100,8 @@ class Resultado:
     # tela; guardar so o bruto esconderia quais slots a regra invalidou.
     slots: list[dict] | None = None
     capturas: list[str] = field(default_factory=list)
+    # Tempo de cada etapa, em milissegundos
+    tempos: dict[str, float] = field(default_factory=dict)
 
 
 class _Diario:
@@ -144,32 +147,40 @@ def _esperar_janela(tela: Tela, diario: _Diario,
     return None, time.monotonic() - inicio
 
 
-def _nome(item: ItemAlvo | None) -> str:
-    """Nome de dominio, nunca o Enum cru: e a linha que o operador le."""
-    return item.value if item is not None else "nenhum Item-alvo reconhecido"
-
-
 def _conferir_a_janela(modal: np.ndarray, escolhida: Listagem,
-                       r: Resultado) -> str | None:
+                       r: Resultado, trabalhadores: int) -> str | None:
     """Le a Janela inteira, guarda tudo no Resultado e devolve a primeira
     divergencia contra a Listagem escolhida — None quando esta tudo certo.
 
     Le antes de conferir, e grava antes de decidir: mesmo abortando, o
     relatorio tem de dizer o que o bot viu. Cada leitura ilegivel tem ramo
     proprio porque a mensagem e o unico diagnostico que atravessa a viagem.
+
+    O Icone e lido e pontuado, mas nao e portao: a varredura de escala
+    0,85-1,15 de `ler_item_da_janela` e palpite calibrado, nao medida, e 5%
+    de diferenca de escala ja derruba a identificacao para None. Na maquina
+    real isso deu 100% de falso negativo (#18) — o piloto validava o
+    primeiro frame em que o modal era detectavel, que e antes de o Icone
+    estar desenhado, o template nao casava, e ele apertava Esc em vez de
+    comprar. O Icone tambem nunca demonstrou valor: dos seis erros de OCR
+    conhecidos do corpus, nenhum teria sido pego so pela conferencia do
+    modal — os nulls e os absurdos sao pegos pela faixa de sanidade, e foi a
+    conferencia de ordenacao que pegou o unico erro de slot errado (#17).
+    Continua sendo lido e gravado no relatorio porque foi exatamente esse
+    dado, a distancia, que permitiu diagnosticar a #18 sem ninguem na frente
+    da maquina — nao reintroduza o ramo de aborto achando que foi esquecido.
     """
     item = ler_item_da_janela(modal)
     r.item_no_modal = item.value if item is not None else None
     r.escala_do_icone, scores = pontuar_icone_da_janela(modal)
     r.scores_do_icone = {alvo.value: round(score, 4)
                          for alvo, score in scores.items()}
-    r.preco_no_modal = ler_preco_da_janela(modal)
-    r.quantidade_no_modal = ler_quantidade_da_janela(modal)
-    r.preco_total_esperado = ler_preco_total_da_janela(modal)
+    r.preco_no_modal, r.quantidade_no_modal, r.preco_total_esperado = mapear(
+        lambda ler: ler(modal),
+        (ler_preco_da_janela, ler_quantidade_da_janela, ler_preco_total_da_janela),
+        trabalhadores,
+    )
 
-    if item is not escolhida.item:
-        return (f"o modal mostra {_nome(item)}, "
-                f"decidimos comprar {_nome(escolhida.item)}")
     if r.preco_no_modal is None:
         return "Preco Unitario ilegivel no modal"
     if r.preco_no_modal != escolhida.preco_unitario:
@@ -218,9 +229,12 @@ def _esperar_o_ouro_cair(tela: Tela, diario: _Diario, r: Resultado,
 
 
 def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
-             simular: bool = False, ritmo: Ritmo = RITMO_PADRAO) -> Resultado:
+             simular: bool = False, ritmo: Ritmo = RITMO_PADRAO,
+             sorteio: random.Random | None = None) -> Resultado:
     diario = _Diario(Path(pasta))
     r = Resultado(Desfecho.ABORTOU, "explodiu antes da primeira captura")
+    if sorteio is None:
+        sorteio = random.Random()
 
     def encerrar(desfecho: Desfecho, motivo: str = "") -> Resultado:
         r.desfecho, r.motivo = desfecho, motivo
@@ -230,6 +244,7 @@ def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
     # o finally, uma excecao inesperada deixa o operador com PNGs soltos
     # depois de ja ter mexido no jogo.
     try:
+        t_pre_voo = time.monotonic()
         inicial = tela.capturar()
         diario.registrar(inicial, "pre-voo")
 
@@ -242,9 +257,12 @@ def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
         if r.ouro_antes is None:
             return encerrar(Desfecho.ABORTOU, "Ouro inicial ilegivel")
 
+        r.tempos["pre_voo"] = (time.monotonic() - t_pre_voo) * 1000
+
         # Em dois passos, e nao pelo `varrer`, para o relatorio poder mostrar
         # o que o OCR entregou ao lado do que a conferencia deixou passar.
-        brutas = varrer_bruto(inicial)
+        t_varredura = time.monotonic()
+        brutas = varrer_bruto(inicial, config.trabalhadores)
         conferidas = conferir_ordenacao(brutas)
         r.slots = [
             {
@@ -257,10 +275,12 @@ def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
             for bruta, conferida in zip(brutas, conferidas)
         ]
 
-        escolhida = escolher(conferidas, config)
+        escolhida = escolher(conferidas, config, sorteio)
+        r.tempos["varredura"] = (time.monotonic() - t_varredura) * 1000
+
         if escolhida is None:
             return encerrar(Desfecho.NADA_COMPRAVEL,
-                            "nenhuma Listagem abaixo do Preco-alvo")
+                            "nenhuma Listagem no Preco-alvo")
         r.listagem = escolhida
 
         if simular:
@@ -270,18 +290,23 @@ def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
         time.sleep(random.uniform(*ritmo.pausa_antes_do_clique))
         mao.clicar((x0 + x1) // 2, (y0 + y1) // 2)
 
+        t_modal = time.monotonic()
         modal, r.segundos_ate_a_janela = _esperar_janela(tela, diario, ritmo)
         if modal is None:
             return encerrar(Desfecho.ABORTOU, "a Janela de Confirmacao nao abriu")
 
-        divergencia = _conferir_a_janela(modal, escolhida, r)
+        divergencia = _conferir_a_janela(modal, escolhida, r, config.trabalhadores)
+        r.tempos["modal"] = (time.monotonic() - t_modal) * 1000
+
         if divergencia is not None:
             mao.apertar_esc()
             return encerrar(Desfecho.ABORTOU, divergencia)
 
+        t_confirmacao = time.monotonic()
         mao.apertar_espaco()
         time.sleep(ritmo.espera_apos_espaco)
         _esperar_o_ouro_cair(tela, diario, r, ritmo)
+        r.tempos["confirmacao_do_ouro"] = (time.monotonic() - t_confirmacao) * 1000
 
         if r.ouro_depois is None:
             return encerrar(Desfecho.ABORTOU,

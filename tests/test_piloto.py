@@ -1,4 +1,6 @@
+import dataclasses
 import json
+import random
 from dataclasses import replace
 
 import cv2
@@ -20,7 +22,6 @@ def cfg():
             ItemAlvo.DRAGAO: 246, ItemAlvo.ORBE: 253, ItemAlvo.REDE: 260,
             ItemAlvo.CODICE: 281,
         },
-        fracao_sanidade=0.25,
     )
 
 def roteiro_feliz():
@@ -32,29 +33,29 @@ JA = Ritmo.instantaneo()  # nenhum teste espera de verdade
 
 def test_caminho_feliz_compra(tmp_path):
     mao = MaoFalsa()
-    r = executar(roteiro_feliz(), mao, cfg(), tmp_path, ritmo=JA)
+    r = executar(roteiro_feliz(), mao, cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
     assert r.desfecho is Desfecho.COMPROU
 
 def test_caminho_feliz_clica_no_slot_certo(tmp_path):
     mao = MaoFalsa()
-    executar(roteiro_feliz(), mao, cfg(), tmp_path, ritmo=JA)
+    executar(roteiro_feliz(), mao, cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
     assert mao.acoes[0] == ("clicar", 1975, 721)
 
 def test_caminho_feliz_aperta_espaco_e_nunca_esc(tmp_path):
     mao = MaoFalsa()
-    executar(roteiro_feliz(), mao, cfg(), tmp_path, ritmo=JA)
+    executar(roteiro_feliz(), mao, cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
     nomes = [a[0] for a in mao.acoes]
     assert nomes == ["clicar", "apertar_espaco"]
 
 def test_caminho_feliz_registra_os_numeros(tmp_path):
-    r = executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, ritmo=JA)
+    r = executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
     assert r.ouro_antes == 66160
     assert r.ouro_depois == 65914
     assert r.preco_total_esperado == 246
     assert r.listagem.item is ItemAlvo.DRAGAO
 
 def test_caminho_feliz_salva_os_prints(tmp_path):
-    executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, ritmo=JA)
+    executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
     assert len(list(tmp_path.glob("*.png"))) >= 3
     assert (tmp_path / "relatorio.json").exists()
 
@@ -63,16 +64,18 @@ JANELA_ESPELHO = "images/janela.png"          # modal com item que nao e alvo
 LISTA_SEM_NADA = "images/lanterna-dragao-orbe-rede.png"  # nada compravel
 RESET = "images/reset-forja.png"              # outra Categoria
 
-def test_item_divergente_aperta_esc_e_nunca_espaco(tmp_path):
-    # O modal mostra Espelho Adornado; decidimos comprar Dragao.
+def test_icone_e_preco_divergentes_aborta_pelo_preco(tmp_path):
+    # O modal mostra Espelho Adornado (nao e Item-alvo) cobrando 237;
+    # decidimos comprar Dragao a 246. Diverge nos dois, mas o icone deixou
+    # de ser portao — quem aborta agora e o Preco Unitario.
     mao = MaoFalsa()
     tela = TelaFalsa([LISTA, JANELA_ESPELHO])
-    r = executar(tela, mao, cfg(), tmp_path, ritmo=JA)
+    r = executar(tela, mao, cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
     nomes = [a[0] for a in mao.acoes]
     assert r.desfecho is Desfecho.ABORTOU
     assert "apertar_espaco" not in nomes
     assert nomes[-1] == "apertar_esc"
-    assert "modal mostra" in r.motivo
+    assert "modal cobra" in r.motivo
 
 def test_janela_que_nao_abre_aborta_sem_apertar_nada(tmp_path):
     # A tela nunca vira modal: fica na lista.
@@ -104,7 +107,7 @@ def test_pre_voo_com_modal_aberto_aborta(tmp_path):
 
 def test_modo_simulado_nao_toca_em_nada(tmp_path):
     mao = MaoFalsa()
-    r = executar(roteiro_feliz(), mao, cfg(), tmp_path, simular=True, ritmo=JA)
+    r = executar(roteiro_feliz(), mao, cfg(), tmp_path, simular=True, ritmo=JA, sorteio=random.Random(1))
     assert mao.acoes == []
     assert r.listagem.item is ItemAlvo.DRAGAO
     assert r.ouro_antes == 66160
@@ -112,7 +115,7 @@ def test_modo_simulado_nao_toca_em_nada(tmp_path):
 def test_modo_simulado_tem_desfecho_proprio(tmp_path):
     # Nao pode ser nada_compravel: o roteiro usa esse desfecho como portao
     # ("se nao bater, pare aqui"), e a simulacao ACHOU uma Listagem.
-    r = executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, simular=True, ritmo=JA)
+    r = executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, simular=True, ritmo=JA, sorteio=random.Random(1))
     assert r.desfecho is Desfecho.SIMULOU
     assert r.desfecho is not Desfecho.NADA_COMPRAVEL
 
@@ -127,7 +130,7 @@ JANELA_ORBE_246 = "fixtures/sinteticas/janela-orbe-246.png"
 def test_preco_divergente_isolado_aperta_esc_e_nunca_espaco(tmp_path):
     # Item bate (Dragao), so o Preco Unitario diverge (999 contra 246).
     mao = MaoFalsa()
-    r = executar(TelaFalsa([LISTA, JANELA_DRAGAO_999]), mao, cfg(), tmp_path, ritmo=JA)
+    r = executar(TelaFalsa([LISTA, JANELA_DRAGAO_999]), mao, cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
     nomes = [a[0] for a in mao.acoes]
     assert r.desfecho is Desfecho.ABORTOU
     assert "apertar_espaco" not in nomes
@@ -137,29 +140,31 @@ def test_preco_divergente_isolado_aperta_esc_e_nunca_espaco(tmp_path):
 def test_quantidade_divergente_isolada_aperta_esc_e_nunca_espaco(tmp_path):
     # Item e Preco Unitario batem, so a Quantidade diverge (5 em vez de 1).
     mao = MaoFalsa()
-    r = executar(TelaFalsa([LISTA, JANELA_DRAGAO_QTD_5]), mao, cfg(), tmp_path, ritmo=JA)
+    r = executar(TelaFalsa([LISTA, JANELA_DRAGAO_QTD_5]), mao, cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
     nomes = [a[0] for a in mao.acoes]
     assert r.desfecho is Desfecho.ABORTOU
     assert "apertar_espaco" not in nomes
     assert "apertar_esc" in nomes
     assert "Quantidade e" in r.motivo
 
-def test_item_divergente_isolado_aperta_esc_e_nunca_espaco(tmp_path):
-    # Preco Unitario bate (246), so o Item diverge (Orbe em vez de Dragao).
+def test_icone_divergente_nao_impede_a_compra(tmp_path):
+    # Preco Unitario, Quantidade e Preco Total batem (246, 1, 246); so o
+    # Icone diverge (Orbe em vez de Dragao). O icone saiu do portao: o
+    # piloto segue, aperta Espaco e conclui a Compra.
     mao = MaoFalsa()
-    r = executar(TelaFalsa([LISTA, JANELA_ORBE_246]), mao, cfg(), tmp_path, ritmo=JA)
+    tela = TelaFalsa([LISTA, JANELA_ORBE_246, LISTA_DEBITADA])
+    r = executar(tela, mao, cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
     nomes = [a[0] for a in mao.acoes]
-    assert r.desfecho is Desfecho.ABORTOU
-    assert "apertar_espaco" not in nomes
-    assert "apertar_esc" in nomes
-    assert "modal mostra" in r.motivo
+    assert "apertar_esc" not in nomes
+    assert "apertar_espaco" in nomes
+    assert r.desfecho is Desfecho.COMPROU
 
 def test_ouro_que_cai_valor_inesperado_e_reportado(tmp_path):
     # Depois do Espaco a tela mostra um print real cujo Ouro e 64735, nao
     # os 65914 esperados. A Compra aconteceu, mas a queda nao bate.
     OUTRA_LISTA = "images/broche-tres-adaga-lanterna-rede-padrao.png"  # Ouro 64735
     tela = TelaFalsa([LISTA, JANELA_DRAGAO, OUTRA_LISTA])
-    r = executar(tela, MaoFalsa(), cfg(), tmp_path, ritmo=JA)
+    r = executar(tela, MaoFalsa(), cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
     assert r.desfecho is Desfecho.COMPROU
     assert r.ouro_depois == 64735
     assert "esperava 246" in r.motivo
@@ -181,16 +186,13 @@ LISTA_OURO_ILEGIVEL = "fixtures/sinteticas/lista-ouro-ilegivel.png"
     (JANELA_PRECO_ILEGIVEL, "Preco Unitario ilegivel"),
     (JANELA_QTD_ILEGIVEL, "Quantidade ilegivel"),
     (JANELA_TOTAL_ILEGIVEL, "Preco Total ilegivel"),
-    # Icone que nao e Item-alvo, com os numeros batendo: a unica divergencia
-    # possivel e o icone, entao a conferencia de item responde sozinha.
-    (JANELA_ESPELHO_246, "nenhum Item-alvo reconhecido"),
     # Total que nao fecha com 1 x Preco Unitario.
     (JANELA_TOTAL_250, "nao fecha"),
 ])
 def test_leitura_suspeita_no_modal_aperta_esc_e_nunca_espaco(
         tmp_path, fixture, pedaco_do_motivo):
     mao = MaoFalsa()
-    r = executar(TelaFalsa([LISTA, fixture]), mao, cfg(), tmp_path, ritmo=JA)
+    r = executar(TelaFalsa([LISTA, fixture]), mao, cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
     nomes = [a[0] for a in mao.acoes]
     assert r.desfecho is Desfecho.ABORTOU
     assert "apertar_espaco" not in nomes
@@ -204,15 +206,6 @@ def test_ouro_inicial_ilegivel_aborta_antes_de_clicar(tmp_path):
     assert "Ouro inicial ilegivel" in r.motivo
     assert mao.acoes == []
 
-def test_mensagem_de_item_divergente_nao_mostra_o_enum_cru(tmp_path):
-    # "o modal mostra ItemAlvo.DRAGAO" e a linha que o operador mais
-    # provavelmente vai ler na maquina Windows.
-    r = executar(TelaFalsa([LISTA, JANELA_ESPELHO_246]), MaoFalsa(), cfg(),
-                 tmp_path, ritmo=JA)
-    assert "ItemAlvo." not in r.motivo
-    assert "dragao" in r.motivo
-
-
 # ---------------------------------------------------------------------------
 # Confirmacao pelo Ouro.
 
@@ -223,7 +216,7 @@ def test_ouro_ainda_nao_debitado_continua_esperando(tmp_path):
     # com atraso); o seguinte ja mostra o debito. Quem para na primeira
     # leitura legivel reporta Compra com queda zero.
     tela = TelaFalsa([LISTA, JANELA_DRAGAO, LISTA, LISTA_DEBITADA])
-    r = executar(tela, MaoFalsa(), cfg(), tmp_path, ritmo=ESPERA_DE_VERDADE)
+    r = executar(tela, MaoFalsa(), cfg(), tmp_path, ritmo=ESPERA_DE_VERDADE, sorteio=random.Random(1))
     assert r.desfecho is Desfecho.COMPROU
     assert r.ouro_depois == 65914
     assert r.motivo == ""
@@ -232,7 +225,7 @@ def test_ouro_que_nunca_se_move_nao_e_compra(tmp_path):
     # Espaco apertado e o Ouro parado ate o teto: e "o Espaco nao registrou",
     # que e a pergunta numero 1 da viagem. Nao pode sair como COMPROU.
     tela = TelaFalsa([LISTA, JANELA_DRAGAO, LISTA])
-    r = executar(tela, MaoFalsa(), cfg(), tmp_path, ritmo=ESPERA_DE_VERDADE)
+    r = executar(tela, MaoFalsa(), cfg(), tmp_path, ritmo=ESPERA_DE_VERDADE, sorteio=random.Random(1))
     assert r.desfecho is Desfecho.OURO_NAO_CAIU
     assert r.desfecho is not Desfecho.COMPROU
     assert r.ouro_antes == 66160
@@ -297,6 +290,58 @@ def test_relatorio_guarda_os_doze_slots_mesmo_sem_nada_compravel(tmp_path):
     assert [(s["linha"], s["coluna"]) for s in dados["slots"]] == [
         (linha, coluna) for linha in range(6) for coluna in range(2)]
 
+
+def test_a_varredura_repassa_os_trabalhadores_configurados_ao_helper(monkeypatch, tmp_path):
+    # Achado do review final: config.trabalhadores ficava pelo caminho entre a
+    # Config e varrer_bruto, entao a varredura sempre corria com o padrao (4)
+    # mesmo com trabalhadores=1 configurado como saida de emergencia. Este
+    # espiao fica em mistfall.leilao, que e onde varrer_bruto de fato chama
+    # mapear — nao em mistfall.piloto, que so espiona as leituras do modal.
+    import mistfall.leilao as leilao
+    from mistfall.paralelo import mapear as mapear_real
+
+    recebidos = []
+
+    def espiao(funcao, itens, trabalhadores):
+        recebidos.append(trabalhadores)
+        return mapear_real(funcao, itens, trabalhadores)
+
+    monkeypatch.setattr(leilao, "mapear", espiao)
+    config = dataclasses.replace(cfg(), trabalhadores=7)  # nem 4 (padrao), nem 1
+    executar(TelaFalsa([LISTA_SEM_NADA]), MaoFalsa(), config, tmp_path, ritmo=JA)
+    assert 7 in recebidos, f"trabalhadores configurado (7) nao chegou ao helper: {recebidos}"
+
+
+def test_as_leituras_do_modal_passam_pelo_helper_de_paralelismo(monkeypatch, tmp_path):
+    # Sem isto o teste de equivalencia abaixo passaria trivialmente: as tres
+    # leituras sequenciais dao o mesmo resultado que as paralelas, entao so
+    # comparar resultado nao prova que o helper entrou no caminho.
+    import mistfall.piloto as piloto
+    from mistfall.paralelo import mapear as mapear_real
+
+    chamadas = []
+
+    def espiao(funcao, itens, trabalhadores):
+        itens = list(itens)
+        chamadas.append(len(itens))
+        return mapear_real(funcao, itens, trabalhadores)
+
+    monkeypatch.setattr(piloto, "mapear", espiao)
+    executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
+    assert 3 in chamadas, "as tres leituras do modal nao passaram pelo mapear"
+
+def test_conferencia_do_modal_bate_entre_paralelo_e_sequencial(tmp_path):
+    def rodar(trabalhadores, pasta):
+        config = dataclasses.replace(cfg(), trabalhadores=trabalhadores)
+        return executar(roteiro_feliz(), MaoFalsa(), config, pasta, ritmo=JA, sorteio=random.Random(1))
+    um = rodar(1, tmp_path / "um")
+    quatro = rodar(4, tmp_path / "quatro")
+    assert (um.item_no_modal, um.preco_no_modal, um.quantidade_no_modal,
+            um.preco_total_esperado) == (
+           quatro.item_no_modal, quatro.preco_no_modal, quatro.quantidade_no_modal,
+           quatro.preco_total_esperado)
+    assert um.desfecho is quatro.desfecho
+
 def test_relatorio_mostra_o_preco_bruto_que_a_conferencia_derrubou(tmp_path):
     # A regra de ordenacao e contagiosa de proposito: uma leitura fora de ordem
     # invalida os vizinhos. Guardar so o preco conferido deixaria o relatorio
@@ -313,3 +358,34 @@ def test_ritmo_padrao_espera_a_janela_por_dez_segundos():
     # abortar por uma primeira carga de UI mais lenta custa a viagem.
     assert Ritmo().teto_espera_janela == 10.0
     assert Ritmo().intervalo_entre_perguntas == 0.1
+
+def test_o_piloto_nao_depende_do_random_global(tmp_path):
+    # Com semente injetada, mexer no random global nao pode mudar a escolha.
+    import random as global_random
+    global_random.seed(1)
+    um = executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, ritmo=JA,
+                  sorteio=random.Random(42)).listagem.item
+    global_random.seed(999)
+    dois = executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, ritmo=JA,
+                    sorteio=random.Random(42)).listagem.item
+    assert um is dois
+
+def test_sorteio_injetado_torna_a_escolha_deterministica(tmp_path):
+    escolhas = {
+        executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, ritmo=JA,
+                 sorteio=random.Random(99)).listagem.item
+        for _ in range(5)
+    }
+    assert len(escolhas) == 1
+
+def test_o_relatorio_registra_o_tempo_de_cada_etapa(tmp_path):
+    r = executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, ritmo=JA,
+                 sorteio=random.Random(99))
+    assert set(r.tempos) >= {"pre_voo", "varredura", "modal"}
+    assert all(v >= 0 for v in r.tempos.values())
+
+def test_o_tempo_por_etapa_vai_para_o_json(tmp_path):
+    executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, ritmo=JA,
+             sorteio=random.Random(99))
+    dados = json.loads((tmp_path / "relatorio.json").read_text(encoding="utf-8"))
+    assert "tempos" in dados and "varredura" in dados["tempos"]

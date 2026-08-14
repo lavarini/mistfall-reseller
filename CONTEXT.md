@@ -21,8 +21,10 @@ Rede, Códice). Cada Item-alvo tem um Preço-alvo associado.
 _Avoid_: Item desejado, Produto.
 
 **Preço-alvo**:
-O preço unitário máximo que aceitamos pagar por um Item-alvo. O bot compra uma Listagem
-quando o Preço-unitário dela é menor ou igual ao Preço-alvo.
+O preço unitário exato pelo qual compramos um Item-alvo. O bot compra uma Listagem
+quando o Preço-unitário dela é **igual** ao Preço-alvo — nem acima, nem abaixo.
+Os Itens-alvo não ficam abaixo desse valor: ele é chão de mercado, e um preço menor
+é leitura errada, não pechincha.
 _Avoid_: Preço-limite, Valor, Preço-máximo (todos aliases; usar Preço-alvo).
 
 **Preço-unitário**:

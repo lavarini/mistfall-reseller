@@ -15,14 +15,18 @@ Entrada: um print da tela em 2560×1440. Saída: a decisão de qual Listagem com
 3. Recorta os 12 slots por coordenada fixa e identifica o item de cada um por **template
    matching do ícone** — não por OCR do nome, que é fonte estilizada
 4. Lê o **Preço-unitário** de cada slot por OCR
-5. Escolhe a Listagem de maior margem entre as que estão abaixo do Preço-alvo
-6. Clica, espera a **Janela de Confirmação** ser detectada, e confere **quatro coisas** nela:
-   o ícone, o Preço Unitário, a Quantidade e o Preço Total
+5. Entre as Listagens que estão **exatamente** no Preço-alvo, sorteia uma. Preço abaixo do
+   Preço-alvo é leitura suspeita, não pechincha: vai para o `relatorio.json`, não gera Compra
+6. Clica, espera a **Janela de Confirmação** ser detectada, e confere **três coisas** nela:
+   o Preço Unitário, a Quantidade e o Preço Total. O ícone também é lido e vai para o
+   `relatorio.json` com os sete scores, mas não faz parte da conferência que aborta
 7. Aperta **Espaço** e confirma que o Ouro caiu **exatamente** o Preço Total
 
-**Na dúvida, não compra.** Qualquer divergência no passo 6 aperta **Esc** e aborta — inclusive
-leitura ilegível, que conta como divergência e não como caso a tratar. É a proteção contra a
-pior falha possível: comprar caro por leitura errada, sem ninguém olhando.
+**Na dúvida, não compra.** Divergência no Preço Unitário, na Quantidade ou no Preço Total do
+passo 6 aperta **Esc** e aborta — inclusive leitura ilegível, que conta como divergência e não
+como caso a tratar. O ícone é a exceção deliberada: é lido e registrado no `relatorio.json`,
+mas não é portão, e sozinho não aborta a Compra. É a proteção contra a pior falha possível:
+comprar caro por leitura errada, sem ninguém olhando.
 
 Velocidade não é requisito. Toda espera é generosa e toda conferência é paga.
 
@@ -85,7 +89,7 @@ tesseract --version
 
 - Jogo em **2560×1440**, com a escala de exibição do Windows em **100%**
 - Leilão aberto, aba **Comprar**, Categoria **Material de Construção**
-- Pelo menos um **Item-alvo abaixo do Preço-alvo** visível na tela
+- Pelo menos um **Item-alvo exatamente no Preço-alvo** visível na tela
 
 ### Simulado, sem risco
 
@@ -108,11 +112,20 @@ mistfall-piloto --pasta execucao-real
 Durante a contagem de 5 segundos, dê **Alt+Tab para o jogo** — não clique nele, porque um
 clique pode abrir um modal sozinho. O `SendInput` vai para a janela ativa.
 
-**Sobre administrador.** O UIPI do Windows impede um processo de integridade menor de enviar
-input a uma janela de integridade maior, e o jogo roda elevado — daí a recomendação. Mas a
-primeira execução na máquina do jogo mostrou comportamento **idêntico com e sem elevação**, com
-o `SendInput` aceitando os eventos nas duas. O que estava travando era outra coisa: o clique ia
-e voltava no mesmo lote, durando tempo zero, e o jogo lê o mouse por amostragem. Detalhes no
+**Sobre administrador.** É necessário — mas o motivo ficou mais claro do que a recomendação
+original deixava parecer. Numa primeira execução na máquina do jogo, o clique falhava **igual
+com e sem elevação**: o `SendInput` aceitava os eventos nos dois casos, e o cursor chegava até
+a Listagem certa. A causa era outra — `LEFTDOWN` e `LEFTUP` viajavam no mesmo lote, o botão
+ficava apertado por tempo zero, e o jogo amostra o mouse uma vez por quadro. Corrigido isso, o
+clique passou a funcionar, e **só como administrador**. O UIPI do Windows — que impede um
+processo de integridade menor de enviar input a uma janela de integridade maior, e o jogo roda
+elevado — segue sendo a explicação mais provável, mas não é uma causa demonstrada, só a
+hipótese que sobrou. Rode elevado de qualquer forma: é o que funciona.
+
+Essa sequência tem um padrão que vale carregar para o próximo bug do gênero: **scancode em vez
+de virtual-key, rodar elevado, e dar duração ao evento** — os três resolvem a mesma distância,
+entre mandar o evento e o alvo perceber o evento, e nenhum deles aparece em teste, porque os
+três vivem do lado de fora do processo. Detalhes no
 [ADR-0001](docs/adr/0001-dev-mac-run-windows.md).
 
 O roteiro completo, com a execução de diagnóstico que roda sem administrador de propósito,
@@ -132,16 +145,16 @@ O `3` existe para não confundir "o Espaço não registrou" com uma Compra confi
 ### O que fica na pasta de execução
 
 Cada captura do caminho vira PNG numerado, mais um `relatorio.json` com tudo que o bot leu —
-inclusive quando ele aborta, e inclusive se algo explodir no meio. Se der errado, é essa pasta
-que diagnostica.
+inclusive quando ele aborta, e inclusive se algo explodir no meio. Traz também o tempo de cada
+etapa (`pre_voo`, `varredura`, `modal`, `confirmacao_do_ouro`), em milissegundos. Se der
+errado, é essa pasta que diagnostica.
 
 ## Configuração
 
-`config.toml` traz o **Preço-alvo** de cada Item-alvo: o máximo que você aceita pagar por
-unidade.
+`config.toml` traz o **Preço-alvo** de cada Item-alvo: o preço exato pelo qual compramos.
 
 ```toml
-fracao_sanidade = 0.25
+trabalhadores = 4
 
 [precos_alvo]
 broche = 188
@@ -153,9 +166,12 @@ rede = 260
 codice = 281
 ```
 
-`fracao_sanidade` é uma proteção contra OCR que perde um dígito: preço lido **abaixo** dessa
-fração do Preço-alvo é tratado como leitura falha, não como pechincha. Um Broche de alvo 188
-aparecendo a 19 é erro, não oportunidade.
+`trabalhadores` controla quantos OCRs rodam em paralelo — na varredura dos 12 slots e nos
+números da Janela de Confirmação. O padrão é **4**: já dá um ganho de ~3× sobre rodar
+sequencial, e deixa CPU sobrando para o próprio jogo, que roda na mesma máquina e precisa
+desenhar a tela que o bot captura. Subir para o total de núcleos rende pouco mais e disputa
+tudo com o jogo — `trabalhadores=1` continua disponível, e roda sequencial de verdade, útil
+para depurar.
 
 ## Desenvolvimento
 
@@ -163,7 +179,7 @@ aparecendo a 19 é erro, não oportunidade.
 .venv/bin/python -m pytest
 ```
 
-São 226 testes, e todos rodam no Mac sem o jogo aberto.
+São 257 testes, e todos rodam no Mac sem o jogo aberto.
 
 ### Ferramentas de bancada
 
@@ -186,11 +202,11 @@ número de acurácia agregado.
 
 ### Uma coisa que este projeto aprendeu do jeito difícil
 
-Verde não é evidência. A base já teve **dez** defeitos da família "teste que não testa" —
-testes que comparavam a saída consigo mesma, que importavam do módulo sob teste a constante
-que iam afirmar, que buscavam uma string no código-fonte em vez de exercitar comportamento.
-Nenhum apareceu como suíte vermelha: todos precisaram de alguém quebrando o código de
-propósito.
+Verde não é evidência. A base já teve **doze** defeitos da família "teste que não testa" —
+cinco só nesta branch —, testes que comparavam a saída consigo mesma, que importavam do
+módulo sob teste a constante que iam afirmar, que buscavam uma string no código-fonte em vez
+de exercitar comportamento. Nenhum apareceu como suíte vermelha: todos precisaram de alguém
+quebrando o código de propósito.
 
 Se você mexer numa proteção, **quebre-a e confirme que a suíte reclama.**
 

@@ -147,6 +147,21 @@ Windows vai corrigir.
 específica sobre o número que decide o gasto. Com o paralelismo, os 400 ms deixam de ser
 relevantes — e a conferência sai barateada junto (198 ms).
 
+> **Revisto durante a execução.** A decisão acima segurava as quatro leituras porque o tempo
+> deixou de importar — mas tempo não era a única variável, e essa parte ficou de fora. A
+> [#18](https://github.com/lavarini/mistfall-reseller/issues/18) mostrou que a conferência do
+> ícone dá **100% de falso negativo** na máquina real: `_esperar_janela` devolve o primeiro
+> frame em que o *estado* já é detectável, e a detecção de estado precisa de menos pixels
+> estáveis que o casamento de ícone, então o modal ainda está desenhando quando o ícone é
+> lido. E, olhando os seis erros de OCR conhecidos do corpus, nenhum teria sido pego só pela
+> conferência do ícone — os nulos já são ignorados por `decisao` e os absurdos são pegos pela
+> ordenação. Uma guarda que erra 100% das vezes que dispara e não pega nenhum dos casos reais
+> não estava protegendo nada, só abortando à toa. O ícone **saiu do portão**: continua sendo
+> lido e vai para o `relatorio.json` com os sete scores — é o que permitiu diagnosticar a #18
+> a distância —, mas deixou de abortar a Compra. Preço Unitário, Quantidade e Preço Total
+> continuam conferindo, porque são baratos, estáveis, e cobrem o caminho que a regra de preço
+> exato deixa aberto (um 250 lido como 246 compraria por 250).
+
 **Enxugar a conferência, mantendo só ícone e Preço Unitário.** Economizaria 260 ms. A
 Quantidade cobre um cenário real que aparece na
 [#6](https://github.com/lavarini/mistfall-reseller/issues/6): se o modal lembrar a quantidade

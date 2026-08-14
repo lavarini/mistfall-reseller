@@ -147,6 +147,12 @@ não como pechincha. Um Broche com Preço-alvo 200 aparecendo a 19 é erro de OC
 oportunidade. A fração é configurável; um preço absurdamente *alto* não precisa de
 tratamento especial, porque a comparação com o Preço-alvo já o rejeita.
 
+> **Superado.** A regra `≤` acima e a `fracao_sanidade` foram substituídas por igualdade
+> exata (`Preço-unitário == Preço-alvo`) mais sorteio entre os empatados: o corpus mostrou
+> que os Itens-alvo nunca ficam abaixo do corte, o que torna qualquer leitura abaixo dele
+> suspeita por definição e a fração, inalcançável. Ver
+> [2026-08-13-preco-exato-e-paralelismo-design.md](2026-08-13-preco-exato-e-paralelismo-design.md).
+
 ### Ferramenta de anotação
 
 Utilitário que recebe um print e devolve a mesma imagem com as caixas desenhadas: cada
@@ -191,6 +197,9 @@ aberta.
 **Escolha entre várias compráveis:** a de maior margem (Preço-alvo − Preço-unitário). Como
 se compra 1 unidade e a lista recarrega a cada Compra, a ordem quase não importa na
 prática, então vale a regra mais simples.
+
+> **Superado.** Com igualdade exata a margem é sempre zero, e todo candidato empata; a
+> escolha passou a ser um sorteio uniforme entre eles — ver a spec de 2026-08-13.
 
 ### Registro
 
