@@ -1,12 +1,13 @@
 """Dispara uma unica Compra. Precisa rodar como administrador no Windows."""
 
 import argparse
+import dataclasses
 import sys
 import time
 from pathlib import Path
 
 from mistfall.config import carregar_config
-from mistfall.piloto import Desfecho, Resultado, executar
+from mistfall.piloto import RITMO_PADRAO, Desfecho, Resultado, executar
 
 SEGUNDOS_DE_CONTAGEM = 5
 
@@ -18,6 +19,12 @@ def montar_parser() -> argparse.ArgumentParser:
     p.add_argument("--pasta", default="execucao",
                    help="onde salvar prints e relatorio")
     p.add_argument("--config", default="config.toml")
+    # A Janela abre com animacao, e enquanto ela corre os campos numericos
+    # estao fora das coordenadas fixas (#18). Quanto ela dura so se descobre
+    # na maquina do jogo — calibrar nao pode exigir editar Python la.
+    p.add_argument("--espera-modal", type=int,
+                   default=round(RITMO_PADRAO.espera_para_o_modal_abrir[0] * 1000),
+                   help="ms entre o clique e o Espaco, dados a Janela para abrir. E o PISO: a espera de cada Compra e sorteada entre ele e 1,5x ele, para o ritmo nao sair sempre identico")
     return p
 
 
@@ -64,8 +71,13 @@ def _rodar(args: argparse.Namespace) -> int:
                   "(nao clique nele) e tire a mao do mouse", flush=True)
             time.sleep(1)
 
+    # Faixa, e nao numero: o piso e o que o operador pediu, e o sorteio vai
+    # para cima. Variar para baixo do valor calibrado perde Compra.
+    piso = args.espera_modal / 1000
+    ritmo = dataclasses.replace(
+        RITMO_PADRAO, espera_para_o_modal_abrir=(piso, piso * 1.5))
     resultado = executar(TelaWindows(), MaoWindows(), config,
-                         Path(args.pasta), simular=args.simular)
+                         Path(args.pasta), simular=args.simular, ritmo=ritmo)
 
     print(f"desfecho: {resultado.desfecho.value}")
     if resultado.motivo:

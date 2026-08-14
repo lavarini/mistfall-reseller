@@ -8,8 +8,9 @@ import pytest
 
 from mistfall.config import Config
 from mistfall.perifericos.falso import MaoFalsa, TelaFalsa
-from mistfall.piloto import Desfecho, Ritmo, executar
-from mistfall.tipos import ItemAlvo
+from mistfall.piloto import (Desfecho, Resultado, Ritmo, _conferir_a_janela,
+                             executar)
+from mistfall.tipos import ItemAlvo, Listagem
 
 LISTA = "images/broche-dragao-orbe-codice-padrao.png"
 JANELA_DRAGAO = "fixtures/sinteticas/janela-dragao-246.png"
@@ -36,8 +37,12 @@ def cfg_sem_alvo():
     return dataclasses.replace(cfg(), precos_alvo={item: 1 for item in ItemAlvo})
 
 def roteiro_feliz():
-    # pre-voo, apos o clique (modal), apos o Espaco (lista com Ouro debitado)
-    return TelaFalsa([LISTA, JANELA_DRAGAO, LISTA_DEBITADA])
+    # pre-voo e, depois do Espaco, a lista com o Ouro debitado.
+    #
+    # Nao ha frame de Janela: o piloto nao captura a tela entre o clique e o
+    # Espaco. Um frame de modal aqui seria consumido pela leitura do Ouro, que
+    # e a proxima captura, e o teste mediria outra coisa.
+    return TelaFalsa([LISTA, LISTA_DEBITADA])
 
 
 JA = Ritmo.instantaneo()  # nenhum teste espera de verdade
@@ -66,35 +71,22 @@ def test_caminho_feliz_registra_os_numeros(tmp_path):
     assert r.listagem.item is ItemAlvo.DRAGAO
 
 def test_caminho_feliz_salva_os_prints(tmp_path):
+    # Duas capturas, e nao mais tres: sumiu a da Janela, que nao e mais
+    # olhada. Restam o pre-voo e a tela com o Ouro debitado — as duas pontas
+    # da unica conferencia que sobrou.
     executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
-    assert len(list(tmp_path.glob("*.png"))) >= 3
+    assert sorted(p.name for p in tmp_path.glob("*.png")) == [
+        "00-pre-voo.png", "01-apos-espaco.png"]
     assert (tmp_path / "relatorio.json").exists()
 
 
 JANELA_ESPELHO = "images/janela.png"          # modal com item que nao e alvo
 RESET = "images/reset-forja.png"              # outra Categoria
 
-def test_icone_e_preco_divergentes_aborta_pelo_preco(tmp_path):
-    # O modal mostra Espelho Adornado (nao e Item-alvo) cobrando 237;
-    # decidimos comprar Dragao a 246. Diverge nos dois, mas o icone deixou
-    # de ser portao — quem aborta agora e o Preco Unitario.
-    mao = MaoFalsa()
-    tela = TelaFalsa([LISTA, JANELA_ESPELHO])
-    r = executar(tela, mao, cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
-    nomes = [a[0] for a in mao.acoes]
-    assert r.desfecho is Desfecho.ABORTOU
-    assert "apertar_espaco" not in nomes
-    assert nomes[-1] == "apertar_esc"
-    assert "modal cobra" in r.motivo
-
-def test_janela_que_nao_abre_aborta_sem_apertar_nada(tmp_path):
-    # A tela nunca vira modal: fica na lista.
-    mao = MaoFalsa()
-    r = executar(TelaFalsa([LISTA, LISTA]), mao, cfg(), tmp_path, ritmo=JA)
-    nomes = [a[0] for a in mao.acoes]
-    assert r.desfecho is Desfecho.ABORTOU
-    assert nomes == ["clicar"]
-    assert r.segundos_ate_a_janela is not None
+# Os testes de divergencia no modal via `executar` sairam daqui: o piloto nao
+# consulta mais a Janela, entao nao ha comportamento a afirmar nesse nivel. As
+# conferencias continuam no codigo e sao exercitadas direto, no fim do arquivo.
+# O mesmo vale para "a Janela nao abriu": sem deteccao, nao existe esse aborto.
 
 def test_nada_compravel_sai_limpo_sem_clicar(tmp_path):
     mao = MaoFalsa()
@@ -137,43 +129,14 @@ JANELA_DRAGAO_999 = "fixtures/sinteticas/janela-dragao-999.png"
 JANELA_DRAGAO_QTD_5 = "fixtures/sinteticas/janela-dragao-246-qtd-5.png"
 JANELA_ORBE_246 = "fixtures/sinteticas/janela-orbe-246.png"
 
-def test_preco_divergente_isolado_aperta_esc_e_nunca_espaco(tmp_path):
-    # Item bate (Dragao), so o Preco Unitario diverge (999 contra 246).
-    mao = MaoFalsa()
-    r = executar(TelaFalsa([LISTA, JANELA_DRAGAO_999]), mao, cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
-    nomes = [a[0] for a in mao.acoes]
-    assert r.desfecho is Desfecho.ABORTOU
-    assert "apertar_espaco" not in nomes
-    assert "apertar_esc" in nomes
-    assert "modal cobra" in r.motivo
-
-def test_quantidade_divergente_isolada_aperta_esc_e_nunca_espaco(tmp_path):
-    # Item e Preco Unitario batem, so a Quantidade diverge (5 em vez de 1).
-    mao = MaoFalsa()
-    r = executar(TelaFalsa([LISTA, JANELA_DRAGAO_QTD_5]), mao, cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
-    nomes = [a[0] for a in mao.acoes]
-    assert r.desfecho is Desfecho.ABORTOU
-    assert "apertar_espaco" not in nomes
-    assert "apertar_esc" in nomes
-    assert "Quantidade e" in r.motivo
-
-def test_icone_divergente_nao_impede_a_compra(tmp_path):
-    # Preco Unitario, Quantidade e Preco Total batem (246, 1, 246); so o
-    # Icone diverge (Orbe em vez de Dragao). O icone saiu do portao: o
-    # piloto segue, aperta Espaco e conclui a Compra.
-    mao = MaoFalsa()
-    tela = TelaFalsa([LISTA, JANELA_ORBE_246, LISTA_DEBITADA])
-    r = executar(tela, mao, cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
-    nomes = [a[0] for a in mao.acoes]
-    assert "apertar_esc" not in nomes
-    assert "apertar_espaco" in nomes
-    assert r.desfecho is Desfecho.COMPROU
-
 def test_ouro_que_cai_valor_inesperado_e_reportado(tmp_path):
     # Depois do Espaco a tela mostra um print real cujo Ouro e 64735, nao
     # os 65914 esperados. A Compra aconteceu, mas a queda nao bate.
+    #
+    # Com o modal fora do caminho, esta e a unica conferencia que sobrou: o
+    # esperado vem da Listagem escolhida, e a queda tem de bater com ele.
     OUTRA_LISTA = "images/broche-tres-adaga-lanterna-rede-padrao.png"  # Ouro 64735
-    tela = TelaFalsa([LISTA, JANELA_DRAGAO, OUTRA_LISTA])
+    tela = TelaFalsa([LISTA, OUTRA_LISTA])
     r = executar(tela, MaoFalsa(), cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
     assert r.desfecho is Desfecho.COMPROU
     assert r.ouro_depois == 64735
@@ -198,16 +161,34 @@ LISTA_OURO_ILEGIVEL = "fixtures/sinteticas/lista-ouro-ilegivel.png"
     (JANELA_TOTAL_ILEGIVEL, "Preco Total ilegivel"),
     # Total que nao fecha com 1 x Preco Unitario.
     (JANELA_TOTAL_250, "nao fecha"),
+    (JANELA_DRAGAO_999, "modal cobra"),
+    (JANELA_DRAGAO_QTD_5, "Quantidade e"),
 ])
-def test_leitura_suspeita_no_modal_aperta_esc_e_nunca_espaco(
-        tmp_path, fixture, pedaco_do_motivo):
-    mao = MaoFalsa()
-    r = executar(TelaFalsa([LISTA, fixture]), mao, cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
-    nomes = [a[0] for a in mao.acoes]
-    assert r.desfecho is Desfecho.ABORTOU
-    assert "apertar_espaco" not in nomes
-    assert nomes[-1] == "apertar_esc"
-    assert pedaco_do_motivo in r.motivo, r.motivo
+def test_conferencia_da_janela_pega_cada_divergencia(fixture, pedaco_do_motivo):
+    # A conferencia esta estacionada: ninguem a chama. Continua exercitada
+    # direto para nao apodrecer enquanto espera — se um dia voltar ao caminho,
+    # tem de voltar funcionando. Ver o docstring de _conferir_a_janela.
+    escolhida = Listagem(linha=2, coluna=1, item=ItemAlvo.DRAGAO, preco_unitario=246)
+    r = Resultado(Desfecho.ABORTOU)
+    divergencia = _conferir_a_janela(cv2.imread(fixture), escolhida, r, 1)
+    assert divergencia is not None, "esta fixture tem de divergir"
+    assert pedaco_do_motivo in divergencia, divergencia
+
+def test_conferencia_da_janela_aprova_o_modal_correto():
+    # O contrario do teste acima: sem ele, uma conferencia que reprovasse tudo
+    # passaria nos seis casos de divergencia sem ninguem perceber.
+    escolhida = Listagem(linha=2, coluna=1, item=ItemAlvo.DRAGAO, preco_unitario=246)
+    r = Resultado(Desfecho.ABORTOU)
+    assert _conferir_a_janela(cv2.imread(JANELA_DRAGAO), escolhida, r, 1) is None
+
+def test_conferencia_da_janela_le_o_icone_sem_reprovar_por_ele():
+    # O icone saiu do portao por decisao registrada, mas continua sendo lido.
+    # JANELA_ORBE_246 mostra Orbe onde escolhemos Dragao, e mesmo assim passa.
+    escolhida = Listagem(linha=2, coluna=1, item=ItemAlvo.DRAGAO, preco_unitario=246)
+    r = Resultado(Desfecho.ABORTOU)
+    assert _conferir_a_janela(cv2.imread(JANELA_ORBE_246), escolhida, r, 1) is None
+    assert r.scores_do_icone is not None, "o icone tem de continuar sendo lido"
+    assert r.item_no_modal == "orbe"
 
 
 # ---------------------------------------------------------------------------
@@ -215,20 +196,115 @@ def test_leitura_suspeita_no_modal_aperta_esc_e_nunca_espaco(
 
 JANELA_EM_ANIMACAO = "images/janela-em-animacao-rede-260.png"
 
-def test_janela_em_animacao_nao_e_a_validada(tmp_path):
-    # Captura real da maquina do jogo: a Janela ja e reconhecivel como
-    # JANELA_CONFIRMACAO enquanto ainda se expande, e nessa fase esta 69 px
-    # acima da posicao final. As regioes fixas caem sobre fundo vazio, o OCR
-    # devolve None nos tres campos, e o piloto reprovava uma Compra boa.
+
+# ---------------------------------------------------------------------------
+# O modal nao e olhado para nada. Decisao do dono do projeto: a leitura da
+# Janela e intermitente e estava custando mais do que entregava. As funcoes
+# continuam no codigo, sem chamador. Ver o docstring de _conferir_a_janela.
+
+class MaoQueAnotaQuandoApertou:
+    """MaoFalsa que registra quantas capturas a tela ja tinha feito."""
+
+    def __init__(self, tela) -> None:
+        self.tela = tela
+        self.acoes: list[tuple] = []
+        self.capturas_ao_apertar: int | None = None
+
+    def clicar(self, x: int, y: int) -> None:
+        self.acoes.append(("clicar", x, y))
+
+    def apertar_espaco(self) -> None:
+        self.capturas_ao_apertar = self.tela.capturas_feitas
+        self.acoes.append(("apertar_espaco",))
+
+    def apertar_esc(self) -> None:
+        self.acoes.append(("apertar_esc",))
+
+def test_compra_sem_a_Janela_aparecer_no_roteiro_da_tela(tmp_path):
+    # O roteiro vai do pre-voo direto para a lista com o Ouro debitado: nao ha
+    # frame de Janela nenhum. O piloto compra assim mesmo, porque nao olha.
     #
-    # O roteiro serve o modal em animacao e so depois o modal assentado. O
-    # piloto tem de comprar: esperar antes de capturar o frame que valida.
-    tela = TelaFalsa([LISTA, JANELA_EM_ANIMACAO, JANELA_DRAGAO, LISTA_DEBITADA])
+    # Este roteiro seria impossivel antes: sem um frame reconhecido como
+    # JANELA_CONFIRMACAO o piloto abortava com "a Janela nao abriu".
+    tela = TelaFalsa([LISTA, LISTA_DEBITADA])
     mao = MaoFalsa()
     r = executar(tela, mao, cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
     nomes = [a[0] for a in mao.acoes]
     assert r.desfecho is Desfecho.COMPROU, r.motivo
+    assert nomes == ["clicar", "apertar_espaco"]
     assert "apertar_esc" not in nomes
+
+def test_nenhuma_captura_entre_o_clique_e_o_espaco(tmp_path):
+    # A prova de que o modal nao e olhado: entre o pre-voo e o Espaco a tela
+    # nao e consultada nenhuma vez. Sem isto, reintroduzir uma captura de
+    # diagnostico passaria despercebido e traria o custo de volta.
+    tela = TelaFalsa([LISTA, JANELA_DRAGAO, LISTA_DEBITADA])
+    mao = MaoQueAnotaQuandoApertou(tela)
+    executar(tela, mao, cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
+    assert mao.capturas_ao_apertar == 1, "so o pre-voo deve ter sido capturado"
+
+def test_preco_total_esperado_vem_da_listagem_e_nao_do_modal(tmp_path):
+    # Com o modal fora do caminho, a queda do Ouro e a unica conferencia que
+    # sobra — e o valor esperado passa a vir da Listagem escolhida, assumindo
+    # Quantidade 1.
+    #
+    # Sem frame de Janela no roteiro, o unico lugar de onde 246 pode ter vindo
+    # e a Listagem escolhida. Se ainda viesse do modal seria None, e a
+    # comparacao com a queda do Ouro nunca bateria.
+    tela = TelaFalsa([LISTA, LISTA_DEBITADA])
+    r = executar(tela, MaoFalsa(), cfg(), tmp_path, ritmo=JA,
+                 sorteio=random.Random(1))
+    assert r.preco_total_esperado == r.listagem.preco_unitario == 246
+    assert r.desfecho is Desfecho.COMPROU, r.motivo
+
+def test_a_conferencia_reprovaria_o_frame_em_animacao(tmp_path):
+    # Captura real da maquina do jogo: a Janela e reconhecivel como
+    # JANELA_CONFIRMACAO enquanto ainda se expande, e nessa fase esta 69 px
+    # acima da posicao final, com as regioes fixas sobre fundo vazio.
+    #
+    # O piloto nao valida mais nada, entao isso deixou de derrubar Compra. O
+    # teste fica como registro do achado: se a conferencia voltar ao caminho
+    # sem que a espera cubra a animacao, ela reprova de novo.
+    escolhida = Listagem(linha=3, coluna=0, item=ItemAlvo.REDE, preco_unitario=260)
+    divergencia = _conferir_a_janela(
+        cv2.imread(JANELA_EM_ANIMACAO), escolhida, Resultado(Desfecho.ABORTOU), 1)
+    assert divergencia is not None
+    assert "ilegivel" in divergencia, divergencia
+
+def test_espera_do_modal_e_sorteada_dentro_da_faixa(tmp_path):
+    # Ritmo identico em tudo, sementes diferentes: se a espera fosse fixa os
+    # dois valores seriam iguais. O sorteio existe para o ritmo do bot nao
+    # sair sempre com o mesmo numero.
+    ritmo = dataclasses.replace(JA, espera_para_o_modal_abrir=(0.08, 0.12))
+    vistos = set()
+    for semente in range(12):
+        r = executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path / str(semente),
+                     ritmo=ritmo, sorteio=random.Random(semente))
+        vistos.add(r.espera_do_modal_ms)
+    assert len(vistos) > 1, "a espera saiu igual em 12 sementes: nao ha sorteio"
+    assert all(80 <= ms <= 120 for ms in vistos), sorted(vistos)
+
+def test_a_espera_do_modal_nunca_fica_abaixo_do_piso(tmp_path):
+    # O sorteio e para cima, nunca para baixo: curto demais faz o Espaco
+    # chegar antes de a Janela abrir, e a Compra se perde. O piso e o numero
+    # calibrado; a variacao e so enfeite por cima dele.
+    ritmo = dataclasses.replace(JA, espera_para_o_modal_abrir=(0.08, 0.12))
+    for semente in range(30):
+        r = executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path / str(semente),
+                     ritmo=ritmo, sorteio=random.Random(semente))
+        assert r.espera_do_modal_ms >= 80
+
+def test_relatorio_diz_quanto_esperou_pelo_modal(tmp_path):
+    # A espera vai ser calibrada por tentativas na maquina do jogo. Sem este
+    # numero gravado, as pastas de execucao viram evidencia sem etiqueta: nao
+    # da para saber qual tentativa produziu qual resultado.
+    # Faixa degenerada, com piso e teto iguais: o sorteio so pode devolver um
+    # valor, entao o teste afirma o numero exato sem depender de semente.
+    ritmo = dataclasses.replace(JA, espera_para_o_modal_abrir=(0.25, 0.25))
+    executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, ritmo=ritmo,
+             sorteio=random.Random(1))
+    dados = json.loads((tmp_path / "relatorio.json").read_text(encoding="utf-8"))
+    assert dados["espera_do_modal_ms"] == 250
 
 def test_o_frame_em_animacao_realmente_engana_a_deteccao_de_estado(tmp_path):
     # A premissa do teste acima. Se um dia a deteccao de estado passar a
@@ -291,32 +367,23 @@ def test_excecao_depois_do_clique_ainda_escreve_o_relatorio(tmp_path):
     with pytest.raises(RuntimeError):
         executar(TelaQueExplodeDepoisDoPrimeiroFrame(), mao, cfg(), tmp_path,
                  ritmo=JA)
-    assert [a[0] for a in mao.acoes] == ["clicar"]  # o bot ja mexeu no jogo
+    # O bot ja mexeu no jogo: clicou e apertou Espaco antes de a tela cair.
+    assert [a[0] for a in mao.acoes] == ["clicar", "apertar_espaco"]
     dados = json.loads((tmp_path / "relatorio.json").read_text(encoding="utf-8"))
     assert dados["desfecho"] == "abortou"
     assert "explodiu" in dados["motivo"]
     assert "mss caiu" in dados["motivo"]
 
-def test_relatorio_guarda_o_que_o_modal_mostrava_mesmo_abortando(tmp_path):
-    executar(TelaFalsa([LISTA, JANELA_ESPELHO_246]), MaoFalsa(), cfg(),
-             tmp_path, ritmo=JA)
+def test_relatorio_nao_traz_mais_nada_do_modal(tmp_path):
+    # O modal nao e lido, entao estes campos ficam vazios de proposito. Se um
+    # deles voltar a ser preenchido, alguem religou a leitura no caminho da
+    # Compra — que e justamente o que foi desativado.
+    executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, ritmo=JA,
+             sorteio=random.Random(1))
     dados = json.loads((tmp_path / "relatorio.json").read_text(encoding="utf-8"))
-    assert dados["desfecho"] == "abortou"
-    assert dados["item_no_modal"] is None
-    assert dados["preco_no_modal"] == 246
-    assert dados["quantidade_no_modal"] == 1
-    assert dados["preco_total_esperado"] == 246
-
-def test_relatorio_guarda_os_sete_scores_do_icone(tmp_path):
-    # Aborto por icone e o desfecho mais provavel da execucao no Windows, e
-    # sem os scores o operador volta so com "o modal mostra None".
-    executar(TelaFalsa([LISTA, JANELA_ESPELHO_246]), MaoFalsa(), cfg(),
-             tmp_path, ritmo=JA)
-    dados = json.loads((tmp_path / "relatorio.json").read_text(encoding="utf-8"))
-    assert set(dados["scores_do_icone"]) == {
-        "broche", "adaga", "lanterna", "orbe", "dragao", "rede", "codice"}
-    assert all(0.0 <= s <= 1.0 for s in dados["scores_do_icone"].values())
-    assert 0.85 <= dados["escala_do_icone"] <= 1.15
+    for campo in ("item_no_modal", "preco_no_modal", "quantidade_no_modal",
+                  "escala_do_icone", "scores_do_icone", "segundos_ate_a_janela"):
+        assert dados[campo] is None, campo
 
 def test_relatorio_guarda_os_doze_slots_mesmo_sem_nada_compravel(tmp_path):
     # O desfecho nada_compravel era o mais opaco de todos: dizia que nao havia
@@ -345,7 +412,8 @@ def test_as_leituras_do_modal_passam_pelo_helper_de_paralelismo(monkeypatch, tmp
         return mapear_real(funcao, itens, trabalhadores)
 
     monkeypatch.setattr(piloto, "mapear", espiao)
-    executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
+    escolhida = Listagem(linha=2, coluna=1, item=ItemAlvo.DRAGAO, preco_unitario=246)
+    _conferir_a_janela(cv2.imread(JANELA_DRAGAO), escolhida, Resultado(Desfecho.ABORTOU), 2)
     assert 3 in chamadas, "as tres leituras do modal nao passaram pelo mapear"
 
 def test_conferencia_do_modal_bate_entre_paralelo_e_sequencial(tmp_path):

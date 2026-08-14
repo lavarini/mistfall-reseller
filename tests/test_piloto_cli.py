@@ -13,6 +13,37 @@ def test_parser_tem_simular_e_pasta():
 def test_simular_e_falso_por_padrao():
     assert montar_parser().parse_args([]).simular is False
 
+def test_espera_do_modal_e_ajustavel_em_milissegundos():
+    # A Janela abre com animacao, e quanto ela dura so se descobre na maquina
+    # do jogo. Calibrar nao pode exigir editar Python la.
+    assert montar_parser().parse_args(["--espera-modal", "250"]).espera_modal == 250
+
+def test_espera_do_modal_vira_faixa_com_piso_no_valor_pedido(monkeypatch, tmp_path):
+    # O flag e em ms porque e assim que se fala de animacao; o Ritmo e em
+    # segundos. E o valor pedido e o PISO da faixa sorteada, nunca o teto: o
+    # sorteio existe para o ritmo variar, e variar para baixo perde Compra.
+    import ferramentas.piloto_cli as cli
+    import mistfall.perifericos.windows as windows
+
+    monkeypatch.setattr(windows, "TelaWindows", type("T", (), {}))
+    monkeypatch.setattr(windows, "MaoWindows", type("M", (), {}))
+    monkeypatch.setattr(cli, "carregar_config",
+                        lambda caminho: Config(precos_alvo={ItemAlvo.DRAGAO: 246}))
+    visto = {}
+
+    def espiao(*a, **k):
+        visto["ritmo"] = k["ritmo"]
+        return Resultado(Desfecho.COMPROU)
+
+    monkeypatch.setattr(cli, "executar", espiao)
+    monkeypatch.setattr(sys, "argv", ["mistfall-piloto", "--simular",
+                                      "--pasta", str(tmp_path),
+                                      "--espera-modal", "250"])
+    assert cli.main() == 0
+    piso, teto = visto["ritmo"].espera_para_o_modal_abrir
+    assert piso == 0.25
+    assert teto > piso
+
 def test_comprou_sai_zero():
     assert codigo_de_saida(Resultado(Desfecho.COMPROU)) == 0
 

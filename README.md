@@ -19,18 +19,26 @@ Entrada: um print da tela em 2560×1440. Saída: a decisão de qual Listagem com
    posição vertical
 5. Entre as Listagens que estão **exatamente** no Preço-alvo, sorteia uma. Preço abaixo do
    Preço-alvo é leitura suspeita, não pechincha: vai para o `relatorio.json`, não gera Compra
-6. Clica, espera a **Janela de Confirmação** ser detectada, e confere **três coisas** nela:
-   o Preço Unitário, a Quantidade e o Preço Total. O ícone também é lido e vai para o
-   `relatorio.json` com os sete scores, mas não faz parte da conferência que aborta
-7. Aperta **Espaço** e confirma que o Ouro caiu **exatamente** o Preço Total
+6. Clica, espera um tempo sorteado numa faixa curta para a **Janela de Confirmação**
+   abrir, e aperta **Espaço**
+7. Confirma que o Ouro caiu **exatamente** o Preço-unitário da Listagem escolhida
 
-**Na dúvida, não compra.** Divergência no Preço Unitário, na Quantidade ou no Preço Total do
-passo 6 aperta **Esc** e aborta — inclusive leitura ilegível, que conta como divergência e não
-como caso a tratar. O ícone é a exceção deliberada: é lido e registrado no `relatorio.json`,
-mas não é portão, e sozinho não aborta a Compra. É a proteção contra a pior falha possível:
-comprar caro por leitura errada, sem ninguém olhando.
+**A Janela de Confirmação não é conferida.** Ela não é detectada, não é capturada e não é
+lida — o passo 6 é uma espera e uma tecla. A conferência existia e foi desativada: ela nunca
+pegou uma Compra ruim e derrubou Compras boas duas vezes, porque ler o modal é intermitente.
+O porquê, o que isso deixa descoberto e o que continua cobrindo estão no
+[ADR-0003](docs/adr/0003-nao-conferir-a-janela-de-confirmacao.md).
 
-Velocidade não é requisito. Toda espera é generosa e toda conferência é paga.
+O que protege agora vive **antes** do clique: só é comprável o preço **exatamente** igual ao
+Preço-alvo, e a conferência de ordenação invalida preço fora da ordem crescente. Depois do
+clique sobra uma conferência só, a do passo 7 — ela não impede a Compra errada, mas não deixa
+ela passar calada.
+
+Velocidade não era requisito enquanto era uma Compra e para. Com a conferência do modal fora
+do caminho, a espera do passo 6 é o único tempo morto que restou. Ela é **sorteada** a cada
+Compra, entre o valor calibrado e 1,5× ele, para o ritmo não sair sempre idêntico — o piso é
+`--espera-modal`, e o sorteio vai só para cima dele: variar para baixo do calibrado perde
+Compra.
 
 ## Onde roda
 
@@ -138,7 +146,7 @@ está em [`docs/execucao-windows.md`](docs/execucao-windows.md).
 | Código | Significado |
 |--------|-------------|
 | `0` | Correu como esperado: comprou, simulou, ou não havia nada comprável |
-| `1` | Abortou por segurança — divergência no modal, ou tela que ele não entendeu |
+| `1` | Abortou por segurança — tela que ele não entendeu, ou Ouro ilegível |
 | `2` | Problema de ambiente: resolução errada, tesseract ausente, config inválida |
 | `3` | Apertou Espaço e o **Ouro não se moveu** |
 
@@ -168,20 +176,26 @@ rede = 260
 codice = 281
 ```
 
-`trabalhadores` controla quantos OCRs rodam em paralelo **na Janela de Confirmação** — são as
-três leituras dela, e só. A varredura dos 12 slots **não** usa este número: ela faz uma chamada
-só ao tesseract, com os doze recortes empilhados numa folha, e não há o que paralelizar.
+`trabalhadores` controlava quantos OCRs rodavam em paralelo. Hoje **não controla nada**: a chave
+está dormente, e mexer nela não muda o comportamento do bot.
 
-Vale a pena saber por quê, porque foi o contrário do esperado: paralelizar doze execuções do
-tesseract continua sendo doze execuções, e o custo real era criar processo — 5729 ms na máquina
-do jogo contra 477 ms no Mac, com o mesmo paralelismo ligado. Trocar doze chamadas por uma
-levou a varredura de 503 ms para 221 ms no Mac, e de quebra subiu o acerto do corpus de 79 para
-84 slots em 84: empilhados, o tesseract compara altura de dígito e alinhamento entre as linhas,
-onde antes julgava cada recorte sozinho.
+Ela perdeu os dois consumidores que tinha. A varredura dos 12 slots deixou de usar este número —
+ela faz uma chamada só ao tesseract, com os doze recortes empilhados numa folha, e não há o que
+paralelizar. E as três leituras da Janela de Confirmação saíram do caminho junto com a
+conferência do modal, pelo [ADR-0003](docs/adr/0003-nao-conferir-a-janela-de-confirmacao.md).
 
-O padrão é **4**, e deixa CPU sobrando para o próprio jogo, que roda na mesma máquina e precisa
-desenhar a tela que o bot captura. `trabalhadores=1` continua disponível, e roda sequencial de
-verdade, útil para depurar.
+A chave e o helper (`src/mistfall/paralelo.py`) continuam no código de propósito, não por
+esquecimento: a leitura em folha única e a espera cega no modal são as duas experimentais, e
+manter o paralelismo permite voltar atrás sem reconstruir nada. A
+[#20](https://github.com/lavarini/mistfall-reseller/issues/20) decide se ele fica ou sai, e o
+que o traria de volta.
+
+Vale a pena saber por que a varredura o perdeu, porque foi o contrário do esperado: paralelizar
+doze execuções do tesseract continua sendo doze execuções, e o custo real era criar processo —
+5729 ms na máquina do jogo contra 477 ms no Mac, com o mesmo paralelismo ligado. Trocar doze
+chamadas por uma levou a varredura de 503 ms para 221 ms no Mac, e de quebra subiu o acerto do
+corpus de 79 para 84 slots em 84: empilhados, o tesseract compara altura de dígito e alinhamento
+entre as linhas, onde antes julgava cada recorte sozinho.
 
 ## Desenvolvimento
 
@@ -189,7 +203,7 @@ verdade, útil para depurar.
 .venv/bin/python -m pytest
 ```
 
-São 267 testes, e todos rodam no Mac sem o jogo aberto.
+São 274 testes, e todos rodam no Mac sem o jogo aberto.
 
 ### Ferramentas de bancada
 
