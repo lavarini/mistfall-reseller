@@ -314,13 +314,13 @@ def test_as_leituras_do_modal_passam_pelo_helper_de_paralelismo(monkeypatch, tmp
         return mapear_real(funcao, itens, trabalhadores)
 
     monkeypatch.setattr(piloto, "mapear", espiao)
-    executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, ritmo=JA)
+    executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
     assert 3 in chamadas, "as tres leituras do modal nao passaram pelo mapear"
 
 def test_conferencia_do_modal_bate_entre_paralelo_e_sequencial(tmp_path):
     def rodar(trabalhadores, pasta):
         config = dataclasses.replace(cfg(), trabalhadores=trabalhadores)
-        return executar(roteiro_feliz(), MaoFalsa(), config, pasta, ritmo=JA)
+        return executar(roteiro_feliz(), MaoFalsa(), config, pasta, ritmo=JA, sorteio=random.Random(1))
     um = rodar(1, tmp_path / "um")
     quatro = rodar(4, tmp_path / "quatro")
     assert (um.item_no_modal, um.preco_no_modal, um.quantidade_no_modal,
