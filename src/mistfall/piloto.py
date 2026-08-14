@@ -100,6 +100,8 @@ class Resultado:
     # tela; guardar so o bruto esconderia quais slots a regra invalidou.
     slots: list[dict] | None = None
     capturas: list[str] = field(default_factory=list)
+    # Tempo de cada etapa, em milissegundos
+    tempos: dict[str, float] = field(default_factory=dict)
 
 
 class _Diario:
@@ -242,6 +244,7 @@ def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
     # o finally, uma excecao inesperada deixa o operador com PNGs soltos
     # depois de ja ter mexido no jogo.
     try:
+        t_pre_voo = time.monotonic()
         inicial = tela.capturar()
         diario.registrar(inicial, "pre-voo")
 
@@ -254,8 +257,11 @@ def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
         if r.ouro_antes is None:
             return encerrar(Desfecho.ABORTOU, "Ouro inicial ilegivel")
 
+        r.tempos["pre_voo"] = (time.monotonic() - t_pre_voo) * 1000
+
         # Em dois passos, e nao pelo `varrer`, para o relatorio poder mostrar
         # o que o OCR entregou ao lado do que a conferencia deixou passar.
+        t_varredura = time.monotonic()
         brutas = varrer_bruto(inicial)
         conferidas = conferir_ordenacao(brutas)
         r.slots = [
@@ -270,6 +276,8 @@ def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
         ]
 
         escolhida = escolher(conferidas, config, sorteio)
+        r.tempos["varredura"] = (time.monotonic() - t_varredura) * 1000
+
         if escolhida is None:
             return encerrar(Desfecho.NADA_COMPRAVEL,
                             "nenhuma Listagem abaixo do Preco-alvo")
@@ -282,18 +290,23 @@ def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
         time.sleep(random.uniform(*ritmo.pausa_antes_do_clique))
         mao.clicar((x0 + x1) // 2, (y0 + y1) // 2)
 
+        t_modal = time.monotonic()
         modal, r.segundos_ate_a_janela = _esperar_janela(tela, diario, ritmo)
         if modal is None:
             return encerrar(Desfecho.ABORTOU, "a Janela de Confirmacao nao abriu")
 
         divergencia = _conferir_a_janela(modal, escolhida, r, config.trabalhadores)
+        r.tempos["modal"] = (time.monotonic() - t_modal) * 1000
+
         if divergencia is not None:
             mao.apertar_esc()
             return encerrar(Desfecho.ABORTOU, divergencia)
 
+        t_confirmacao = time.monotonic()
         mao.apertar_espaco()
         time.sleep(ritmo.espera_apos_espaco)
         _esperar_o_ouro_cair(tela, diario, r, ritmo)
+        r.tempos["confirmacao_do_ouro"] = (time.monotonic() - t_confirmacao) * 1000
 
         if r.ouro_depois is None:
             return encerrar(Desfecho.ABORTOU,

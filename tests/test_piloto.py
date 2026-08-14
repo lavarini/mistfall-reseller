@@ -348,3 +348,23 @@ def test_o_piloto_nao_depende_do_random_global(tmp_path):
     dois = executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, ritmo=JA,
                     sorteio=random.Random(42)).listagem.item
     assert um is dois
+
+def test_sorteio_injetado_torna_a_escolha_deterministica(tmp_path):
+    escolhas = {
+        executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, ritmo=JA,
+                 sorteio=random.Random(99)).listagem.item
+        for _ in range(5)
+    }
+    assert len(escolhas) == 1
+
+def test_o_relatorio_registra_o_tempo_de_cada_etapa(tmp_path):
+    r = executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, ritmo=JA,
+                 sorteio=random.Random(99))
+    assert set(r.tempos) >= {"pre_voo", "varredura", "modal"}
+    assert all(v >= 0 for v in r.tempos.values())
+
+def test_o_tempo_por_etapa_vai_para_o_json(tmp_path):
+    executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, ritmo=JA,
+             sorteio=random.Random(99))
+    dados = json.loads((tmp_path / "relatorio.json").read_text(encoding="utf-8"))
+    assert "tempos" in dados and "varredura" in dados["tempos"]
