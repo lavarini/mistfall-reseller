@@ -101,23 +101,17 @@ def test_deteccao_bate_com_o_corpus_rotulado(caminho_json):
 def test_o_corpus_nao_esta_vazio():
     assert len(CASOS) >= 7
 
-# Slots cujo Preco-unitario a conferencia de ordenacao derruba em cada print,
-# escritos a mao a partir da leitura crua registrada no corpus. Print que nao
-# aparece aqui sai da conferencia com os doze precos intactos.
+# Slots cujo Preco-unitario a conferencia de ordenacao derruba em cada print.
+# Vazio desde a leitura em folha unica: os tres prints que apareciam aqui
+# apareciam por erro de OCR — um 24 onde a verdade era 241, um 2892 onde era
+# 282, um 293 onde era 223 — e a folha unica le os tres certo. Nenhuma leitura
+# do corpus viola mais a ordenacao.
 #
-# broche-dragao-orbe-codice: o OCR le 24 em (2,0), onde a verdade e 241. O 24
-#   derruba a si mesmo e tudo que vem antes dele, que e maior.
-# broche-tres-dragao: o OCR le 2892 em (4,0), onde a verdade e 282. O 2892
-#   derruba a si mesmo e tudo que vem depois, que e menor.
-# lanterna-dragao-orbe-rede: o OCR le 293 em (0,1), onde a verdade e 223. Custa
-#   9 dos 12 slots — o preco do custo de nunca comprar caro por leitura errada.
-DERRUBADOS_PELA_ORDENACAO = {
-    "broche-dragao-orbe-codice-padrao": [(0, 0), (0, 1), (1, 0), (2, 0)],
-    "broche-tres-dragao-padrao": [(4, 0), (4, 1), (5, 0), (5, 1)],
-    "lanterna-dragao-orbe-rede": [
-        (0, 1), (1, 0), (1, 1), (2, 0), (2, 1), (3, 0), (3, 1), (4, 0), (4, 1),
-    ],
-}
+# Dicionario vazio nao e teste sem dentes: se o OCR regredir e voltar a produzir
+# preco fora de ordem, a ordenacao derruba slots e este teste quebra na hora. O
+# comportamento da propria regra e provado em tests/test_ordenacao.py, com
+# listagens montadas a mao — nao depende do corpus acertar ou errar.
+DERRUBADOS_PELA_ORDENACAO = {}
 
 @pytest.mark.parametrize("caminho_json", CASOS, ids=lambda p: pathlib.Path(p).stem)
 def test_conferencia_de_ordenacao_derruba_exatamente_os_slots_previstos(caminho_json):
@@ -166,7 +160,7 @@ def test_slot_com_gap_de_ocr_tem_verdade_humana_propria():
             assert verdade > 0, onde
             # Se fossem iguais nao haveria gap nenhum a registrar.
             assert verdade != slot["ocr_lido_atual"], onde
-    assert conferidos == 5
+    assert conferidos == 0
 
 def test_corpus_tem_gaps_conhecidos_de_ocr():
     """Afirma quantos slots carregam falha de OCR conhecida.
@@ -179,8 +173,9 @@ def test_corpus_tem_gaps_conhecidos_de_ocr():
         slots = json.loads(pathlib.Path(caminho).read_text(encoding="utf-8"))["slots"]
         total_gaps += sum(1 for slot in slots if "ocr_lido_atual" in slot)
 
-    assert total_gaps == 5, (
-        f"Corpus tem {total_gaps} slots com ocr_lido_atual, esperado 5. "
-        "Se um gap foi fechado (OCR melhorou), remova o campo e confira o corpus. "
-        "Se um gap novo apareceu, adicione ocr_lido_atual ao JSON e reavalie."
+    assert total_gaps == 0, (
+        f"Corpus tem {total_gaps} slots com ocr_lido_atual, esperado 0. "
+        "A leitura em folha unica fechou os cinco gaps que existiam. "
+        "Se um gap novo apareceu, o OCR regrediu — investigue antes de "
+        "adicionar ocr_lido_atual de volta."
     )
