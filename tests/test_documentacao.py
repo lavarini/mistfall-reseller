@@ -63,3 +63,12 @@ def test_o_readme_nao_promete_paralelismo_na_varredura():
 
 def test_o_readme_explica_a_leitura_em_folha_unica():
     assert "folha" in README.lower()
+
+
+def test_o_readme_diz_que_trabalhadores_esta_dormente():
+    # A chave perdeu os DOIS consumidores que tinha: a varredura virou uma
+    # chamada so, e as tres leituras da Janela sairam com a conferencia do
+    # modal (ADR-0003). O teste acima guarda uma frase antiga; este guarda a
+    # afirmacao atual, que e mais forte — a chave nao controla nada. Config que
+    # promete uma coisa e faz outra ja custou um review inteiro neste projeto.
+    assert "dormente" in README
