@@ -53,7 +53,9 @@
 
 - Jogo em **2560x1440**, em primeiro plano.
 - Leilao aberto, aba **Comprar**, Categoria **Material de Construcao**.
-- Pelo menos um **Item-alvo abaixo do Preco-alvo** visivel na tela.
+- Pelo menos um **Item-alvo exatamente no Preco-alvo** visivel na tela. Preco abaixo do
+  Preco-alvo e leitura suspeita, nao pechincha: nao gera Compra, entao a pre-condicao com a
+  regra nova e "no valor", nao "abaixo dele".
 - O terminal aberto **na raiz do repositorio**. "Executar como administrador" abre o
   terminal em `C:\Windows\System32`, e `--pasta` e `--config` sao relativos ao diretorio
   atual: de la, ou o piloto morre em codigo 2 sem achar o `config.toml`, ou as pastas de
@@ -83,7 +85,7 @@ Ela nao clica nem aperta nada, e o desfecho esperado e `simulou`. Confira no rel
 item e o preco que ela diz que compraria batem com o que voce ve na tela. **Se isso nao
 bater, pare aqui** — a visao nao esta lendo a tela ao vivo, e nao adianta arriscar ouro.
 
-Se o desfecho vier `nada_compravel`, nao e falha do bot: nao ha Item-alvo abaixo do
+Se o desfecho vier `nada_compravel`, nao e falha do bot: nao ha Item-alvo exatamente no
 Preco-alvo na tela. Refaca a pre-condicao e rode de novo.
 
 ## Segunda execucao: sem administrador, de proposito
@@ -107,7 +109,7 @@ Ha **tres** desfechos possiveis:
 2. **Codigo 1**, com "a Janela de Confirmacao nao abriu" — o clique nao produziu efeito.
 3. **Ela compra de verdade** (codigo 0, ou 3) — mas significa que uma Compra foi feita:
    **refaca a pre-condicao antes da terceira execucao** (confira que ainda ha Item-alvo
-   abaixo do Preco-alvo na tela).
+   exatamente no Preco-alvo na tela).
 
 **O desfecho 2 nao prova UIPI.** Uma versao anterior deste roteiro dizia que sim, e a
 execucao de 2026-08-13 mostrou que nao: com e sem administrador o comportamento foi
@@ -132,16 +134,25 @@ $LASTEXITCODE
 Durante a contagem de 5 segundos: **Alt+Tab para o jogo**, sem clicar nele, e tire a mao do
 mouse.
 
-### Se o desfecho for "abortou" com "o modal mostra nenhum Item-alvo reconhecido"
+### Se o desfecho for "abortou"
 
-E o aborto mais provavel, e **nao e viagem perdida**. Significa que o ícone dentro da Janela
-nao casou com nenhum template — quase certamente porque o modal desenha o icone numa escala
-que a varredura de 0,85x a 1,15x nao cobre, ou com fundo diferente do da lista.
+O ícone dentro da Janela **nao e mais portao**: ele e lido e pontuado contra os sete
+templates, e tudo isso vai para o `relatorio.json` (`item_no_modal`, `escala_do_icone`,
+`scores_do_icone`), mas uma divergencia so nele **nao aborta** — o piloto segue e aperta
+Espaco mesmo que o icone nao tenha casado com nada. Se voce esperava "o modal mostra nenhum
+Item-alvo reconhecido" como o aborto mais provavel: essa string nao existe mais, e o
+desfecho que ela descrevia hoje e o desfecho em que o bot **compra**.
 
-O bot nao apertou Espaco, entao nao gastou ouro. E o print `01-janela.png` daquela pasta **e
-a fixture que faltava** desde o inicio do projeto: o primeiro modal com Item-alvo dentro.
-Traga a pasta; o `relatorio.json` traz os sete scores do icone e a escala vencedora, que
-dizem exatamente o quanto faltou.
+Quem aborta agora e a conferencia do **Preco Unitario**, da **Quantidade** e do **Preco
+Total** contra a Listagem escolhida. O `motivo` no `relatorio.json` diz qual dos tres:
+
+- "Preco Unitario ilegivel no modal", ou "o modal cobra X, a Listagem dizia Y"
+- "Quantidade ilegivel no modal", ou "a Quantidade e N, esperava 1"
+- "Preco Total ilegivel no modal", ou "o Preco Total e X, e 1 unidade a Y nao fecha com isso"
+
+Nesses casos o bot nao apertou Espaco, entao nao gastou ouro. Traga a pasta inteira; o
+`relatorio.json` traz tudo que o modal mostrava, inclusive os scores do icone, mesmo quando
+o aborto foi por preco ou quantidade.
 
 ## O que trazer de volta
 
