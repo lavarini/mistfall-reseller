@@ -15,11 +15,11 @@ def test_tela_falsa_devolve_copia_nao_o_frame_original():
     assert np.array_equal(segunda, original)
 
 def test_tela_falsa_serve_os_frames_na_ordem():
+    # Confere QUAL frame veio em cada captura. "os dois diferem" passaria
+    # tambem com a ordem invertida — e a ordem e todo o roteiro do piloto.
     tela = TelaFalsa([LISTA, JANELA])
-    primeira = tela.capturar()
-    segunda = tela.capturar()
-    assert primeira.shape == (1440, 2560, 3)
-    assert not np.array_equal(primeira, segunda)
+    assert np.array_equal(tela.capturar(), cv2.imread(LISTA))
+    assert np.array_equal(tela.capturar(), cv2.imread(JANELA))
 
 def test_tela_falsa_repete_o_ultimo_frame_quando_acaba():
     tela = TelaFalsa([LISTA, JANELA])

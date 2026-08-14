@@ -32,13 +32,32 @@ def test_o_teste_de_import_pega_a_forma_from(tmp_path):
     arquivo.write_text("from ctypes import wintypes\n", encoding="utf-8")
     assert "ctypes" in _modulos_importados(arquivo)
 
+def _fontes_do_projeto() -> list[pathlib.Path]:
+    """Todo .py do projeto — inclusive os testes.
+
+    A restricao e "nenhum outro arquivo, nem teste": um teste que importe
+    ctypes ou mss deixa de rodar no Mac, que e onde este projeto e
+    desenvolvido, e a suite inteira vira refem da maquina Windows.
+    """
+    return [py for pasta in ("src", "ferramentas", "tests")
+            for py in pathlib.Path(pasta).rglob("*.py")]
+
 def test_nenhum_outro_arquivo_importa_windows():
     # Toda dependencia de Windows tem de estar confinada a este arquivo.
-    for py in list(pathlib.Path("src").rglob("*.py")) + list(pathlib.Path("ferramentas").rglob("*.py")):
+    conferidos = 0
+    for py in _fontes_do_projeto():
         if py == FONTE:
             continue
+        conferidos += 1
         vazando = _modulos_importados(py) & PROIBIDOS
         assert not vazando, f"{py} importa {vazando}"
+    # Sem isto, um glob que nao casa com nada passaria como sucesso.
+    assert conferidos >= 20, f"varreu so {conferidos} arquivos"
+
+def test_a_varredura_alcanca_os_testes():
+    # Guarda o alcance da varredura acima: quando ela so olhava src/ e
+    # ferramentas/, um teste podia importar ctypes sem ninguem notar.
+    assert any(py.parts[0] == "tests" for py in _fontes_do_projeto())
 
 def test_windows_implementa_os_protocolos():
     arvore = ast.parse(FONTE.read_text(encoding="utf-8"))

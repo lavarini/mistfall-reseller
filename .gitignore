@@ -22,3 +22,5 @@ venv/
 # Saída do bot (log de Compras, capturas de depuração)
 *.log
 /out/
+# Pastas de evidência das execuções no Windows (--pasta execucao-*)
+execucao*/
