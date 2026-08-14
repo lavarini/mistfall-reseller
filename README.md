@@ -22,9 +22,11 @@ Entrada: um print da tela em 2560×1440. Saída: a decisão de qual Listagem com
    `relatorio.json` com os sete scores, mas não faz parte da conferência que aborta
 7. Aperta **Espaço** e confirma que o Ouro caiu **exatamente** o Preço Total
 
-**Na dúvida, não compra.** Qualquer divergência no passo 6 aperta **Esc** e aborta — inclusive
-leitura ilegível, que conta como divergência e não como caso a tratar. É a proteção contra a
-pior falha possível: comprar caro por leitura errada, sem ninguém olhando.
+**Na dúvida, não compra.** Divergência no Preço Unitário, na Quantidade ou no Preço Total do
+passo 6 aperta **Esc** e aborta — inclusive leitura ilegível, que conta como divergência e não
+como caso a tratar. O ícone é a exceção deliberada: é lido e registrado no `relatorio.json`,
+mas não é portão, e sozinho não aborta a Compra. É a proteção contra a pior falha possível:
+comprar caro por leitura errada, sem ninguém olhando.
 
 Velocidade não é requisito. Toda espera é generosa e toda conferência é paga.
 
@@ -200,11 +202,11 @@ número de acurácia agregado.
 
 ### Uma coisa que este projeto aprendeu do jeito difícil
 
-Verde não é evidência. A base já teve **dez** defeitos da família "teste que não testa" —
-testes que comparavam a saída consigo mesma, que importavam do módulo sob teste a constante
-que iam afirmar, que buscavam uma string no código-fonte em vez de exercitar comportamento.
-Nenhum apareceu como suíte vermelha: todos precisaram de alguém quebrando o código de
-propósito.
+Verde não é evidência. A base já teve **doze** defeitos da família "teste que não testa" —
+cinco só nesta branch —, testes que comparavam a saída consigo mesma, que importavam do
+módulo sob teste a constante que iam afirmar, que buscavam uma string no código-fonte em vez
+de exercitar comportamento. Nenhum apareceu como suíte vermelha: todos precisaram de alguém
+quebrando o código de propósito.
 
 Se você mexer numa proteção, **quebre-a e confirme que a suíte reclama.**
 
