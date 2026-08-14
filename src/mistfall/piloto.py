@@ -279,7 +279,10 @@ def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
                 "ou a Compra nao foi debitada")
         return encerrar(Desfecho.COMPROU,
                         f"Ouro caiu {caiu}, esperava {r.preco_total_esperado}")
-    except Exception as erro:
+    # BaseException, e nao Exception: o operador pode dar Ctrl+C no meio (nao
+    # existe tecla de panico, e a #8 que traz), e o relatorio tem de dizer que
+    # foi isso, nao ficar com o motivo de partida.
+    except BaseException as erro:
         r.desfecho = Desfecho.ABORTOU
         r.motivo = f"explodiu: {type(erro).__name__}: {erro}"
         raise
