@@ -21,7 +21,6 @@ from mistfall.decisao import escolher
 from mistfall.estado import identificar_estado
 from mistfall.geometria import caixa_slot
 from mistfall.janela import (
-    PRECO_TOTAL_REL, PRECO_UNITARIO_REL, QUANTIDADE_REL,
     ler_item_da_janela, ler_preco_da_janela,
     ler_preco_total_da_janela, ler_quantidade_da_janela,
     pontuar_icone_da_janela,
@@ -47,11 +46,11 @@ class Ritmo:
     # mas ela nao vale a viagem: esperar de graca custa 10 s numa execucao
     # unica, e abortar por uma primeira carga de UI mais lenta custa o dia.
     teto_espera_janela: float = 10.0
-    # A Janela e detectavel antes de estar desenhada. Este e o teto para ela
-    # assentar depois de detectada — 2 s e generoso de proposito: estourar
-    # custa uma validacao sobre frame possivelmente cru, que a conferencia
-    # pega, e velocidade nao e requisito.
-    teto_espera_assentar: float = 2.0
+    # A Janela abre com animacao e e detectavel antes de terminar de se
+    # expandir. Esta e a espera entre detectar e capturar o frame que vai ser
+    # validado. 1,5 s e generoso de proposito: velocidade nao e requisito, e
+    # esperar de graca custa 1,5 s numa execucao unica.
+    espera_para_o_modal_assentar: float = 1.5
     espera_apos_espaco: float = 2.0
     teto_espera_ouro: float = 5.0
 
@@ -63,7 +62,7 @@ class Ritmo:
             pausa_antes_do_clique=(0.0, 0.0),
             intervalo_entre_perguntas=0.0,
             teto_espera_janela=0.05,
-            teto_espera_assentar=0.05,
+            espera_para_o_modal_assentar=0.0,
             espera_apos_espaco=0.0,
             teto_espera_ouro=0.05,
         )
@@ -155,45 +154,33 @@ def _esperar_janela(tela: Tela, diario: _Diario,
     return None, time.monotonic() - inicio
 
 
-def _mesmos_numeros(a: np.ndarray, b: np.ndarray) -> bool:
-    """Dois frames mostram os mesmos pixels nos tres campos numericos."""
-    return all(
-        np.array_equal(a[y0:y1, x0:x1], b[y0:y1, x0:x1])
-        for x0, y0, x1, y1 in (PRECO_UNITARIO_REL, QUANTIDADE_REL, PRECO_TOTAL_REL)
-    )
-
-
-def _esperar_a_janela_assentar(tela: Tela, diario: _Diario, ritmo: Ritmo,
-                               detectado: np.ndarray) -> np.ndarray:
+def _capturar_a_janela_assentada(tela: Tela, diario: _Diario, ritmo: Ritmo,
+                                 detectado: np.ndarray) -> np.ndarray:
     """Devolve o frame da Janela que vale a pena validar, e o grava.
 
-    `identificar_estado` reconhece a Janela com menos pixels estaveis do que
-    o OCR dos campos precisa: existe um intervalo em que o estado ja diz
-    JANELA_CONFIRMACAO e os numeros ainda nao foram desenhados. Validar esse
-    frame reprova uma Compra boa, e foi o que aconteceu na maquina do jogo
-    (#18).
+    A Janela abre com animacao: ela e reconhecivel como JANELA_CONFIRMACAO
+    enquanto ainda esta se expandindo, e nessa fase os campos numericos estao
+    a 69 px da posicao final — medido em `images/janela-em-animacao-rede-260`.
+    As regioes fixas caem sobre fundo vazio, o OCR devolve None, e o piloto
+    reprova uma Compra boa. Foi o que aconteceu na maquina do jogo (#18).
 
-    Compara so as tres regioes numericas, e nao o frame inteiro: qualquer
-    animacao noutro canto da tela impediria a igualdade global e a espera
-    viraria letra morta.
+    A espera e fixa, e nao uma comparacao entre frames consecutivos. A
+    tentativa anterior comparava as tres regioes numericas e concluia
+    'assentado' quando duas capturas seguidas eram iguais — mas durante a
+    animacao essas regioes estao sobre fundo liso, e preto igual a preto deu
+    falso positivo em ~0,1 s. O laco saia cedo, entao aumentar o teto nao
+    resolvia nada. Qualquer criterio de estabilidade tem de olhar pixel que
+    muda durante a animacao; simplesmente esperar dispensa o criterio.
 
-    Estourar o teto nao inventa desfecho novo — valida o ultimo frame visto,
-    que e o comportamento de antes desta espera. Se ele estiver cru, a
-    conferencia pega e aborta.
+    Se a Janela sair de cena durante a espera, vale o frame detectado — senao
+    o piloto valida a tela que ficou atras dela.
     """
-    inicio = time.monotonic()
-    anterior = detectado
-    while time.monotonic() - inicio < ritmo.teto_espera_assentar:
-        time.sleep(ritmo.intervalo_entre_perguntas)
-        atual = tela.capturar()
-        if identificar_estado(atual) is not EstadoTela.JANELA_CONFIRMACAO:
-            break  # a Janela saiu de cena; vale o ultimo modal que vimos
-        if _mesmos_numeros(anterior, atual):
-            anterior = atual
-            break
-        anterior = atual
-    diario.registrar(anterior, "janela")
-    return anterior
+    time.sleep(ritmo.espera_para_o_modal_assentar)
+    assentado = tela.capturar()
+    if identificar_estado(assentado) is not EstadoTela.JANELA_CONFIRMACAO:
+        assentado = detectado
+    diario.registrar(assentado, "janela")
+    return assentado
 
 
 def _conferir_a_janela(modal: np.ndarray, escolhida: Listagem,
@@ -346,7 +333,7 @@ def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
 
         # segundos_ate_a_janela mede ate a DETECCAO, que e o numero que a #6
         # pede. A validacao acontece sobre o frame assentado, que vem depois.
-        modal = _esperar_a_janela_assentar(tela, diario, ritmo, modal)
+        modal = _capturar_a_janela_assentada(tela, diario, ritmo, modal)
 
         divergencia = _conferir_a_janela(modal, escolhida, r, config.trabalhadores)
         r.tempos["modal"] = (time.monotonic() - t_modal) * 1000

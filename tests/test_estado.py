@@ -20,6 +20,10 @@ ESTADO_ESPERADO = {
     # Primeira captura vinda da maquina do jogo, e nao do corpus montado a mao.
     "sete-itens-ocr-227-como-297": EstadoTela.LISTA,
     "janela": EstadoTela.JANELA_CONFIRMACAO,
+    # Capturada no meio da animacao de abertura: o modal esta 69 px acima da
+    # posicao final, e por isso os tres campos numericos caem sobre fundo
+    # vazio. O estado ja e reconhecivel — e justamente esse o problema.
+    "janela-em-animacao-rede-260": EstadoTela.JANELA_CONFIRMACAO,
     "reset-forja": EstadoTela.OUTRA_CATEGORIA,
     "reset-chave": EstadoTela.OUTRA_CATEGORIA,
 }
