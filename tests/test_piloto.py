@@ -20,7 +20,6 @@ def cfg():
             ItemAlvo.DRAGAO: 246, ItemAlvo.ORBE: 253, ItemAlvo.REDE: 260,
             ItemAlvo.CODICE: 281,
         },
-        fracao_sanidade=0.25,
     )
 
 def roteiro_feliz():

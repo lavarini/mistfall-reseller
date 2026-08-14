@@ -3,15 +3,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from mistfall.tipos import ItemAlvo
 
-FRACAO_SANIDADE_PADRAO = 0.25
-
 @dataclass(frozen=True)
 class Config:
     precos_alvo: dict[ItemAlvo, int]
-    fracao_sanidade: float
 
 def carregar_config(caminho: str | Path = "config.toml") -> Config:
-    """Le os Precos-alvo e a fracao de sanidade do arquivo de configuracao.
+    """Le os Precos-alvo do arquivo de configuracao.
 
     Estes numeros decidem gasto de ouro real, entao todo erro sai dizendo qual
     arquivo e qual chave — nunca um KeyError ou ValueError cru, que obriga a
@@ -53,14 +50,4 @@ def carregar_config(caminho: str | Path = "config.toml") -> Config:
             )
         precos_alvo[item] = valor
 
-    fracao = dados.get("fracao_sanidade", FRACAO_SANIDADE_PADRAO)
-    if not isinstance(fracao, (int, float)) or isinstance(fracao, bool):
-        raise ValueError(f"{arquivo}: fracao_sanidade = {fracao!r}; esperava um numero")
-    if not 0.0 < fracao < 1.0:
-        raise ValueError(
-            f"{arquivo}: fracao_sanidade = {fracao!r}; "
-            "e a fracao do Preco-alvo abaixo da qual a leitura vira suspeita, "
-            "entao tem de ficar entre 0 e 1"
-        )
-
-    return Config(precos_alvo=precos_alvo, fracao_sanidade=float(fracao))
+    return Config(precos_alvo=precos_alvo)

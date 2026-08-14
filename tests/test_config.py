@@ -26,9 +26,6 @@ def test_carrega_os_sete_precos_alvo_do_config_do_projeto():
         ItemAlvo.CODICE: 281,
     }
 
-def test_carrega_a_fracao_de_sanidade_do_config_do_projeto():
-    assert carregar_config("config.toml").fracao_sanidade == 0.25
-
 def test_todo_item_alvo_tem_preco_alvo_no_config_do_projeto():
     # Item-alvo sem Preco-alvo nunca e comprado: `escolher` o ignora em silencio.
     assert set(carregar_config("config.toml").precos_alvo) == set(ItemAlvo)
@@ -48,11 +45,6 @@ def test_nome_de_item_alvo_desconhecido_diz_qual_e_lista_os_validos(tmp_path):
     assert "config.toml" in str(erro.value)
     assert "broche" in str(erro.value)
 
-def test_fracao_de_sanidade_ausente_usa_o_padrao(tmp_path):
-    # 0.25 escrito a mao, nao importado de config.
-    caminho = escrever(tmp_path, "[precos_alvo]\nbroche = 188\n")
-    assert carregar_config(caminho).fracao_sanidade == 0.25
-
 def test_preco_alvo_nao_inteiro_e_recusado(tmp_path):
     caminho = escrever(tmp_path, '[precos_alvo]\nbroche = "188"\n')
     with pytest.raises(ValueError, match="broche"):
@@ -66,12 +58,6 @@ def test_preco_alvo_zero_ou_negativo_e_recusado(tmp_path):
         with pytest.raises(ValueError, match="broche"):
             carregar_config(caminho)
 
-@pytest.mark.parametrize("valor", ["0", "1", "1.5", "-0.25"])
-def test_fracao_de_sanidade_fora_de_zero_a_um_e_recusada(tmp_path, valor):
-    caminho = escrever(tmp_path, f"[precos_alvo]\nbroche = 188\nfracao_sanidade = {valor}\n")
-    with pytest.raises(ValueError, match="fracao_sanidade"):
-        carregar_config(caminho)
-
 def test_arquivo_inexistente_diz_qual_arquivo(tmp_path):
     with pytest.raises(ValueError, match="nao-existe.toml"):
         carregar_config(tmp_path / "nao-existe.toml")
@@ -80,3 +66,6 @@ def test_toml_invalido_diz_qual_arquivo(tmp_path):
     caminho = escrever(tmp_path, "[precos_alvo\nbroche = 188\n")
     with pytest.raises(ValueError, match=r"config\.toml"):
         carregar_config(caminho)
+
+def test_config_real_nao_declara_fracao_de_sanidade():
+    assert not hasattr(carregar_config("config.toml"), "fracao_sanidade")

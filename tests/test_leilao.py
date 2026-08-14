@@ -82,8 +82,8 @@ def test_nenhum_slot_do_modal_tem_item_e_preco_ao_mesmo_tempo(listagens_do_modal
     ] == []
 
 def test_escolher_nao_compra_nada_atraves_do_modal(listagens_do_modal):
+    import random
     config = Config(
         precos_alvo={item: 2000 for item in ItemAlvo},  # alvo generoso de proposito
-        fracao_sanidade=0.25,
     )
-    assert escolher(listagens_do_modal, config) is None
+    assert escolher(listagens_do_modal, config, random.Random(42)) is None
