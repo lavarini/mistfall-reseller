@@ -291,6 +291,27 @@ def test_relatorio_guarda_os_doze_slots_mesmo_sem_nada_compravel(tmp_path):
         (linha, coluna) for linha in range(6) for coluna in range(2)]
 
 
+def test_a_varredura_repassa_os_trabalhadores_configurados_ao_helper(monkeypatch, tmp_path):
+    # Achado do review final: config.trabalhadores ficava pelo caminho entre a
+    # Config e varrer_bruto, entao a varredura sempre corria com o padrao (4)
+    # mesmo com trabalhadores=1 configurado como saida de emergencia. Este
+    # espiao fica em mistfall.leilao, que e onde varrer_bruto de fato chama
+    # mapear — nao em mistfall.piloto, que so espiona as leituras do modal.
+    import mistfall.leilao as leilao
+    from mistfall.paralelo import mapear as mapear_real
+
+    recebidos = []
+
+    def espiao(funcao, itens, trabalhadores):
+        recebidos.append(trabalhadores)
+        return mapear_real(funcao, itens, trabalhadores)
+
+    monkeypatch.setattr(leilao, "mapear", espiao)
+    config = dataclasses.replace(cfg(), trabalhadores=7)  # nem 4 (padrao), nem 1
+    executar(TelaFalsa([LISTA_SEM_NADA]), MaoFalsa(), config, tmp_path, ritmo=JA)
+    assert 7 in recebidos, f"trabalhadores configurado (7) nao chegou ao helper: {recebidos}"
+
+
 def test_as_leituras_do_modal_passam_pelo_helper_de_paralelismo(monkeypatch, tmp_path):
     # Sem isto o teste de equivalencia abaixo passaria trivialmente: as tres
     # leituras sequenciais dao o mesmo resultado que as paralelas, entao so
