@@ -3,7 +3,6 @@ import pytest
 from mistfall.config import Config
 from mistfall.decisao import escolher
 from mistfall.leilao import varrer, varrer_bruto
-from mistfall.paralelo import TRABALHADORES_PADRAO
 from mistfall.tipos import ItemAlvo
 
 PRINT = "images/broche-tres-adaga-lanterna-rede-padrao.png"
@@ -90,43 +89,52 @@ def test_escolher_nao_compra_nada_atraves_do_modal(listagens_do_modal):
     assert escolher(listagens_do_modal, config, random.Random(42)) is None
 
 
-# --- paralelismo da varredura ------------------------------------------------
+# --- a varredura le os doze precos numa chamada so --------------------------
 
 LISTA = "images/broche-dragao-orbe-codice-padrao.png"
 
-def test_paralelo_devolve_o_mesmo_que_sequencial():
-    img = cv2.imread(LISTA)
-    assert varrer(img, trabalhadores=4) == varrer(img, trabalhadores=1)
 
-def test_paralelo_preserva_a_posicao_de_cada_slot():
-    img = cv2.imread(LISTA)
-    posicoes = [(l.linha, l.coluna) for l in varrer(img, trabalhadores=8)]
+def test_a_varredura_faz_uma_unica_chamada_ao_tesseract(monkeypatch):
+    # Comparar resultado nao distingue uma chamada de doze: as duas leem os
+    # mesmos slots. Este projeto ja teve doze defeitos da familia "teste que
+    # nao testa", cinco deles numa branch so, e nenhum apareceu como suite
+    # vermelha. Espiar a chamada e o que separa as duas implementacoes.
+    import pytesseract
+    from mistfall import precos as modulo_precos
+
+    em_folha = []
+    um_a_um = []
+    data_real = pytesseract.image_to_data
+    string_real = pytesseract.image_to_string
+
+    def espiao_data(*args, **kwargs):
+        em_folha.append(1)
+        return data_real(*args, **kwargs)
+
+    def espiao_string(*args, **kwargs):
+        um_a_um.append(1)
+        return string_real(*args, **kwargs)
+
+    monkeypatch.setattr(modulo_precos.pytesseract, "image_to_data", espiao_data)
+    monkeypatch.setattr(modulo_precos.pytesseract, "image_to_string", espiao_string)
+
+    varrer_bruto(cv2.imread(LISTA))
+
+    assert len(em_folha) == 1, f"esperava uma chamada em folha, houve {len(em_folha)}"
+    assert um_a_um == [], f"a varredura voltou a ler recorte a recorte: {len(um_a_um)} chamadas"
+
+
+def test_a_varredura_preserva_a_posicao_de_cada_slot():
+    posicoes = [(l.linha, l.coluna) for l in varrer(cv2.imread(LISTA))]
     assert posicoes == [
         (0, 0), (0, 1), (1, 0), (1, 1), (2, 0), (2, 1),
         (3, 0), (3, 1), (4, 0), (4, 1), (5, 0), (5, 1),
     ]
 
-def test_varrer_bruto_tambem_bate_entre_paralelo_e_sequencial():
-    img = cv2.imread(LISTA)
-    assert varrer_bruto(img, trabalhadores=4) == varrer_bruto(img, trabalhadores=1)
 
-def test_o_padrao_e_o_do_helper():
+def test_a_varredura_nao_aceita_mais_trabalhadores():
+    # Com uma chamada so nao ha o que paralelizar. Parametro que nao faz nada e
+    # a mesma falha que esta base ja cometeu — config que promete e nao entrega.
     import inspect
-    assert inspect.signature(varrer).parameters["trabalhadores"].default == TRABALHADORES_PADRAO
-
-def test_varrer_repassa_os_trabalhadores_ao_helper(monkeypatch):
-    # Comparar resultado nao distingue paralelo de sequencial: eles sao
-    # identicos de proposito. Este teste garante que o parametro chega
-    # ao helper, entao forcar sequencial la dentro quebra a suite.
-    import mistfall.leilao as leilao
-    from mistfall.paralelo import mapear as mapear_real
-
-    recebidos = []
-
-    def espiao(funcao, itens, trabalhadores):
-        recebidos.append(trabalhadores)
-        return mapear_real(funcao, itens, trabalhadores)
-
-    monkeypatch.setattr(leilao, "mapear", espiao)
-    varrer(cv2.imread(LISTA), trabalhadores=7)
-    assert recebidos == [7]
+    assert "trabalhadores" not in inspect.signature(varrer).parameters
+    assert "trabalhadores" not in inspect.signature(varrer_bruto).parameters

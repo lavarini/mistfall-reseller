@@ -2,24 +2,25 @@ import dataclasses
 import numpy as np
 from mistfall.geometria import TODOS_OS_SLOTS, regiao_icone, recorte_preco
 from mistfall.itens import identificar_item
-from mistfall.paralelo import TRABALHADORES_PADRAO, mapear
-from mistfall.precos import ler_preco
+from mistfall.precos import ler_precos
 from mistfall.tipos import Listagem
 
-def varrer_bruto(img: np.ndarray,
-                 trabalhadores: int = TRABALHADORES_PADRAO) -> list[Listagem]:
+def varrer_bruto(img: np.ndarray) -> list[Listagem]:
     """Le os doze slots como estao, sem conferir nada entre eles.
 
     Existe separada de `varrer` para o corpus de regressao poder documentar o
     que o OCR entrega de fato. Quem decide Compra usa `varrer`.
 
-    So o OCR de preco e paralelizado: os doze casamentos de icone custam 49 ms
-    somados, e nao ha o que ganhar ali.
+    Os doze precos saem de UMA chamada ao tesseract, com os recortes empilhados
+    numa folha — nao ha `trabalhadores` aqui porque nao ha o que paralelizar.
+    O helper de paralelismo continua no projeto e continua servindo as tres
+    leituras da Janela de Confirmacao; `config.trabalhadores` alimenta aquele
+    caminho, nao este.
     """
     icones = [regiao_icone(img, linha, coluna) for linha, coluna in TODOS_OS_SLOTS]
     precos = [recorte_preco(img, linha, coluna) for linha, coluna in TODOS_OS_SLOTS]
     itens = [identificar_item(icone) for icone in icones]
-    lidos = mapear(ler_preco, precos, trabalhadores)
+    lidos = ler_precos(precos)
     return [
         Listagem(linha=linha, coluna=coluna, item=item, preco_unitario=preco)
         for (linha, coluna), item, preco in zip(TODOS_OS_SLOTS, itens, lidos)
@@ -62,7 +63,6 @@ def conferir_ordenacao(listagens: list[Listagem]) -> list[Listagem]:
         )
     return conferidas
 
-def varrer(img: np.ndarray,
-           trabalhadores: int = TRABALHADORES_PADRAO) -> list[Listagem]:
+def varrer(img: np.ndarray) -> list[Listagem]:
     """Imagem do Leilao -> doze Listagens ja conferidas contra a ordenacao."""
-    return conferir_ordenacao(varrer_bruto(img, trabalhadores))
+    return conferir_ordenacao(varrer_bruto(img))

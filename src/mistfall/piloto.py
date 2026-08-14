@@ -298,7 +298,7 @@ def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
         # Em dois passos, e nao pelo `varrer`, para o relatorio poder mostrar
         # o que o OCR entregou ao lado do que a conferencia deixou passar.
         t_varredura = time.monotonic()
-        brutas = varrer_bruto(inicial, config.trabalhadores)
+        brutas = varrer_bruto(inicial)
         conferidas = conferir_ordenacao(brutas)
         r.slots = [
             {
