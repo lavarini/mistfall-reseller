@@ -11,6 +11,18 @@ def test_o_glossario_nao_promete_menor_ou_igual():
     assert "preço unitário máximo" not in CONTEXT
 
 
+def test_o_readme_nao_promete_a_regra_antiga():
+    # Achado do review final: um revisor colou a regra antiga de volta no
+    # README, palavra por palavra ("Escolhe a Listagem de maior margem entre
+    # as que estão com preço menor ou igual ao Preço-alvo"), e os 7 testes
+    # deste arquivo passaram — porque so afirmavam contra o CONTEXT, nunca
+    # contra o README. Estas tres asserções são a prova de que a regra antiga
+    # não pode voltar sem a suíte reclamar.
+    assert "menor ou igual" not in README
+    assert "maior margem" not in README
+    assert "abaixo do Preço-alvo" not in README
+
+
 def test_o_glossario_fala_em_preco_exato():
     assert "exat" in CONTEXT.lower()
 
