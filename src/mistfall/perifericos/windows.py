@@ -107,13 +107,16 @@ class TelaWindows:
 # numero a calibrar contra o jogo real — numa maquina onde ninguem depura.
 PAUSA_APOS_MOVER = 0.05
 SEGUNDOS_DE_CLIQUE = 0.05
+SEGUNDOS_DE_TECLA = 0.05
 
 
 class MaoWindows:
     def __init__(self, pausa_apos_mover: float = PAUSA_APOS_MOVER,
-                 segundos_de_clique: float = SEGUNDOS_DE_CLIQUE) -> None:
+                 segundos_de_clique: float = SEGUNDOS_DE_CLIQUE,
+                 segundos_de_tecla: float = SEGUNDOS_DE_TECLA) -> None:
         self._pausa_apos_mover = pausa_apos_mover
         self._segundos_de_clique = segundos_de_clique
+        self._segundos_de_tecla = segundos_de_tecla
 
     def clicar(self, x: int, y: int) -> None:
         # SendInput absoluto usa 0..65535 sobre a tela virtual.
@@ -128,8 +131,15 @@ class MaoWindows:
         time.sleep(self._segundos_de_clique)
         _enviar(_mouse(MOUSEEVENTF_LEFTUP))
 
+    def _apertar(self, scancode: int) -> None:
+        # Mesmo motivo do clique: em lotes separados, com a tecla segurada
+        # entre os dois. Juntos num lote so ela dura tempo zero.
+        _enviar(_tecla(scancode, False))
+        time.sleep(self._segundos_de_tecla)
+        _enviar(_tecla(scancode, True))
+
     def apertar_espaco(self) -> None:
-        _enviar(_tecla(SCANCODE_ESPACO, False), _tecla(SCANCODE_ESPACO, True))
+        self._apertar(SCANCODE_ESPACO)
 
     def apertar_esc(self) -> None:
-        _enviar(_tecla(SCANCODE_ESC, False), _tecla(SCANCODE_ESC, True))
+        self._apertar(SCANCODE_ESC)

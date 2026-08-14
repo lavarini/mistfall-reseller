@@ -87,6 +87,33 @@ def test_tecla_espaco_pressionada_usa_scancode_e_nao_virtual_key():
     assert ki.wScan == 0x39
     assert ki.dwFlags == 0x0008  # KEYEVENTF_SCANCODE, sem KEYEVENTF_KEYUP
 
+@pytest.mark.parametrize("metodo, scancode", [
+    ("apertar_espaco", 0x39),
+    ("apertar_esc", 0x01),
+])
+def test_tecla_fica_pressionada_antes_de_soltar(monkeypatch, metodo, scancode):
+    # Mesmo defeito que o clique tinha: com pressionar e soltar no mesmo lote
+    # a tecla dura tempo zero, e o jogo, que le o teclado por amostragem, nunca
+    # a ve apertada. O Espaco confirma a Compra e o Esc aborta — os dois
+    # precisam chegar.
+    linha = []
+    monkeypatch.setattr(windows, "_enviar", lambda *e: linha.append(
+        ("enviar", e[0].uniao.ki.wScan, e[0].uniao.ki.dwFlags)))
+    monkeypatch.setattr(windows.time, "sleep", lambda s: linha.append(("dormir", s, None)))
+    getattr(windows.MaoWindows(), metodo)()
+
+    assert [evento for evento, _, _ in linha] == ["enviar", "dormir", "enviar"]
+    assert (linha[0][1], linha[0][2]) == (scancode, 0x0008)  # desce, scancode
+    assert (linha[2][1], linha[2][2]) == (scancode, 0x000A)  # sobe, com KEYUP
+    assert linha[1][1] > 0, "a tecla tem de ficar apertada por tempo maior que zero"
+
+def test_duracao_da_tecla_e_ajustavel_sem_editar_o_modulo(monkeypatch):
+    esperas = []
+    monkeypatch.setattr(windows, "_enviar", lambda *e: None)
+    monkeypatch.setattr(windows.time, "sleep", esperas.append)
+    windows.MaoWindows(segundos_de_tecla=0.3).apertar_espaco()
+    assert esperas == [0.3]
+
 def test_tecla_esc_solta_usa_scancode_e_marca_keyup():
     entrada = windows._tecla(windows.SCANCODE_ESC, soltando=True)
     ki = entrada.uniao.ki
