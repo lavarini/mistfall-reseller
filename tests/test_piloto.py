@@ -64,16 +64,18 @@ JANELA_ESPELHO = "images/janela.png"          # modal com item que nao e alvo
 LISTA_SEM_NADA = "images/lanterna-dragao-orbe-rede.png"  # nada compravel
 RESET = "images/reset-forja.png"              # outra Categoria
 
-def test_item_divergente_aperta_esc_e_nunca_espaco(tmp_path):
-    # O modal mostra Espelho Adornado; decidimos comprar Dragao.
+def test_icone_e_preco_divergentes_aborta_pelo_preco(tmp_path):
+    # O modal mostra Espelho Adornado (nao e Item-alvo) cobrando 237;
+    # decidimos comprar Dragao a 246. Diverge nos dois, mas o icone deixou
+    # de ser portao — quem aborta agora e o Preco Unitario.
     mao = MaoFalsa()
     tela = TelaFalsa([LISTA, JANELA_ESPELHO])
-    r = executar(tela, mao, cfg(), tmp_path, ritmo=JA)
+    r = executar(tela, mao, cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
     nomes = [a[0] for a in mao.acoes]
     assert r.desfecho is Desfecho.ABORTOU
     assert "apertar_espaco" not in nomes
     assert nomes[-1] == "apertar_esc"
-    assert "modal mostra" in r.motivo
+    assert "modal cobra" in r.motivo
 
 def test_janela_que_nao_abre_aborta_sem_apertar_nada(tmp_path):
     # A tela nunca vira modal: fica na lista.
@@ -145,15 +147,17 @@ def test_quantidade_divergente_isolada_aperta_esc_e_nunca_espaco(tmp_path):
     assert "apertar_esc" in nomes
     assert "Quantidade e" in r.motivo
 
-def test_item_divergente_isolado_aperta_esc_e_nunca_espaco(tmp_path):
-    # Preco Unitario bate (246), so o Item diverge (Orbe em vez de Dragao).
+def test_icone_divergente_nao_impede_a_compra(tmp_path):
+    # Preco Unitario, Quantidade e Preco Total batem (246, 1, 246); so o
+    # Icone diverge (Orbe em vez de Dragao). O icone saiu do portao: o
+    # piloto segue, aperta Espaco e conclui a Compra.
     mao = MaoFalsa()
-    r = executar(TelaFalsa([LISTA, JANELA_ORBE_246]), mao, cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
+    tela = TelaFalsa([LISTA, JANELA_ORBE_246, LISTA_DEBITADA])
+    r = executar(tela, mao, cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
     nomes = [a[0] for a in mao.acoes]
-    assert r.desfecho is Desfecho.ABORTOU
-    assert "apertar_espaco" not in nomes
-    assert "apertar_esc" in nomes
-    assert "modal mostra" in r.motivo
+    assert "apertar_esc" not in nomes
+    assert "apertar_espaco" in nomes
+    assert r.desfecho is Desfecho.COMPROU
 
 def test_ouro_que_cai_valor_inesperado_e_reportado(tmp_path):
     # Depois do Espaco a tela mostra um print real cujo Ouro e 64735, nao
@@ -182,9 +186,6 @@ LISTA_OURO_ILEGIVEL = "fixtures/sinteticas/lista-ouro-ilegivel.png"
     (JANELA_PRECO_ILEGIVEL, "Preco Unitario ilegivel"),
     (JANELA_QTD_ILEGIVEL, "Quantidade ilegivel"),
     (JANELA_TOTAL_ILEGIVEL, "Preco Total ilegivel"),
-    # Icone que nao e Item-alvo, com os numeros batendo: a unica divergencia
-    # possivel e o icone, entao a conferencia de item responde sozinha.
-    (JANELA_ESPELHO_246, "nenhum Item-alvo reconhecido"),
     # Total que nao fecha com 1 x Preco Unitario.
     (JANELA_TOTAL_250, "nao fecha"),
 ])
@@ -204,15 +205,6 @@ def test_ouro_inicial_ilegivel_aborta_antes_de_clicar(tmp_path):
     assert r.desfecho is Desfecho.ABORTOU
     assert "Ouro inicial ilegivel" in r.motivo
     assert mao.acoes == []
-
-def test_mensagem_de_item_divergente_nao_mostra_o_enum_cru(tmp_path):
-    # "o modal mostra ItemAlvo.DRAGAO" e a linha que o operador mais
-    # provavelmente vai ler na maquina Windows.
-    r = executar(TelaFalsa([LISTA, JANELA_ESPELHO_246]), MaoFalsa(), cfg(),
-                 tmp_path, ritmo=JA, sorteio=random.Random(1))
-    assert "ItemAlvo." not in r.motivo
-    assert "dragao" in r.motivo
-
 
 # ---------------------------------------------------------------------------
 # Confirmacao pelo Ouro.

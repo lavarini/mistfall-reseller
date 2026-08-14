@@ -29,7 +29,7 @@ from mistfall.leilao import conferir_ordenacao, varrer_bruto
 from mistfall.ouro import ler_ouro
 from mistfall.paralelo import mapear
 from mistfall.perifericos.protocolos import Mao, Tela
-from mistfall.tipos import EstadoTela, ItemAlvo, Listagem
+from mistfall.tipos import EstadoTela, Listagem
 
 @dataclass(frozen=True)
 class Ritmo:
@@ -145,11 +145,6 @@ def _esperar_janela(tela: Tela, diario: _Diario,
     return None, time.monotonic() - inicio
 
 
-def _nome(item: ItemAlvo | None) -> str:
-    """Nome de dominio, nunca o Enum cru: e a linha que o operador le."""
-    return item.value if item is not None else "nenhum Item-alvo reconhecido"
-
-
 def _conferir_a_janela(modal: np.ndarray, escolhida: Listagem,
                        r: Resultado, trabalhadores: int) -> str | None:
     """Le a Janela inteira, guarda tudo no Resultado e devolve a primeira
@@ -158,6 +153,20 @@ def _conferir_a_janela(modal: np.ndarray, escolhida: Listagem,
     Le antes de conferir, e grava antes de decidir: mesmo abortando, o
     relatorio tem de dizer o que o bot viu. Cada leitura ilegivel tem ramo
     proprio porque a mensagem e o unico diagnostico que atravessa a viagem.
+
+    O Icone e lido e pontuado, mas nao e portao: a varredura de escala
+    0,85-1,15 de `ler_item_da_janela` e palpite calibrado, nao medida, e 5%
+    de diferenca de escala ja derruba a identificacao para None. Na maquina
+    real isso deu 100% de falso negativo (#18) — o piloto validava o
+    primeiro frame em que o modal era detectavel, que e antes de o Icone
+    estar desenhado, o template nao casava, e ele apertava Esc em vez de
+    comprar. O Icone tambem nunca demonstrou valor: dos seis erros de OCR
+    conhecidos do corpus, nenhum teria sido pego so pela conferencia do
+    modal — os nulls e os absurdos sao pegos pela faixa de sanidade, e foi a
+    conferencia de ordenacao que pegou o unico erro de slot errado (#17).
+    Continua sendo lido e gravado no relatorio porque foi exatamente esse
+    dado, a distancia, que permitiu diagnosticar a #18 sem ninguem na frente
+    da maquina — nao reintroduza o ramo de aborto achando que foi esquecido.
     """
     item = ler_item_da_janela(modal)
     r.item_no_modal = item.value if item is not None else None
@@ -170,9 +179,6 @@ def _conferir_a_janela(modal: np.ndarray, escolhida: Listagem,
         trabalhadores,
     )
 
-    if item is not escolhida.item:
-        return (f"o modal mostra {_nome(item)}, "
-                f"decidimos comprar {_nome(escolhida.item)}")
     if r.preco_no_modal is None:
         return "Preco Unitario ilegivel no modal"
     if r.preco_no_modal != escolhida.preco_unitario:
