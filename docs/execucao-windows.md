@@ -106,7 +106,9 @@ Ha **tres** desfechos possiveis:
 
 1. **Codigo 2**, com "problema de ambiente: SendInput aceitou 0 de 1 eventos" — o Windows
    recusou o input na cara. Ai sim o UIPI esta bloqueando, e a falha **nao** e silenciosa.
-2. **Codigo 1**, com "a Janela de Confirmacao nao abriu" — o clique nao produziu efeito.
+2. **Codigo 1 ou 3**, sem a Compra acontecer — o clique nao produziu efeito, e o Espaco
+   foi apertado no vazio. Como a Janela nao e mais conferida, o piloto nao sabe dizer
+   que ela nao abriu: quem denuncia e o Ouro nao ter caido.
 3. **Ela compra de verdade** (codigo 0, ou 3) — mas significa que uma Compra foi feita:
    **refaca a pre-condicao antes da terceira execucao** (confira que ainda ha Item-alvo
    exatamente no Preco-alvo na tela).
@@ -134,32 +136,41 @@ $LASTEXITCODE
 Durante a contagem de 5 segundos: **Alt+Tab para o jogo**, sem clicar nele, e tire a mao do
 mouse.
 
+### A Janela nao e mais conferida
+
+Depois do clique o piloto **espera um tempo fixo e aperta Espaco**. A Janela nao e detectada,
+nao e capturada e nao e lida. Nenhum aborto vem mais do modal, e nenhuma string do tipo "o
+modal cobra X" ou "Preco Unitario ilegivel" existe hoje. Ver o ADR-0003.
+
+Consequencia pratica para quem opera: **o bot aperta Espaco de olhos fechados.** Se o clique
+nao abrir a Janela, o Espaco vai para o jogo. Se a Janela abrir com Quantidade diferente de
+1, ele compra a Quantidade que estiver la.
+
+A espera e ajustavel sem editar codigo, e e o numero que esta sendo calibrado:
+
+```
+mistfall-piloto --pasta execucao-700 --espera-modal 700
+```
+
+Cada `relatorio.json` grava o valor usado em `espera_do_modal_ms`, entao as pastas de
+tentativas diferentes nao se confundem.
+
 ### Se o desfecho for "abortou"
 
-O ícone dentro da Janela **nao e mais portao**: ele e lido e pontuado contra os sete
-templates, e tudo isso vai para o `relatorio.json` (`item_no_modal`, `escala_do_icone`,
-`scores_do_icone`), mas uma divergencia so nele **nao aborta** — o piloto segue e aperta
-Espaco mesmo que o icone nao tenha casado com nada. Se voce esperava "o modal mostra nenhum
-Item-alvo reconhecido" como o aborto mais provavel: essa string nao existe mais, e o
-desfecho que ela descrevia hoje e o desfecho em que o bot **compra**.
+Sobrou pouca coisa que aborta, e nenhuma delas olha o modal: pre-voo em outra Categoria, tela
+que nao e a lista, Ouro inicial ilegivel, ou Ouro final ilegivel depois do Espaco. O `motivo`
+no `relatorio.json` diz qual.
 
-Quem aborta agora e a conferencia do **Preco Unitario**, da **Quantidade** e do **Preco
-Total** contra a Listagem escolhida. O `motivo` no `relatorio.json` diz qual dos tres:
-
-- "Preco Unitario ilegivel no modal", ou "o modal cobra X, a Listagem dizia Y"
-- "Quantidade ilegivel no modal", ou "a Quantidade e N, esperava 1"
-- "Preco Total ilegivel no modal", ou "o Preco Total e X, e 1 unidade a Y nao fecha com isso"
-
-Nesses casos o bot nao apertou Espaco, entao nao gastou ouro. Traga a pasta inteira; o
-`relatorio.json` traz tudo que o modal mostrava, inclusive os scores do icone, mesmo quando
-o aborto foi por preco ou quantidade.
+**Atencao ao aborto depois do Espaco**: nesse caso o bot ja apertou, entao pode ter gastado
+ouro. Confira o Ouro no jogo antes de repetir.
 
 ## O que trazer de volta
 
 1. As tres pastas de execucao, inteiras.
 2. O codigo de saida de cada uma das tres.
-3. O tempo que a Janela levou para abrir, que a saida imprime. E um **teto**, nao uma
-   medida: o relogio comeca antes do clique e so para depois de uma captura e de uma
-   deteccao de estado, entao inclui o custo de perguntar.
+3. O `espera_do_modal_ms` de cada pasta, e se aquele valor bastou. E o numero em calibracao:
+   pequeno demais e o Espaco chega antes de a Janela abrir.
 4. Qual dos tres desfechos aconteceu na execucao sem administrador.
-5. Se comprou: o Ouro antes e depois, e se a queda bateu com o Preco Total.
+5. Se comprou: o Ouro antes e depois, e se a queda bateu com o Preco-unitario da
+   Listagem escolhida. Com o modal fora do caminho, essa e a unica conferencia que
+   sobrou — e ela acontece depois do Espaco.

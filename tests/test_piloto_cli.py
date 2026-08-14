@@ -39,7 +39,7 @@ def test_espera_do_modal_chega_ao_ritmo_em_segundos(monkeypatch, tmp_path):
                                       "--pasta", str(tmp_path),
                                       "--espera-modal", "250"])
     assert cli.main() == 0
-    assert visto["ritmo"].espera_para_o_modal_assentar == 0.25
+    assert visto["ritmo"].espera_para_o_modal_abrir == 0.25
 
 def test_comprou_sai_zero():
     assert codigo_de_saida(Resultado(Desfecho.COMPROU)) == 0

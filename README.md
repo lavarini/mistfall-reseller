@@ -17,18 +17,23 @@ Entrada: um print da tela em 2560×1440. Saída: a decisão de qual Listagem com
 4. Lê o **Preço-unitário** de cada slot por OCR
 5. Entre as Listagens que estão **exatamente** no Preço-alvo, sorteia uma. Preço abaixo do
    Preço-alvo é leitura suspeita, não pechincha: vai para o `relatorio.json`, não gera Compra
-6. Clica, espera a **Janela de Confirmação** ser detectada, e confere **três coisas** nela:
-   o Preço Unitário, a Quantidade e o Preço Total. O ícone também é lido e vai para o
-   `relatorio.json` com os sete scores, mas não faz parte da conferência que aborta
-7. Aperta **Espaço** e confirma que o Ouro caiu **exatamente** o Preço Total
+6. Clica, espera um tempo fixo para a **Janela de Confirmação** abrir, e aperta **Espaço**
+7. Confirma que o Ouro caiu **exatamente** o Preço-unitário da Listagem escolhida
 
-**Na dúvida, não compra.** Divergência no Preço Unitário, na Quantidade ou no Preço Total do
-passo 6 aperta **Esc** e aborta — inclusive leitura ilegível, que conta como divergência e não
-como caso a tratar. O ícone é a exceção deliberada: é lido e registrado no `relatorio.json`,
-mas não é portão, e sozinho não aborta a Compra. É a proteção contra a pior falha possível:
-comprar caro por leitura errada, sem ninguém olhando.
+**A Janela de Confirmação não é conferida.** Ela não é detectada, não é capturada e não é
+lida — o passo 6 é uma espera e uma tecla. A conferência existia e foi desativada: ela nunca
+pegou uma Compra ruim e derrubou Compras boas duas vezes, porque ler o modal é intermitente.
+O porquê, o que isso deixa descoberto e o que continua cobrindo estão no
+[ADR-0003](docs/adr/0003-nao-conferir-a-janela-de-confirmacao.md).
 
-Velocidade não é requisito. Toda espera é generosa e toda conferência é paga.
+O que protege agora vive **antes** do clique: só é comprável o preço **exatamente** igual ao
+Preço-alvo, e a conferência de ordenação invalida preço fora da ordem crescente. Depois do
+clique sobra uma conferência só, a do passo 7 — ela não impede a Compra errada, mas não deixa
+ela passar calada.
+
+Velocidade não era requisito enquanto era uma Compra e para. Com a conferência do modal fora
+do caminho, a espera do passo 6 é o único tempo morto que restou, e ela está sendo calibrada
+(`--espera-modal`).
 
 ## Onde roda
 
@@ -136,7 +141,7 @@ está em [`docs/execucao-windows.md`](docs/execucao-windows.md).
 | Código | Significado |
 |--------|-------------|
 | `0` | Correu como esperado: comprou, simulou, ou não havia nada comprável |
-| `1` | Abortou por segurança — divergência no modal, ou tela que ele não entendeu |
+| `1` | Abortou por segurança — tela que ele não entendeu, ou Ouro ilegível |
 | `2` | Problema de ambiente: resolução errada, tesseract ausente, config inválida |
 | `3` | Apertou Espaço e o **Ouro não se moveu** |
 
@@ -166,8 +171,10 @@ rede = 260
 codice = 281
 ```
 
-`trabalhadores` controla quantos OCRs rodam em paralelo — na varredura dos 12 slots e nos
-números da Janela de Confirmação. O padrão é **4**: já dá um ganho de ~3× sobre rodar
+`trabalhadores` controla quantos OCRs rodam em paralelo na varredura dos 12 slots. (Também
+nos números da Janela, mas essa leitura está fora do caminho — ver o
+[ADR-0003](docs/adr/0003-nao-conferir-a-janela-de-confirmacao.md).) O padrão é **4**: já dá um
+ganho de ~3× sobre rodar
 sequencial, e deixa CPU sobrando para o próprio jogo, que roda na mesma máquina e precisa
 desenhar a tela que o bot captura. Subir para o total de núcleos rende pouco mais e disputa
 tudo com o jogo — `trabalhadores=1` continua disponível, e roda sequencial de verdade, útil

@@ -1,9 +1,36 @@
-"""Orquestra uma unica Compra: varre, decide, clica, confere e aperta Espaco.
+"""Orquestra uma unica Compra: varre, decide, clica e aperta Espaco.
 
 Uma Compra e para. Sem loop, sem Reset — esses sao a #6 e a #7.
 
 Nao sabe se fala com o Windows ou com um duble: toda a fronteira de IO
 passa pelos protocolos Tela e Mao.
+
+A Janela de Confirmacao NAO e consultada. Nao e detectada, nao e capturada
+e nao e conferida: depois do clique o piloto espera um tempo fixo e aperta
+Espaco. Decisao do dono do projeto, por a leitura do modal ser
+intermitente e estar custando mais do que entregava — ela derrubou Compras
+boas duas vezes (#18) e nunca pegou uma ruim.
+
+`_esperar_janela`, `_capturar_a_janela_assentada` e `_conferir_a_janela`
+continuam aqui, sem chamador, exercitados direto pelos testes. Estao
+estacionados, nao esquecidos.
+
+O que essa decisao deixa descoberto, para constar:
+
+- **Quantidade diferente de 1.** Nada a montante conhece a Quantidade do
+  modal. Se ele abrir com uma Quantidade lembrada de outra Compra, o bot
+  paga por N unidades.
+- **Clique no slot errado.** E falha de geometria, nao de OCR, entao
+  nenhuma regra da varredura alcanca.
+
+O que continua cobrindo, e por isso a decisao nao deixa o bot cego:
+
+- `decisao._compravel` so aceita preco EXATAMENTE igual ao Preco-alvo,
+  entao leitura baixa nao vira pechincha.
+- `leilao.conferir_ordenacao` invalida preco fora da ordem crescente.
+- A queda do Ouro tem de bater com o Preco-unitario da Listagem escolhida.
+  E a unica conferencia que sobrou no caminho, e ela acontece depois do
+  Espaco: nao impede a Compra errada, mas nao deixa passar calada.
 """
 
 import json
@@ -46,13 +73,11 @@ class Ritmo:
     # mas ela nao vale a viagem: esperar de graca custa 10 s numa execucao
     # unica, e abortar por uma primeira carga de UI mais lenta custa o dia.
     teto_espera_janela: float = 10.0
-    # A Janela abre com animacao e e detectavel antes de terminar de se
-    # expandir. Esta e a espera entre detectar e capturar o frame que vai ser
-    # validado. O numero esta sendo calibrado na maquina do jogo: 500 ms, com
-    # a deteccao medida em 198 ms e um frame ainda em animacao capturado a
-    # ~300 ms. Ajustavel pela CLI com --espera-modal, para nao exigir editar
-    # Python na maquina do jogo, e gravado em cada relatorio.
-    espera_para_o_modal_assentar: float = 0.5
+    # Espera entre o clique e o Espaco: o tempo dado a Janela para abrir.
+    # Ela nao e detectada nem lida, entao este numero e a unica coisa entre um
+    # e outro. Ajustavel pela CLI com --espera-modal e gravado em cada
+    # relatorio, porque so se calibra na maquina do jogo.
+    espera_para_o_modal_abrir: float = 0.15
     espera_apos_espaco: float = 2.0
     teto_espera_ouro: float = 5.0
 
@@ -64,7 +89,7 @@ class Ritmo:
             pausa_antes_do_clique=(0.0, 0.0),
             intervalo_entre_perguntas=0.0,
             teto_espera_janela=0.05,
-            espera_para_o_modal_assentar=0.0,
+            espera_para_o_modal_abrir=0.0,
             espera_apos_espaco=0.0,
             teto_espera_ouro=0.05,
         )
@@ -194,6 +219,13 @@ def _conferir_a_janela(modal: np.ndarray, escolhida: Listagem,
     """Le a Janela inteira, guarda tudo no Resultado e devolve a primeira
     divergencia contra a Listagem escolhida — None quando esta tudo certo.
 
+    ESTACIONADA: nada no caminho da Compra chama esta funcao. O piloto nao
+    consulta mais a Janela — ver o docstring do modulo para a decisao e para
+    o que ela deixa descoberto. Continua exercitada direto pelos testes para
+    nao apodrecer: se um dia voltar ao caminho, tem de voltar funcionando.
+    Nao a religue sem resolver antes o que a tirou de la — a leitura do modal
+    e intermitente, e ela reprovou Compras boas duas vezes.
+
     Le antes de conferir, e grava antes de decidir: mesmo abortando, o
     relatorio tem de dizer o que o bot viu. Cada leitura ilegivel tem ramo
     proprio porque a mensagem e o unico diagnostico que atravessa a viagem.
@@ -275,7 +307,7 @@ def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
              sorteio: random.Random | None = None) -> Resultado:
     diario = _Diario(Path(pasta))
     r = Resultado(Desfecho.ABORTOU, "explodiu antes da primeira captura")
-    r.espera_do_modal_ms = round(ritmo.espera_para_o_modal_assentar * 1000, 1)
+    r.espera_do_modal_ms = round(ritmo.espera_para_o_modal_abrir * 1000, 1)
     if sorteio is None:
         sorteio = random.Random()
 
@@ -333,21 +365,17 @@ def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
         time.sleep(random.uniform(*ritmo.pausa_antes_do_clique))
         mao.clicar((x0 + x1) // 2, (y0 + y1) // 2)
 
+        # A Janela nao e olhada para nada: nem capturada, nem lida, nem
+        # conferida. Espera-se ela abrir e aperta-se Espaco. Ver o docstring
+        # do modulo para o porque e para o que isso deixa descoberto.
         t_modal = time.monotonic()
-        modal, r.segundos_ate_a_janela = _esperar_janela(tela, diario, ritmo)
-        if modal is None:
-            return encerrar(Desfecho.ABORTOU, "a Janela de Confirmacao nao abriu")
-
-        # segundos_ate_a_janela mede ate a DETECCAO, que e o numero que a #6
-        # pede. A validacao acontece sobre o frame assentado, que vem depois.
-        modal = _capturar_a_janela_assentada(tela, diario, ritmo, modal)
-
-        divergencia = _conferir_a_janela(modal, escolhida, r, config.trabalhadores)
+        time.sleep(ritmo.espera_para_o_modal_abrir)
         r.tempos["modal"] = (time.monotonic() - t_modal) * 1000
 
-        if divergencia is not None:
-            mao.apertar_esc()
-            return encerrar(Desfecho.ABORTOU, divergencia)
+        # Quantidade 1 e premissa, e nao leitura: o modal nao e consultado.
+        # Este numero e o que a queda do Ouro vai ter de bater, e a queda e a
+        # unica conferencia que sobrou no caminho.
+        r.preco_total_esperado = escolhida.preco_unitario
 
         t_confirmacao = time.monotonic()
         mao.apertar_espaco()

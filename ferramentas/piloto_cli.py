@@ -23,9 +23,8 @@ def montar_parser() -> argparse.ArgumentParser:
     # estao fora das coordenadas fixas (#18). Quanto ela dura so se descobre
     # na maquina do jogo — calibrar nao pode exigir editar Python la.
     p.add_argument("--espera-modal", type=int,
-                   default=round(RITMO_PADRAO.espera_para_o_modal_assentar * 1000),
-                   help="ms de espera entre a Janela ser detectada e o frame "
-                        "que sera validado ser capturado")
+                   default=round(RITMO_PADRAO.espera_para_o_modal_abrir * 1000),
+                   help="ms entre o clique e o Espaco, dados a Janela para abrir")
     return p
 
 
@@ -73,7 +72,7 @@ def _rodar(args: argparse.Namespace) -> int:
             time.sleep(1)
 
     ritmo = dataclasses.replace(
-        RITMO_PADRAO, espera_para_o_modal_assentar=args.espera_modal / 1000)
+        RITMO_PADRAO, espera_para_o_modal_abrir=args.espera_modal / 1000)
     resultado = executar(TelaWindows(), MaoWindows(), config,
                          Path(args.pasta), simular=args.simular, ritmo=ritmo)
 
