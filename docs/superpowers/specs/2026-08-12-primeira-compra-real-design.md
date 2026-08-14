@@ -41,18 +41,23 @@ O modo simulado (abaixo) recupera boa parte do isolamento perdido, de graça.
 5. **Clica** no centro da Listagem escolhida, após uma pausa aleatória entre 200 e 600 ms.
    Numa execução única isso quase não importa; o valor está em o código nascer com o hábito,
    já que o loop da #6 herda esse ritmo e é lá que timing metronômico destoaria.
-6. **Espera a Janela de Confirmação ser detectada** — pergunta a cada 250 ms, desiste em 10 s.
+6. **Espera a Janela de Confirmação ser detectada** — pergunta a cada 100 ms, desiste em 10 s.
    Não abriu, aborta sem apertar nada.
-7. **Confere três coisas dentro da Janela:** o ícone bate com o Item-alvo decidido; o Preço
-   Unitário bate com o lido na Listagem; a Quantidade é exatamente 1. Qualquer divergência →
-   **Esc**, salva o print, aborta.
+7. **Confere quatro coisas dentro da Janela:** o ícone bate com o Item-alvo decidido; o Preço
+   Unitário bate com o lido na Listagem; a Quantidade é exatamente 1; e o Preço Total fecha
+   com 1 × Preço Unitário. **Leitura ilegível é divergência**, não caso a tratar. Qualquer
+   divergência → **Esc**, salva o print, aborta.
 8. **Espaço.**
-9. **Confirma pelo Ouro.** Espera 2 s, captura, lê por até 5 s. Como a Janela mostra o Preço
+9. **Confirma pelo Ouro.** Espera 2 s e então enquete por até 5 s, **até a queda bater com o
+   Preço Total** — guardando sempre a última leitura legível. Como a Janela mostra o Preço
    Total, a conferência é exata: o Ouro deve cair **exatamente** esse valor, não apenas
-   "diminuir".
+   "diminuir". Parar na primeira leitura legível não serve: o Ouro quase sempre é legível, e
+   ler antes de o jogo debitar reportaria Compra com queda zero.
 10. **Relatório e sai.**
 
-`--simular` executa 1 a 4 e o relatório, sem tocar em mouse ou teclado.
+`--simular` executa 1 a 4 e o relatório, sem tocar em mouse ou teclado. O desfecho dele é
+`simulou`, e não `nada_compravel`: uma simulação bem-sucedida achou uma Listagem, e o roteiro
+usa `nada_compravel` como portão de "pare aqui".
 
 ### Saídas de erro
 
@@ -63,14 +68,19 @@ O modo simulado (abaixo) recupera boa parte do isolamento perdido, de graça.
 | Ouro inicial ilegível | Aborta |
 | Nenhuma Listagem comprável | Sai limpo, sem clicar — não é erro |
 | Clique não abriu a Janela | Aborta **sem apertar nada** |
-| Ícone na Janela ≠ item decidido | **Esc**, salva, aborta |
-| Preço na Janela ≠ preço da Listagem | **Esc**, salva, aborta |
-| Quantidade ≠ 1 | **Esc**, salva, aborta |
+| Ícone na Janela ≠ item decidido, ou irreconhecível | **Esc**, salva, aborta |
+| Preço na Janela ≠ preço da Listagem, ou ilegível | **Esc**, salva, aborta |
+| Quantidade ≠ 1, ou ilegível | **Esc**, salva, aborta |
+| Preço Total ilegível, ou ≠ 1 × Preço Unitário | **Esc**, salva, aborta |
 | Ouro final ilegível | Reporta **indeterminado** — não afirma nada |
-| Ouro caiu ≠ Preço Total | Reporta divergência com os dois números |
+| **Ouro não se moveu** | Desfecho próprio `ouro_nao_caiu` — não é Compra |
+| Ouro caiu ≠ Preço Total, mas se moveu | Reporta divergência com os dois números |
 
-Código de saída: `0` correu como esperado (comprou, ou nada havia comprável), `1` abortou por
-segurança, `2` problema de ambiente.
+Código de saída: `0` correu como esperado (comprou, simulou, ou nada havia comprável), `1`
+abortou por segurança, `2` problema de ambiente, `3` apertou Espaço e o Ouro **não se moveu**.
+
+O `3` existe porque `0` deixaria "o Espaço não registrou" indistinguível de uma Compra
+confirmada — e essa é a primeira pergunta que a execução no Windows existe para responder.
 
 **Sem tecla de pânico.** Numa execução de uma Compra, com contagem regressiva e dez saídas
 automáticas, ela é complexidade sem retorno. Entra na #8, junto com o loop.
@@ -124,6 +134,20 @@ que não é Item-alvo, e o melhor match fica em **0,365** — bem abaixo do limi
 **Limitação conhecida:** é uma amostra só, e negativa. Não existe print de modal com Item-alvo
 dentro, então o casamento de ícone não pode ser provado no sentido positivo antes da execução
 no Windows. Essa execução gera o print que falta.
+
+**Varredura de escala.** Ninguém confirmou que o modal desenha o ícone no mesmo tamanho da
+lista, de onde os templates saíram, e o casamento não perdoa: medido sobre um Dragão real,
+1,000× dá 0,9358 e identifica, 0,950× cai para 0,7818 e devolve `None`. Por isso
+`ler_item_da_janela` tenta sete escalas (0,85× a 1,15×) e decide pela melhor delas.
+
+A varredura vive em `janela.py` e **não** em `itens.identificar_item`, que é compartilhado com
+a detecção da lista — validada em 84/84 slots e sem dúvida de escala nenhuma. Ela não afrouxa
+o único negativo real: em `janela.png` o Espelho Adornado fica em 0,4047 com margem 0,0027 na
+melhor das sete escalas, longe dos limiares de 0,70 e 0,25.
+
+Os sete scores e a escala vencedora vão para o `relatorio.json`, em todos os desfechos: abortar
+por ícone é o desfecho mais provável da primeira execução, e sem esses números o operador volta
+só com "o modal mostra None".
 
 ### O orquestrador
 
@@ -183,7 +207,8 @@ O produto real desta issue não é o código, é a evidência:
 
 1. **Funcionou?** Clique abriu a Janela; Espaço acionou Comprar; Ouro caiu pelo valor certo.
 2. **O tempo da Janela de Confirmação, medido** — não estimado. É o número que a #6 precisa e
-   que hoje ninguém tem.
+   que hoje ninguém tem. É um **teto**: o relógio começa antes do clique e só para depois de
+   uma captura e de um `identificar_estado`, então inclui o custo de perguntar.
 3. **Sem administrador, falha em silêncio?** Uma execução não-elevada. Se o clique for
    ignorado sem erro, confirma o diagnóstico de UIPI e vira nota no ADR-0001.
 4. **A pasta de prints**, para diagnóstico remoto se algo der errado.
@@ -203,9 +228,11 @@ O produto real desta issue não é o código, é a evidência:
 ## Definições que o plano precisa fechar
 
 - **`Resultado`** — o tipo que `executar` devolve. Precisa carregar, no mínimo: o desfecho
-  (comprou / nada comprável / abortado, com o motivo), o Ouro antes e depois, a Listagem
-  escolhida, o Preço Total esperado, e o tempo medido entre o clique e a Janela aparecer.
-  A forma exata fica para o plano de implementação.
+  (comprou / Ouro não caiu / nada comprável / simulou / abortado, com o motivo), o Ouro antes e
+  depois, a Listagem escolhida, **tudo que foi lido dentro da Janela** (item, Preço Unitário,
+  Quantidade, Preço Total, os sete scores do ícone e a escala vencedora), e o tempo medido
+  entre o clique e a Janela aparecer. Ele é gravado em `relatorio.json` **sempre**, inclusive
+  quando uma exceção inesperada sobe depois de o bot já ter clicado.
 
 ## Fora do escopo
 
