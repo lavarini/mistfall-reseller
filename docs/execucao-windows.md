@@ -100,18 +100,24 @@ Quando aparecer a contagem de 5 segundos, **traga o jogo para a frente com Alt+T
 `SendInput` vai para a janela ativa, e nao para uma coordenada da tela. **Nao clique no
 jogo**: um clique pode abrir um modal sozinho e estragar a pre-condicao.
 
-Ha **tres** desfechos possiveis, e distinguir qual aconteceu e a evidencia que o ADR-0001
-quer:
+Ha **tres** desfechos possiveis:
 
 1. **Codigo 2**, com "problema de ambiente: SendInput aceitou 0 de 1 eventos" — o Windows
-   recusou o input na cara. UIPI confirmado, e a falha **nao** e silenciosa.
-2. **Codigo 1**, com "a Janela de Confirmacao nao abriu" — o input foi engolido em
-   silencio. UIPI confirmado, e a falha **e** silenciosa. E o desfecho esperado.
-3. **Ela compra de verdade** (codigo 0, ou 3). Entao o UIPI **nao** era a causa, o que e um
-   bom resultado — mas significa que uma Compra foi feita: **refaca a pre-condicao antes da
-   terceira execucao** (confira que ainda ha Item-alvo abaixo do Preco-alvo na tela).
+   recusou o input na cara. Ai sim o UIPI esta bloqueando, e a falha **nao** e silenciosa.
+2. **Codigo 1**, com "a Janela de Confirmacao nao abriu" — o clique nao produziu efeito.
+3. **Ela compra de verdade** (codigo 0, ou 3) — mas significa que uma Compra foi feita:
+   **refaca a pre-condicao antes da terceira execucao** (confira que ainda ha Item-alvo
+   abaixo do Preco-alvo na tela).
 
-Anote qual dos tres aconteceu, com o codigo de saida.
+**O desfecho 2 nao prova UIPI.** Uma versao anterior deste roteiro dizia que sim, e a
+execucao de 2026-08-13 mostrou que nao: com e sem administrador o comportamento foi
+identico, o `SendInput` aceitou os eventos nas duas, o cursor foi ate a Listagem certa e o
+clique nao aconteceu. A causa era o clique ter duracao zero — `LEFTDOWN` e `LEFTUP` no mesmo
+lote —, e nao privilegio. Veja o ADR-0001.
+
+Entao, se der o desfecho 2, a pergunta a responder e **onde** o clique se perde, e a
+comparacao com e sem administrador e o que separa privilegio de forma do input. Anote qual
+dos tres aconteceu, com o codigo de saida, **nas duas execucoes**.
 
 ## Terceira execucao: valendo
 

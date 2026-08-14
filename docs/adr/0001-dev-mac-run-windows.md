@@ -31,13 +31,41 @@ importa não era a biblioteca, e sim dois detalhes:
 A evidência que sustentou essa aposta é anterior ao projeto: o Mini Mouse Macro dirige o jogo
 quando roda elevado, e ele usa `SendInput` como qualquer um dos candidatos da escada.
 
+## O que a execução na máquina do jogo mostrou
+
+A pergunta era distinguir se a falha **sem** administrador é silenciosa. A execução respondeu
+outra coisa, mais útil: **administrador não é a variável.**
+
+Observado, com o jogo aberto e o Leilão na tela:
+
+- Com e **sem** administrador, o comportamento é **idêntico**.
+- O `SendInput` **aceita** os eventos nas duas. Se recusasse, `_enviar` levantaria `OSError` e
+  a saída seria código 2 — não foi o que aconteceu.
+- O cursor **se move** e para na Listagem certa. A conversão de pixel para coordenada absoluta
+  está correta, e o movimento sintético chega ao jogo.
+- O clique **não acontece**. A Janela de Confirmação não abre, e o bot aborta.
+
+O Windows está aceitando o input, e o jogo enxerga o movimento. Então o UIPI não é o que
+bloqueia, e a linha "rodar como administrador" acima **não se sustenta como explicação deste
+sintoma**. Ela não foi refutada como requisito geral — só deixou de ser a causa aqui.
+
+Sobrou uma única diferença entre o movimento, que funciona, e o clique, que não: a **forma**.
+`LEFTDOWN` e `LEFTUP` viajavam no mesmo lote de `SendInput`, então o botão ficava apertado por
+tempo zero. Um app comum recebe as duas mensagens pela fila e enxerga o clique inteiro; um jogo
+costuma **amostrar** o estado do mouse uma vez por quadro, e entre dois quadros o botão desceu
+e subiu. Na hora de amostrar, está solto.
+
+Isso acrescenta um terceiro detalhe à lista acima, da mesma família dos outros dois — a
+distância entre mandar o evento e o alvo perceber o evento:
+
+- **O clique precisa de duração.** Pressionar e soltar vão em lotes separados, com espera entre
+  eles. O padrão é 50 ms, ~3 quadros a 60 fps.
+
 ## O que ainda não foi observado
 
-Que a falha **sem** administrador é silenciosa. `SendInput` pode recusar na cara, devolvendo
-menos eventos que o pedido — o código transforma isso em `OSError` e sai com código 2 — ou o
-input pode ser engolido sem erro nenhum, e aí o bot aborta com "a Janela de Confirmação não
-abriu" e sai com código 1.
+Que o clique com duração resolve. A correção saiu daqui, por eliminação, e **só a próxima
+execução na máquina do jogo confirma**.
 
-**Distinguir os dois é o que fecha esta ADR.** O roteiro em
-[`docs/execucao-windows.md`](../execucao-windows.md) manda rodar sem administrador de
-propósito, registrando o código de saída, exatamente para isso.
+E, uma vez que o clique funcione: se administrador é necessário para **alguma** coisa. Esta
+execução mostra que ele não muda o clique, mas o Espaço ainda não chegou a ser exercitado —
+o bot nunca passou da Janela de Confirmação.

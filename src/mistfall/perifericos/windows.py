@@ -8,9 +8,17 @@ Jogos costumam ler scancode de hardware direto e ignorar evento de tecla
 virtual — e a razao classica de um script funcionar no Bloco de Notas e
 nao no jogo.
 
-Exige rodar como administrador: o UIPI do Windows impede um processo de
-integridade menor de enviar input a uma janela de integridade maior, e o
-jogo roda elevado. Sem elevacao, o input e ignorado em silencio, sem erro.
+O clique vai em tres lotes — mover, segurar, soltar — e nao em dois. Com
+LEFTDOWN e LEFTUP no mesmo lote o botao fica apertado por tempo zero, e um
+jogo que amostra o estado do mouse uma vez por quadro nunca o ve apertado.
+E a mesma familia do scancode: a distancia entre mandar o evento e o alvo
+perceber o evento.
+
+Sobre administrador: o UIPI impede um processo de integridade menor de
+enviar input a uma janela de integridade maior, e o jogo roda elevado.
+Mas a execucao de 2026-08-13 mostrou comportamento identico com e sem
+elevacao, com o SendInput aceitando os eventos nas duas — entao o UIPI
+nao explicou o clique perdido. Ver ADR-0001.
 """
 
 import ctypes

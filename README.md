@@ -108,9 +108,12 @@ mistfall-piloto --pasta execucao-real
 Durante a contagem de 5 segundos, dê **Alt+Tab para o jogo** — não clique nele, porque um
 clique pode abrir um modal sozinho. O `SendInput` vai para a janela ativa.
 
-**Administrador não é frescura.** O UIPI do Windows impede um processo de integridade menor de
-enviar input a uma janela de integridade maior, e o jogo roda elevado. Sem elevação, o input
-tende a ser ignorado **em silêncio, sem erro nenhum**.
+**Sobre administrador.** O UIPI do Windows impede um processo de integridade menor de enviar
+input a uma janela de integridade maior, e o jogo roda elevado — daí a recomendação. Mas a
+primeira execução na máquina do jogo mostrou comportamento **idêntico com e sem elevação**, com
+o `SendInput` aceitando os eventos nas duas. O que estava travando era outra coisa: o clique ia
+e voltava no mesmo lote, durando tempo zero, e o jogo lê o mouse por amostragem. Detalhes no
+[ADR-0001](docs/adr/0001-dev-mac-run-windows.md).
 
 O roteiro completo, com a execução de diagnóstico que roda sem administrador de propósito,
 está em [`docs/execucao-windows.md`](docs/execucao-windows.md).
