@@ -199,6 +199,27 @@ def test_leitura_suspeita_no_modal_aperta_esc_e_nunca_espaco(
     assert nomes[-1] == "apertar_esc"
     assert pedaco_do_motivo in r.motivo, r.motivo
 
+
+# ---------------------------------------------------------------------------
+# A Janela e detectavel antes de estar desenhada (#18).
+
+def test_janela_ainda_em_renderizacao_nao_e_a_validada(tmp_path):
+    # O frame em que o modal se torna detectavel vem antes de os numeros
+    # estarem desenhados: identificar_estado precisa de menos pixels estaveis
+    # que o OCR dos campos. Validar esse frame aborta uma Compra boa, e foi o
+    # que aconteceu na maquina do jogo.
+    #
+    # O roteiro serve o modal com o Preco Unitario ainda ausente e so depois o
+    # modal inteiro. O piloto tem de comprar: esperar o frame assentar e ler o
+    # segundo, em vez de reprovar o primeiro.
+    tela = TelaFalsa([LISTA, JANELA_PRECO_ILEGIVEL,
+                      JANELA_DRAGAO, JANELA_DRAGAO, LISTA_DEBITADA])
+    mao = MaoFalsa()
+    r = executar(tela, mao, cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
+    nomes = [a[0] for a in mao.acoes]
+    assert r.desfecho is Desfecho.COMPROU, r.motivo
+    assert "apertar_esc" not in nomes
+
 def test_ouro_inicial_ilegivel_aborta_antes_de_clicar(tmp_path):
     mao = MaoFalsa()
     r = executar(TelaFalsa([LISTA_OURO_ILEGIVEL]), mao, cfg(), tmp_path, ritmo=JA)

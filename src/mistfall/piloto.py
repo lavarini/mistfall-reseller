@@ -21,6 +21,7 @@ from mistfall.decisao import escolher
 from mistfall.estado import identificar_estado
 from mistfall.geometria import caixa_slot
 from mistfall.janela import (
+    PRECO_TOTAL_REL, PRECO_UNITARIO_REL, QUANTIDADE_REL,
     ler_item_da_janela, ler_preco_da_janela,
     ler_preco_total_da_janela, ler_quantidade_da_janela,
     pontuar_icone_da_janela,
@@ -46,6 +47,11 @@ class Ritmo:
     # mas ela nao vale a viagem: esperar de graca custa 10 s numa execucao
     # unica, e abortar por uma primeira carga de UI mais lenta custa o dia.
     teto_espera_janela: float = 10.0
+    # A Janela e detectavel antes de estar desenhada. Este e o teto para ela
+    # assentar depois de detectada — 2 s e generoso de proposito: estourar
+    # custa uma validacao sobre frame possivelmente cru, que a conferencia
+    # pega, e velocidade nao e requisito.
+    teto_espera_assentar: float = 2.0
     espera_apos_espaco: float = 2.0
     teto_espera_ouro: float = 5.0
 
@@ -57,6 +63,7 @@ class Ritmo:
             pausa_antes_do_clique=(0.0, 0.0),
             intervalo_entre_perguntas=0.0,
             teto_espera_janela=0.05,
+            teto_espera_assentar=0.05,
             espera_apos_espaco=0.0,
             teto_espera_ouro=0.05,
         )
@@ -141,10 +148,52 @@ def _esperar_janela(tela: Tela, diario: _Diario,
         primeira_volta = False
         img = tela.capturar()
         if identificar_estado(img) is EstadoTela.JANELA_CONFIRMACAO:
-            diario.registrar(img, "janela")
+            # Nao grava aqui: o frame que interessa ao relatorio e o que foi
+            # de fato validado, e este ainda pode estar em renderizacao.
             return img, time.monotonic() - inicio
         time.sleep(ritmo.intervalo_entre_perguntas)
     return None, time.monotonic() - inicio
+
+
+def _mesmos_numeros(a: np.ndarray, b: np.ndarray) -> bool:
+    """Dois frames mostram os mesmos pixels nos tres campos numericos."""
+    return all(
+        np.array_equal(a[y0:y1, x0:x1], b[y0:y1, x0:x1])
+        for x0, y0, x1, y1 in (PRECO_UNITARIO_REL, QUANTIDADE_REL, PRECO_TOTAL_REL)
+    )
+
+
+def _esperar_a_janela_assentar(tela: Tela, diario: _Diario, ritmo: Ritmo,
+                               detectado: np.ndarray) -> np.ndarray:
+    """Devolve o frame da Janela que vale a pena validar, e o grava.
+
+    `identificar_estado` reconhece a Janela com menos pixels estaveis do que
+    o OCR dos campos precisa: existe um intervalo em que o estado ja diz
+    JANELA_CONFIRMACAO e os numeros ainda nao foram desenhados. Validar esse
+    frame reprova uma Compra boa, e foi o que aconteceu na maquina do jogo
+    (#18).
+
+    Compara so as tres regioes numericas, e nao o frame inteiro: qualquer
+    animacao noutro canto da tela impediria a igualdade global e a espera
+    viraria letra morta.
+
+    Estourar o teto nao inventa desfecho novo — valida o ultimo frame visto,
+    que e o comportamento de antes desta espera. Se ele estiver cru, a
+    conferencia pega e aborta.
+    """
+    inicio = time.monotonic()
+    anterior = detectado
+    while time.monotonic() - inicio < ritmo.teto_espera_assentar:
+        time.sleep(ritmo.intervalo_entre_perguntas)
+        atual = tela.capturar()
+        if identificar_estado(atual) is not EstadoTela.JANELA_CONFIRMACAO:
+            break  # a Janela saiu de cena; vale o ultimo modal que vimos
+        if _mesmos_numeros(anterior, atual):
+            anterior = atual
+            break
+        anterior = atual
+    diario.registrar(anterior, "janela")
+    return anterior
 
 
 def _conferir_a_janela(modal: np.ndarray, escolhida: Listagem,
@@ -294,6 +343,10 @@ def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
         modal, r.segundos_ate_a_janela = _esperar_janela(tela, diario, ritmo)
         if modal is None:
             return encerrar(Desfecho.ABORTOU, "a Janela de Confirmacao nao abriu")
+
+        # segundos_ate_a_janela mede ate a DETECCAO, que e o numero que a #6
+        # pede. A validacao acontece sobre o frame assentado, que vem depois.
+        modal = _esperar_a_janela_assentar(tela, diario, ritmo, modal)
 
         divergencia = _conferir_a_janela(modal, escolhida, r, config.trabalhadores)
         r.tempos["modal"] = (time.monotonic() - t_modal) * 1000
