@@ -220,6 +220,16 @@ def test_janela_em_animacao_nao_e_a_validada(tmp_path):
     assert r.desfecho is Desfecho.COMPROU, r.motivo
     assert "apertar_esc" not in nomes
 
+def test_relatorio_diz_quanto_esperou_pelo_modal(tmp_path):
+    # A espera vai ser calibrada por tentativas na maquina do jogo. Sem este
+    # numero gravado, as pastas de execucao viram evidencia sem etiqueta: nao
+    # da para saber qual tentativa produziu qual resultado.
+    ritmo = dataclasses.replace(JA, espera_para_o_modal_assentar=0.25)
+    executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, ritmo=ritmo,
+             sorteio=random.Random(1))
+    dados = json.loads((tmp_path / "relatorio.json").read_text(encoding="utf-8"))
+    assert dados["espera_do_modal_ms"] == 250
+
 def test_o_frame_em_animacao_realmente_engana_a_deteccao_de_estado(tmp_path):
     # A premissa do teste acima. Se um dia a deteccao de estado passar a
     # recusar o frame em animacao, o piloto ficaria esperando em vez de

@@ -48,9 +48,11 @@ class Ritmo:
     teto_espera_janela: float = 10.0
     # A Janela abre com animacao e e detectavel antes de terminar de se
     # expandir. Esta e a espera entre detectar e capturar o frame que vai ser
-    # validado. 1,5 s e generoso de proposito: velocidade nao e requisito, e
-    # esperar de graca custa 1,5 s numa execucao unica.
-    espera_para_o_modal_assentar: float = 1.5
+    # validado. 400 ms e o dobro do tempo de deteccao medido na maquina do
+    # jogo (198 ms), e um ponto de partida a calibrar: o frame que falhou foi
+    # capturado a ~300 ms, entao a margem aqui e estreita. Ajustavel pela CLI
+    # com --espera-modal, para nao exigir editar Python na maquina do jogo.
+    espera_para_o_modal_assentar: float = 0.4
     espera_apos_espaco: float = 2.0
     teto_espera_ouro: float = 5.0
 
@@ -105,6 +107,10 @@ class Resultado:
     # de ordenacao. Guardar so o conferido esconderia a leitura que derrubou a
     # tela; guardar so o bruto esconderia quais slots a regra invalidou.
     slots: list[dict] | None = None
+    # Quanto se esperou o modal assentar nesta execucao. Gravado porque esse
+    # numero esta sendo calibrado por tentativas na maquina do jogo: sem ele,
+    # as pastas de execucao nao dizem qual tentativa as produziu.
+    espera_do_modal_ms: float | None = None
     capturas: list[str] = field(default_factory=list)
     # Tempo de cada etapa, em milissegundos
     tempos: dict[str, float] = field(default_factory=dict)
@@ -269,6 +275,7 @@ def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
              sorteio: random.Random | None = None) -> Resultado:
     diario = _Diario(Path(pasta))
     r = Resultado(Desfecho.ABORTOU, "explodiu antes da primeira captura")
+    r.espera_do_modal_ms = round(ritmo.espera_para_o_modal_assentar * 1000, 1)
     if sorteio is None:
         sorteio = random.Random()
 
