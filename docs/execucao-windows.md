@@ -15,8 +15,37 @@
    deteccao de item quebra na primeira execucao. O `mss` entra junto, por ser dependencia
    declarada so no Windows.
 
-5. Confira que o tesseract responde: `tesseract --version`.
-6. Deixe a **escala de exibicao do Windows em 100%** (Configuracoes → Sistema → Tela →
+5. O `pip` termina com um aviso parecido com este, e ele **importa**:
+
+   ```
+   WARNING: The script mistfall-piloto.exe is installed in
+   'C:\Users\<voce>\AppData\Local\Python\pythoncore-3.14-64\Scripts' which is not on PATH.
+   ```
+
+   O Python 3.14 do python.org instala pelo *Python Install Manager*, e o "Add python.exe to
+   PATH" do passo 1 poe no PATH um atalho para o `python.exe` — **nao** a pasta `Scripts`
+   daquela instalacao. Por isso `python -m pip` funciona e o `mistfall-piloto` responde "nao
+   e reconhecido" mesmo com o pacote instalado. Copie o caminho que o aviso imprimiu e
+   acrescente-o ao PATH do usuario, no PowerShell:
+
+   ```powershell
+   [Environment]::SetEnvironmentVariable(
+     'Path',
+     [Environment]::GetEnvironmentVariable('Path','User') + ';<o caminho do aviso>',
+     'User')
+   ```
+
+   Repare que ele le o PATH **do usuario**, e nao o do processo: lendo o do processo voce
+   grava uma copia do PATH da maquina dentro do seu, e isso e chato de desfazer. Depois
+   **feche e abra um terminal novo** — a sessao atual nao recebe a mudanca. Confirme com
+   `Get-Command mistfall-piloto`. Vale tambem para o terminal elevado da terceira execucao: a
+   elevacao mantem o mesmo perfil de usuario.
+
+   Se preferir nao mexer no PATH, todo `mistfall-piloto ...` deste roteiro pode virar
+   `python -m ferramentas.piloto_cli ...`, que e o mesmo programa pelo caminho do modulo.
+
+6. Confira que o tesseract responde: `tesseract --version`.
+7. Deixe a **escala de exibicao do Windows em 100%** (Configuracoes → Sistema → Tela →
    Escala). Em tela 1440p o Windows costuma sugerir 125%, e com isso a captura nao sai
    2560x1440 — o piloto recusa e sai com codigo 2 antes de fazer qualquer coisa.
 
@@ -30,7 +59,8 @@
   atual: de la, ou o piloto morre em codigo 2 sem achar o `config.toml`, ou as pastas de
   evidencia vao parar dentro do `System32`.
 
-Em todas as execucoes, anote o **codigo de saida**: `echo %ERRORLEVEL%` logo apos o comando.
+Em todas as execucoes, anote o **codigo de saida**: `$LASTEXITCODE` logo apos o comando. Os
+blocos abaixo estao em **PowerShell**; no `cmd.exe` o equivalente e `echo %ERRORLEVEL%`.
 
 | Codigo | Significado |
 |--------|-------------|
@@ -46,7 +76,7 @@ Terminal **normal**, sem administrador:
 ```
 cd C:\caminho\do\repo
 mistfall-piloto --simular --pasta execucao-simulada
-echo %ERRORLEVEL%
+$LASTEXITCODE
 ```
 
 Ela nao clica nem aperta nada, e o desfecho esperado e `simulou`. Confira no relatorio se o
@@ -63,7 +93,7 @@ Terminal **normal**, agora pra valer:
 ```
 cd C:\caminho\do\repo
 mistfall-piloto --pasta execucao-sem-admin
-echo %ERRORLEVEL%
+$LASTEXITCODE
 ```
 
 Quando aparecer a contagem de 5 segundos, **traga o jogo para a frente com Alt+Tab** — o
@@ -90,7 +120,7 @@ Terminal **como administrador**:
 ```
 cd C:\caminho\do\repo
 mistfall-piloto --pasta execucao-real
-echo %ERRORLEVEL%
+$LASTEXITCODE
 ```
 
 Durante a contagem de 5 segundos: **Alt+Tab para o jogo**, sem clicar nele, e tire a mao do

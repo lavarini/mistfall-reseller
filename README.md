@@ -66,6 +66,13 @@ python -m pip install -e .
 
 O `-e` **não é opcional**: sem ele a busca pela pasta `templates/` quebra.
 
+No fim, repare se o `pip` avisou que a pasta `Scripts` **não está no PATH**. No Python 3.14 do
+python.org — que instala pelo *Python Install Manager* — ela costuma não estar, mesmo tendo
+marcado *Add python.exe to PATH*: esse item põe no PATH um atalho para o `python.exe`, e não o
+`Scripts` da instalação. O sintoma é o `mistfall-piloto` sair como "não é reconhecido" com tudo
+instalado; o conserto está no [roteiro](docs/execucao-windows.md). Sem mexer no PATH, todo
+`mistfall-piloto ...` abaixo funciona como `python -m ferramentas.piloto_cli ...`.
+
 Confira que o tesseract responde antes de seguir:
 
 ```
