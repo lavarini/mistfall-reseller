@@ -1,4 +1,5 @@
 import json
+import random
 from dataclasses import replace
 
 import cv2
@@ -31,29 +32,29 @@ JA = Ritmo.instantaneo()  # nenhum teste espera de verdade
 
 def test_caminho_feliz_compra(tmp_path):
     mao = MaoFalsa()
-    r = executar(roteiro_feliz(), mao, cfg(), tmp_path, ritmo=JA)
+    r = executar(roteiro_feliz(), mao, cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
     assert r.desfecho is Desfecho.COMPROU
 
 def test_caminho_feliz_clica_no_slot_certo(tmp_path):
     mao = MaoFalsa()
-    executar(roteiro_feliz(), mao, cfg(), tmp_path, ritmo=JA)
+    executar(roteiro_feliz(), mao, cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
     assert mao.acoes[0] == ("clicar", 1975, 721)
 
 def test_caminho_feliz_aperta_espaco_e_nunca_esc(tmp_path):
     mao = MaoFalsa()
-    executar(roteiro_feliz(), mao, cfg(), tmp_path, ritmo=JA)
+    executar(roteiro_feliz(), mao, cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
     nomes = [a[0] for a in mao.acoes]
     assert nomes == ["clicar", "apertar_espaco"]
 
 def test_caminho_feliz_registra_os_numeros(tmp_path):
-    r = executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, ritmo=JA)
+    r = executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
     assert r.ouro_antes == 66160
     assert r.ouro_depois == 65914
     assert r.preco_total_esperado == 246
     assert r.listagem.item is ItemAlvo.DRAGAO
 
 def test_caminho_feliz_salva_os_prints(tmp_path):
-    executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, ritmo=JA)
+    executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
     assert len(list(tmp_path.glob("*.png"))) >= 3
     assert (tmp_path / "relatorio.json").exists()
 
@@ -103,7 +104,7 @@ def test_pre_voo_com_modal_aberto_aborta(tmp_path):
 
 def test_modo_simulado_nao_toca_em_nada(tmp_path):
     mao = MaoFalsa()
-    r = executar(roteiro_feliz(), mao, cfg(), tmp_path, simular=True, ritmo=JA)
+    r = executar(roteiro_feliz(), mao, cfg(), tmp_path, simular=True, ritmo=JA, sorteio=random.Random(1))
     assert mao.acoes == []
     assert r.listagem.item is ItemAlvo.DRAGAO
     assert r.ouro_antes == 66160
@@ -111,7 +112,7 @@ def test_modo_simulado_nao_toca_em_nada(tmp_path):
 def test_modo_simulado_tem_desfecho_proprio(tmp_path):
     # Nao pode ser nada_compravel: o roteiro usa esse desfecho como portao
     # ("se nao bater, pare aqui"), e a simulacao ACHOU uma Listagem.
-    r = executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, simular=True, ritmo=JA)
+    r = executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, simular=True, ritmo=JA, sorteio=random.Random(1))
     assert r.desfecho is Desfecho.SIMULOU
     assert r.desfecho is not Desfecho.NADA_COMPRAVEL
 
@@ -126,7 +127,7 @@ JANELA_ORBE_246 = "fixtures/sinteticas/janela-orbe-246.png"
 def test_preco_divergente_isolado_aperta_esc_e_nunca_espaco(tmp_path):
     # Item bate (Dragao), so o Preco Unitario diverge (999 contra 246).
     mao = MaoFalsa()
-    r = executar(TelaFalsa([LISTA, JANELA_DRAGAO_999]), mao, cfg(), tmp_path, ritmo=JA)
+    r = executar(TelaFalsa([LISTA, JANELA_DRAGAO_999]), mao, cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
     nomes = [a[0] for a in mao.acoes]
     assert r.desfecho is Desfecho.ABORTOU
     assert "apertar_espaco" not in nomes
@@ -136,7 +137,7 @@ def test_preco_divergente_isolado_aperta_esc_e_nunca_espaco(tmp_path):
 def test_quantidade_divergente_isolada_aperta_esc_e_nunca_espaco(tmp_path):
     # Item e Preco Unitario batem, so a Quantidade diverge (5 em vez de 1).
     mao = MaoFalsa()
-    r = executar(TelaFalsa([LISTA, JANELA_DRAGAO_QTD_5]), mao, cfg(), tmp_path, ritmo=JA)
+    r = executar(TelaFalsa([LISTA, JANELA_DRAGAO_QTD_5]), mao, cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
     nomes = [a[0] for a in mao.acoes]
     assert r.desfecho is Desfecho.ABORTOU
     assert "apertar_espaco" not in nomes
@@ -146,7 +147,7 @@ def test_quantidade_divergente_isolada_aperta_esc_e_nunca_espaco(tmp_path):
 def test_item_divergente_isolado_aperta_esc_e_nunca_espaco(tmp_path):
     # Preco Unitario bate (246), so o Item diverge (Orbe em vez de Dragao).
     mao = MaoFalsa()
-    r = executar(TelaFalsa([LISTA, JANELA_ORBE_246]), mao, cfg(), tmp_path, ritmo=JA)
+    r = executar(TelaFalsa([LISTA, JANELA_ORBE_246]), mao, cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
     nomes = [a[0] for a in mao.acoes]
     assert r.desfecho is Desfecho.ABORTOU
     assert "apertar_espaco" not in nomes
@@ -158,7 +159,7 @@ def test_ouro_que_cai_valor_inesperado_e_reportado(tmp_path):
     # os 65914 esperados. A Compra aconteceu, mas a queda nao bate.
     OUTRA_LISTA = "images/broche-tres-adaga-lanterna-rede-padrao.png"  # Ouro 64735
     tela = TelaFalsa([LISTA, JANELA_DRAGAO, OUTRA_LISTA])
-    r = executar(tela, MaoFalsa(), cfg(), tmp_path, ritmo=JA)
+    r = executar(tela, MaoFalsa(), cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
     assert r.desfecho is Desfecho.COMPROU
     assert r.ouro_depois == 64735
     assert "esperava 246" in r.motivo
@@ -189,7 +190,7 @@ LISTA_OURO_ILEGIVEL = "fixtures/sinteticas/lista-ouro-ilegivel.png"
 def test_leitura_suspeita_no_modal_aperta_esc_e_nunca_espaco(
         tmp_path, fixture, pedaco_do_motivo):
     mao = MaoFalsa()
-    r = executar(TelaFalsa([LISTA, fixture]), mao, cfg(), tmp_path, ritmo=JA)
+    r = executar(TelaFalsa([LISTA, fixture]), mao, cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
     nomes = [a[0] for a in mao.acoes]
     assert r.desfecho is Desfecho.ABORTOU
     assert "apertar_espaco" not in nomes
@@ -207,7 +208,7 @@ def test_mensagem_de_item_divergente_nao_mostra_o_enum_cru(tmp_path):
     # "o modal mostra ItemAlvo.DRAGAO" e a linha que o operador mais
     # provavelmente vai ler na maquina Windows.
     r = executar(TelaFalsa([LISTA, JANELA_ESPELHO_246]), MaoFalsa(), cfg(),
-                 tmp_path, ritmo=JA)
+                 tmp_path, ritmo=JA, sorteio=random.Random(1))
     assert "ItemAlvo." not in r.motivo
     assert "dragao" in r.motivo
 
@@ -222,7 +223,7 @@ def test_ouro_ainda_nao_debitado_continua_esperando(tmp_path):
     # com atraso); o seguinte ja mostra o debito. Quem para na primeira
     # leitura legivel reporta Compra com queda zero.
     tela = TelaFalsa([LISTA, JANELA_DRAGAO, LISTA, LISTA_DEBITADA])
-    r = executar(tela, MaoFalsa(), cfg(), tmp_path, ritmo=ESPERA_DE_VERDADE)
+    r = executar(tela, MaoFalsa(), cfg(), tmp_path, ritmo=ESPERA_DE_VERDADE, sorteio=random.Random(1))
     assert r.desfecho is Desfecho.COMPROU
     assert r.ouro_depois == 65914
     assert r.motivo == ""
@@ -231,7 +232,7 @@ def test_ouro_que_nunca_se_move_nao_e_compra(tmp_path):
     # Espaco apertado e o Ouro parado ate o teto: e "o Espaco nao registrou",
     # que e a pergunta numero 1 da viagem. Nao pode sair como COMPROU.
     tela = TelaFalsa([LISTA, JANELA_DRAGAO, LISTA])
-    r = executar(tela, MaoFalsa(), cfg(), tmp_path, ritmo=ESPERA_DE_VERDADE)
+    r = executar(tela, MaoFalsa(), cfg(), tmp_path, ritmo=ESPERA_DE_VERDADE, sorteio=random.Random(1))
     assert r.desfecho is Desfecho.OURO_NAO_CAIU
     assert r.desfecho is not Desfecho.COMPROU
     assert r.ouro_antes == 66160
@@ -312,3 +313,14 @@ def test_ritmo_padrao_espera_a_janela_por_dez_segundos():
     # abortar por uma primeira carga de UI mais lenta custa a viagem.
     assert Ritmo().teto_espera_janela == 10.0
     assert Ritmo().intervalo_entre_perguntas == 0.1
+
+def test_o_piloto_nao_depende_do_random_global(tmp_path):
+    # Com semente injetada, mexer no random global nao pode mudar a escolha.
+    import random as global_random
+    global_random.seed(1)
+    um = executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, ritmo=JA,
+                  sorteio=random.Random(42)).listagem.item
+    global_random.seed(999)
+    dois = executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, ritmo=JA,
+                    sorteio=random.Random(42)).listagem.item
+    assert um is dois

@@ -218,9 +218,12 @@ def _esperar_o_ouro_cair(tela: Tela, diario: _Diario, r: Resultado,
 
 
 def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
-             simular: bool = False, ritmo: Ritmo = RITMO_PADRAO) -> Resultado:
+             simular: bool = False, ritmo: Ritmo = RITMO_PADRAO,
+             sorteio: random.Random | None = None) -> Resultado:
     diario = _Diario(Path(pasta))
     r = Resultado(Desfecho.ABORTOU, "explodiu antes da primeira captura")
+    if sorteio is None:
+        sorteio = random.Random()
 
     def encerrar(desfecho: Desfecho, motivo: str = "") -> Resultado:
         r.desfecho, r.motivo = desfecho, motivo
@@ -257,7 +260,7 @@ def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
             for bruta, conferida in zip(brutas, conferidas)
         ]
 
-        escolhida = escolher(conferidas, config)
+        escolhida = escolher(conferidas, config, sorteio)
         if escolhida is None:
             return encerrar(Desfecho.NADA_COMPRAVEL,
                             "nenhuma Listagem abaixo do Preco-alvo")
