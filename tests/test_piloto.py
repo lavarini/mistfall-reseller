@@ -286,6 +286,28 @@ def test_relatorio_guarda_os_sete_scores_do_icone(tmp_path):
     assert all(0.0 <= s <= 1.0 for s in dados["scores_do_icone"].values())
     assert 0.85 <= dados["escala_do_icone"] <= 1.15
 
+def test_relatorio_guarda_os_doze_slots_mesmo_sem_nada_compravel(tmp_path):
+    # O desfecho nada_compravel era o mais opaco de todos: dizia que nao havia
+    # Listagem abaixo do Preco-alvo e nao dizia o que tinha lido para concluir
+    # isso. Sem os slots, diagnosticar exige reprocessar o PNG a mao.
+    executar(TelaFalsa([LISTA_SEM_NADA]), MaoFalsa(), cfg(), tmp_path, ritmo=JA)
+    dados = json.loads((tmp_path / "relatorio.json").read_text(encoding="utf-8"))
+    assert dados["desfecho"] == "nada_compravel"
+    assert len(dados["slots"]) == 12
+    assert [(s["linha"], s["coluna"]) for s in dados["slots"]] == [
+        (linha, coluna) for linha in range(6) for coluna in range(2)]
+
+def test_relatorio_mostra_o_preco_bruto_que_a_conferencia_derrubou(tmp_path):
+    # A regra de ordenacao e contagiosa de proposito: uma leitura fora de ordem
+    # invalida os vizinhos. Guardar so o preco conferido deixaria o relatorio
+    # cheio de null sem dizer qual numero causou a queda — que e exatamente o
+    # que precisa ser lido para consertar o OCR.
+    executar(TelaFalsa([LISTA_SEM_NADA]), MaoFalsa(), cfg(), tmp_path, ritmo=JA)
+    dados = json.loads((tmp_path / "relatorio.json").read_text(encoding="utf-8"))
+    derrubados = [s for s in dados["slots"]
+                  if s["preco_bruto"] is not None and s["preco_conferido"] is None]
+    assert derrubados, "nesta tela a conferencia derruba slots; o bruto tem de sobreviver"
+
 def test_ritmo_padrao_espera_a_janela_por_dez_segundos():
     # A spec pede 10 s. Numa execucao unica, esperar de graca nao custa nada;
     # abortar por uma primeira carga de UI mais lenta custa a viagem.

@@ -25,7 +25,7 @@ from mistfall.janela import (
     ler_preco_total_da_janela, ler_quantidade_da_janela,
     pontuar_icone_da_janela,
 )
-from mistfall.leilao import varrer
+from mistfall.leilao import conferir_ordenacao, varrer_bruto
 from mistfall.ouro import ler_ouro
 from mistfall.perifericos.protocolos import Mao, Tela
 from mistfall.tipos import EstadoTela, ItemAlvo, Listagem
@@ -94,6 +94,10 @@ class Resultado:
     quantidade_no_modal: int | None = None
     escala_do_icone: float | None = None
     scores_do_icone: dict[str, float] | None = None
+    # As doze Listagens do pre-voo, com o preco antes e depois da conferencia
+    # de ordenacao. Guardar so o conferido esconderia a leitura que derrubou a
+    # tela; guardar so o bruto esconderia quais slots a regra invalidou.
+    slots: list[dict] | None = None
     capturas: list[str] = field(default_factory=list)
 
 
@@ -238,7 +242,22 @@ def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
         if r.ouro_antes is None:
             return encerrar(Desfecho.ABORTOU, "Ouro inicial ilegivel")
 
-        escolhida = escolher(varrer(inicial), config)
+        # Em dois passos, e nao pelo `varrer`, para o relatorio poder mostrar
+        # o que o OCR entregou ao lado do que a conferencia deixou passar.
+        brutas = varrer_bruto(inicial)
+        conferidas = conferir_ordenacao(brutas)
+        r.slots = [
+            {
+                "linha": bruta.linha,
+                "coluna": bruta.coluna,
+                "item": bruta.item.value if bruta.item else None,
+                "preco_bruto": bruta.preco_unitario,
+                "preco_conferido": conferida.preco_unitario,
+            }
+            for bruta, conferida in zip(brutas, conferidas)
+        ]
+
+        escolhida = escolher(conferidas, config)
         if escolhida is None:
             return encerrar(Desfecho.NADA_COMPRAVEL,
                             "nenhuma Listagem abaixo do Preco-alvo")
