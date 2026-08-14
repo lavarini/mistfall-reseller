@@ -6,7 +6,7 @@ import pytest
 from mistfall.estado import identificar_estado
 from mistfall.tipos import EstadoTela
 
-# Estado esperado de cada um dos dez prints, escrito a mao. O teste anterior
+# Estado esperado de cada um dos onze prints, escrito a mao. O teste anterior
 # varria images/*.png e so afirmava "nenhum e DESCONHECIDO": os sete prints de
 # lista poderiam todos virar OUTRA_CATEGORIA que ele passava.
 ESTADO_ESPERADO = {
@@ -17,6 +17,8 @@ ESTADO_ESPERADO = {
     "dragao-um-rede-padrao": EstadoTela.LISTA,
     "lanterna-dragao-orbe-rede": EstadoTela.LISTA,
     "rede-dois-dragao-padrao": EstadoTela.LISTA,
+    # Primeira captura vinda da maquina do jogo, e nao do corpus montado a mao.
+    "sete-itens-ocr-227-como-297": EstadoTela.LISTA,
     "janela": EstadoTela.JANELA_CONFIRMACAO,
     "reset-forja": EstadoTela.OUTRA_CATEGORIA,
     "reset-chave": EstadoTela.OUTRA_CATEGORIA,
