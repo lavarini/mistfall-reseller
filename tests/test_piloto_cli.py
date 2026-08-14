@@ -17,8 +17,21 @@ def test_comprou_sai_zero():
 def test_nada_compravel_sai_zero():
     assert codigo_de_saida(Resultado(Desfecho.NADA_COMPRAVEL)) == 0
 
+def test_simulou_sai_zero():
+    assert codigo_de_saida(Resultado(Desfecho.SIMULOU)) == 0
+
 def test_abortou_sai_um():
     assert codigo_de_saida(Resultado(Desfecho.ABORTOU, "qualquer motivo")) == 1
+
+def test_ouro_que_nao_caiu_nao_sai_zero():
+    # Sair 0 aqui deixa "o Espaco nao registrou" indistinguivel de uma Compra
+    # confirmada, que e justamente a pergunta que a execucao vai responder.
+    assert codigo_de_saida(Resultado(Desfecho.OURO_NAO_CAIU, "parado")) == 3
+
+def test_todo_desfecho_tem_codigo_de_saida():
+    # Desfecho novo sem codigo tem de estourar, nunca cair num default 0.
+    for desfecho in Desfecho:
+        assert codigo_de_saida(Resultado(desfecho)) in (0, 1, 3)
 
 def test_problema_de_ambiente_sai_dois(monkeypatch, capsys):
     # Resolucao errada, tesseract ausente e config invalida sobem excecao.

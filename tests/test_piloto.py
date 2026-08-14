@@ -1,3 +1,9 @@
+import json
+from dataclasses import replace
+
+import cv2
+import pytest
+
 from mistfall.config import Config
 from mistfall.perifericos.falso import MaoFalsa, TelaFalsa
 from mistfall.piloto import Desfecho, Ritmo, executar
@@ -103,6 +109,13 @@ def test_modo_simulado_nao_toca_em_nada(tmp_path):
     assert r.listagem.item is ItemAlvo.DRAGAO
     assert r.ouro_antes == 66160
 
+def test_modo_simulado_tem_desfecho_proprio(tmp_path):
+    # Nao pode ser nada_compravel: o roteiro usa esse desfecho como portao
+    # ("se nao bater, pare aqui"), e a simulacao ACHOU uma Listagem.
+    r = executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, simular=True, ritmo=JA)
+    assert r.desfecho is Desfecho.SIMULOU
+    assert r.desfecho is not Desfecho.NADA_COMPRAVEL
+
 def test_todo_aborto_salva_relatorio(tmp_path):
     executar(TelaFalsa([RESET]), MaoFalsa(), cfg(), tmp_path, ritmo=JA)
     assert (tmp_path / "relatorio.json").exists()
@@ -150,3 +163,131 @@ def test_ouro_que_cai_valor_inesperado_e_reportado(tmp_path):
     assert r.desfecho is Desfecho.COMPROU
     assert r.ouro_depois == 64735
     assert "esperava 246" in r.motivo
+
+
+# ---------------------------------------------------------------------------
+# Leitura ilegivel dentro da Janela: cada campo apagado em sua propria fixture.
+# Sem uma fixture por campo, apagar a conferencia inteira nao derruba teste
+# nenhum — e o bot aperta Espaco sem saber o que esta comprando.
+
+JANELA_PRECO_ILEGIVEL = "fixtures/sinteticas/janela-dragao-preco-ilegivel.png"
+JANELA_QTD_ILEGIVEL = "fixtures/sinteticas/janela-dragao-quantidade-ilegivel.png"
+JANELA_TOTAL_ILEGIVEL = "fixtures/sinteticas/janela-dragao-total-ilegivel.png"
+JANELA_ESPELHO_246 = "fixtures/sinteticas/janela-espelho-246.png"
+JANELA_TOTAL_250 = "fixtures/sinteticas/janela-dragao-246-total-250.png"
+LISTA_OURO_ILEGIVEL = "fixtures/sinteticas/lista-ouro-ilegivel.png"
+
+@pytest.mark.parametrize("fixture, pedaco_do_motivo", [
+    (JANELA_PRECO_ILEGIVEL, "Preco Unitario ilegivel"),
+    (JANELA_QTD_ILEGIVEL, "Quantidade ilegivel"),
+    (JANELA_TOTAL_ILEGIVEL, "Preco Total ilegivel"),
+    # Icone que nao e Item-alvo, com os numeros batendo: a unica divergencia
+    # possivel e o icone, entao a conferencia de item responde sozinha.
+    (JANELA_ESPELHO_246, "nenhum Item-alvo reconhecido"),
+    # Total que nao fecha com 1 x Preco Unitario.
+    (JANELA_TOTAL_250, "nao fecha"),
+])
+def test_leitura_suspeita_no_modal_aperta_esc_e_nunca_espaco(
+        tmp_path, fixture, pedaco_do_motivo):
+    mao = MaoFalsa()
+    r = executar(TelaFalsa([LISTA, fixture]), mao, cfg(), tmp_path, ritmo=JA)
+    nomes = [a[0] for a in mao.acoes]
+    assert r.desfecho is Desfecho.ABORTOU
+    assert "apertar_espaco" not in nomes
+    assert nomes[-1] == "apertar_esc"
+    assert pedaco_do_motivo in r.motivo, r.motivo
+
+def test_ouro_inicial_ilegivel_aborta_antes_de_clicar(tmp_path):
+    mao = MaoFalsa()
+    r = executar(TelaFalsa([LISTA_OURO_ILEGIVEL]), mao, cfg(), tmp_path, ritmo=JA)
+    assert r.desfecho is Desfecho.ABORTOU
+    assert "Ouro inicial ilegivel" in r.motivo
+    assert mao.acoes == []
+
+def test_mensagem_de_item_divergente_nao_mostra_o_enum_cru(tmp_path):
+    # "o modal mostra ItemAlvo.DRAGAO" e a linha que o operador mais
+    # provavelmente vai ler na maquina Windows.
+    r = executar(TelaFalsa([LISTA, JANELA_ESPELHO_246]), MaoFalsa(), cfg(),
+                 tmp_path, ritmo=JA)
+    assert "ItemAlvo." not in r.motivo
+    assert "dragao" in r.motivo
+
+
+# ---------------------------------------------------------------------------
+# Confirmacao pelo Ouro.
+
+ESPERA_DE_VERDADE = replace(JA, teto_espera_ouro=1.0)
+
+def test_ouro_ainda_nao_debitado_continua_esperando(tmp_path):
+    # O frame logo apos o Espaco ainda mostra o Ouro antigo (o jogo debita
+    # com atraso); o seguinte ja mostra o debito. Quem para na primeira
+    # leitura legivel reporta Compra com queda zero.
+    tela = TelaFalsa([LISTA, JANELA_DRAGAO, LISTA, LISTA_DEBITADA])
+    r = executar(tela, MaoFalsa(), cfg(), tmp_path, ritmo=ESPERA_DE_VERDADE)
+    assert r.desfecho is Desfecho.COMPROU
+    assert r.ouro_depois == 65914
+    assert r.motivo == ""
+
+def test_ouro_que_nunca_se_move_nao_e_compra(tmp_path):
+    # Espaco apertado e o Ouro parado ate o teto: e "o Espaco nao registrou",
+    # que e a pergunta numero 1 da viagem. Nao pode sair como COMPROU.
+    tela = TelaFalsa([LISTA, JANELA_DRAGAO, LISTA])
+    r = executar(tela, MaoFalsa(), cfg(), tmp_path, ritmo=ESPERA_DE_VERDADE)
+    assert r.desfecho is Desfecho.OURO_NAO_CAIU
+    assert r.desfecho is not Desfecho.COMPROU
+    assert r.ouro_antes == 66160
+    assert r.ouro_depois == 66160
+
+
+# ---------------------------------------------------------------------------
+# O relatorio e o produto desta branch.
+
+class TelaQueExplodeDepoisDoPrimeiroFrame:
+    """Serve a lista e depois estoura, como um mss que morre no meio."""
+
+    def __init__(self) -> None:
+        self.capturas = 0
+
+    def capturar(self):
+        self.capturas += 1
+        if self.capturas > 1:
+            raise RuntimeError("mss caiu")
+        return cv2.imread(LISTA)
+
+def test_excecao_depois_do_clique_ainda_escreve_o_relatorio(tmp_path):
+    mao = MaoFalsa()
+    with pytest.raises(RuntimeError):
+        executar(TelaQueExplodeDepoisDoPrimeiroFrame(), mao, cfg(), tmp_path,
+                 ritmo=JA)
+    assert [a[0] for a in mao.acoes] == ["clicar"]  # o bot ja mexeu no jogo
+    dados = json.loads((tmp_path / "relatorio.json").read_text(encoding="utf-8"))
+    assert dados["desfecho"] == "abortou"
+    assert "explodiu" in dados["motivo"]
+    assert "mss caiu" in dados["motivo"]
+
+def test_relatorio_guarda_o_que_o_modal_mostrava_mesmo_abortando(tmp_path):
+    executar(TelaFalsa([LISTA, JANELA_ESPELHO_246]), MaoFalsa(), cfg(),
+             tmp_path, ritmo=JA)
+    dados = json.loads((tmp_path / "relatorio.json").read_text(encoding="utf-8"))
+    assert dados["desfecho"] == "abortou"
+    assert dados["item_no_modal"] is None
+    assert dados["preco_no_modal"] == 246
+    assert dados["quantidade_no_modal"] == 1
+    assert dados["preco_total_esperado"] == 246
+
+def test_relatorio_guarda_os_sete_scores_do_icone(tmp_path):
+    # Aborto por icone e o desfecho mais provavel da execucao no Windows, e
+    # sem os scores o operador volta so com "o modal mostra None".
+    executar(TelaFalsa([LISTA, JANELA_ESPELHO_246]), MaoFalsa(), cfg(),
+             tmp_path, ritmo=JA)
+    dados = json.loads((tmp_path / "relatorio.json").read_text(encoding="utf-8"))
+    assert set(dados["scores_do_icone"]) == {
+        "broche", "adaga", "lanterna", "orbe", "dragao", "rede", "codice"}
+    assert all(0.0 <= s <= 1.0 for s in dados["scores_do_icone"].values())
+    assert 0.85 <= dados["escala_do_icone"] <= 1.15
+
+def test_ritmo_padrao_espera_a_janela_por_dez_segundos():
+    # A spec pede 10 s. Numa execucao unica, esperar de graca nao custa nada;
+    # abortar por uma primeira carga de UI mais lenta custa a viagem.
+    assert Ritmo().teto_espera_janela == 10.0
+    assert Ritmo().intervalo_entre_perguntas == 0.1
