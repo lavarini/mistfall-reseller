@@ -14,7 +14,9 @@ Entrada: um print da tela em 2560×1440. Saída: a decisão de qual Listagem com
 2. Lê o Ouro
 3. Recorta os 12 slots por coordenada fixa e identifica o item de cada um por **template
    matching do ícone** — não por OCR do nome, que é fonte estilizada
-4. Lê o **Preço-unitário** de cada slot por OCR
+4. Lê o **Preço-unitário** dos 12 slots por OCR, numa **chamada só**: os recortes vão
+   empilhados numa folha, separados por faixas pretas, e cada número volta ao seu slot pela
+   posição vertical
 5. Entre as Listagens que estão **exatamente** no Preço-alvo, sorteia uma. Preço abaixo do
    Preço-alvo é leitura suspeita, não pechincha: vai para o `relatorio.json`, não gera Compra
 6. Clica, espera a **Janela de Confirmação** ser detectada, e confere **três coisas** nela:
@@ -166,12 +168,20 @@ rede = 260
 codice = 281
 ```
 
-`trabalhadores` controla quantos OCRs rodam em paralelo — na varredura dos 12 slots e nos
-números da Janela de Confirmação. O padrão é **4**: já dá um ganho de ~3× sobre rodar
-sequencial, e deixa CPU sobrando para o próprio jogo, que roda na mesma máquina e precisa
-desenhar a tela que o bot captura. Subir para o total de núcleos rende pouco mais e disputa
-tudo com o jogo — `trabalhadores=1` continua disponível, e roda sequencial de verdade, útil
-para depurar.
+`trabalhadores` controla quantos OCRs rodam em paralelo **na Janela de Confirmação** — são as
+três leituras dela, e só. A varredura dos 12 slots **não** usa este número: ela faz uma chamada
+só ao tesseract, com os doze recortes empilhados numa folha, e não há o que paralelizar.
+
+Vale a pena saber por quê, porque foi o contrário do esperado: paralelizar doze execuções do
+tesseract continua sendo doze execuções, e o custo real era criar processo — 5729 ms na máquina
+do jogo contra 477 ms no Mac, com o mesmo paralelismo ligado. Trocar doze chamadas por uma
+levou a varredura de 503 ms para 221 ms no Mac, e de quebra subiu o acerto do corpus de 79 para
+84 slots em 84: empilhados, o tesseract compara altura de dígito e alinhamento entre as linhas,
+onde antes julgava cada recorte sozinho.
+
+O padrão é **4**, e deixa CPU sobrando para o próprio jogo, que roda na mesma máquina e precisa
+desenhar a tela que o bot captura. `trabalhadores=1` continua disponível, e roda sequencial de
+verdade, útil para depurar.
 
 ## Desenvolvimento
 
@@ -179,7 +189,7 @@ para depurar.
 .venv/bin/python -m pytest
 ```
 
-São 257 testes, e todos rodam no Mac sem o jogo aberto.
+São 267 testes, e todos rodam no Mac sem o jogo aberto.
 
 ### Ferramentas de bancada
 

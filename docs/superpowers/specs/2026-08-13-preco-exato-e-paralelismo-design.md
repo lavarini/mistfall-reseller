@@ -1,5 +1,11 @@
 # Design: preço exato, sorteio e paralelismo
 
+> **Nota de 2026-08-14.** A seção de paralelismo desta spec descreve a varredura dos 12 slots
+> rodando OCR em paralelo. Isso mudou: a varredura passou a ler os doze preços numa chamada só
+> — ver `2026-08-14-leitura-de-precos-em-folha-unica-design.md`. Os números de paralelismo
+> registrados aqui continuam válidos, mas valem agora só para as três leituras da Janela de
+> Confirmação, que é o único caminho que ainda usa `trabalhadores`.
+
 Data: 2026-08-13
 Épico: [#1](https://github.com/lavarini/mistfall-reseller/issues/1)
 

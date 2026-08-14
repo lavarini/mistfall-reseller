@@ -50,3 +50,16 @@ def test_o_readme_nao_afirma_o_uipi_como_causa_estabelecida():
     # clique falhou igual com e sem elevacao.
     assert "é o UIPI" not in README
     assert "não é frescura" not in README
+
+
+def test_o_readme_nao_promete_paralelismo_na_varredura():
+    # A varredura passou a fazer uma chamada so. O texto antigo dizia que
+    # `trabalhadores` controlava OCRs em paralelo "na varredura dos 12 slots
+    # e nos numeros da Janela de Confirmacao" — metade disso deixou de ser
+    # verdade. Config que promete uma coisa e faz outra ja custou um review
+    # inteiro neste projeto.
+    assert "na varredura dos 12 slots" not in README
+
+
+def test_o_readme_explica_a_leitura_em_folha_unica():
+    assert "folha" in README.lower()
