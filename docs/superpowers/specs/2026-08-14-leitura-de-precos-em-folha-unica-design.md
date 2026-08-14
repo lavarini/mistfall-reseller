@@ -21,19 +21,46 @@ execuções por varredura pagam esse custo doze vezes.
 
 ## A mudança
 
-**Empilhar os doze recortes de preço numa imagem só e fazer uma única chamada ao tesseract**,
-com `--psm 6` — bloco de texto — em vez de doze chamadas com `--psm 7` — linha isolada.
+**Empilhar os doze recortes de preço numa imagem só, separados por faixas pretas, e fazer uma
+única chamada ao tesseract**, com `--psm 6` — bloco de texto — em vez de doze chamadas com
+`--psm 7` — linha isolada.
 
 Medido no Mac, sobre `images/broche-dragao-orbe-codice-padrao.png`:
 
 | Abordagem | Tempo | Acerto no corpus |
 |-----------|-------|------------------|
-| 12 chamadas, sequencial | 2331 ms | 79/84 |
-| 12 chamadas, 4 trabalhadores (hoje) | 797 ms | 79/84 |
-| **1 chamada, folha única** | **245 ms** | **84/84** |
+| 12 chamadas, sequencial | 1512 ms | 79/84 |
+| 12 chamadas, 4 trabalhadores (hoje) | 503 ms | 79/84 |
+| **1 chamada, folha única** | **221 ms** | **84/84** |
 
-**3,3× mais rápido que o paralelismo atual, e sem nenhum erro.** No Windows o ganho tende a ser
+**2,3× mais rápido que o paralelismo atual, e sem nenhum erro.** No Windows o ganho tende a ser
 maior, porque lá o custo evitado — onze execuções de processo a menos — é justamente o que pesa.
+
+### O separador é obrigatório, e o tamanho dele foi medido
+
+Empilhar os recortes colados **não funciona**: dá 80/84, e o `227` continua saindo `297`. Os
+recortes precisam de uma faixa preta entre eles para o `--psm 6` enxergar doze linhas em vez de
+tentar costurar dígitos de slots vizinhos.
+
+Varrendo o tamanho da faixa contra o corpus inteiro:
+
+| separador | acerto no corpus |
+|-----------|------------------|
+| sem separador | 80/84 |
+| 5 px | 82/84 |
+| 10–20 px | 83/84 |
+| **30–60 px** | **84/84** |
+| 80 px | 83/84 |
+| 120 px | 69/84 |
+| 180 px | 65/84 |
+
+**`SEPARADOR = 40`**, centro do platô 30–60. Não é número escolhido a olho, e não está na beira
+de um precipício: erra por 10 px para qualquer lado sem mudar de resultado.
+
+O degrau em 120 px tem explicação: faixa preta grande demais faz o `--psm 6` parar de ver um
+bloco único e passar a tratar os pedaços como regiões separadas — que é exatamente o contexto
+entre linhas que faz a folha única ler melhor. Separador de menos cola dígito; separador de
+mais destrói o bloco.
 
 ### E ela corrige o OCR, não só o tempo
 
@@ -102,9 +129,28 @@ def ler_precos(recortes: list[np.ndarray]) -> list[int | None]
 
 Recebe os recortes na ordem dos slots, devolve os valores na mesma ordem. `ler_preco`, que lê um
 recorte só, **permanece** — é usada pelas leituras do modal, que não são doze e não formam
-bloco.
+bloco. As duas compartilham o mesmo preparo de imagem — cinza, ampliação 4×, Otsu por recorte —
+que hoje já vive dentro de `ler_preco` e passa a ser função própria.
 
 `leilao.varrer_bruto` passa a chamar `ler_precos` uma vez em vez de `mapear(ler_preco, ...)`.
+
+### O parâmetro `trabalhadores` sai da varredura
+
+Com uma chamada só não há o que paralelizar, então `varrer` e `varrer_bruto` **perdem o
+parâmetro `trabalhadores`**, e `piloto` para de repassá-lo à varredura. Manter um parâmetro que
+não faz nada seria a mesma falha que esta base já cometeu — config que promete uma coisa e faz
+outra.
+
+Isso tem custo, e é melhor dizê-lo agora do que descobrir no review: **seis testes deixam de
+fazer sentido** e saem junto — cinco em `tests/test_leilao.py` (equivalência paralelo/sequencial,
+preservação de posição, o padrão do helper, o espião de repasse) e um em `tests/test_piloto.py`
+(`test_a_varredura_repassa_os_trabalhadores_configurados_ao_helper`).
+
+Esse último é o que merece atenção: ele nasceu de um achado de review real — `config.trabalhadores`
+não chegava à varredura. Ele sai porque **o caminho que ele guardava deixa de existir**, não
+porque incomoda. O que ele protegia continua protegido do outro lado: `config.trabalhadores`
+agora alimenta só o modal, e `test_as_leituras_do_modal_passam_pelo_helper_de_paralelismo` já
+guarda esse caminho.
 
 A separação entre `varrer_bruto` e `conferir_ordenacao` não muda. A conferência de ordenação
 **continua**: ela é a rede que pegou o `227→297`, e o fato de a folha única corrigir esse caso
@@ -131,6 +177,20 @@ defeitos dessa família — cinco na branch anterior.
 Com a folha única esses slots passam a ler certo: os campos `ocr_lido_atual` saem, e o guarda
 passa a afirmar **zero**. Isso é resultado, não efeito colateral — mas precisa ser feito
 explicitamente, senão a suíte fica vermelha sem que ninguém entenda por quê.
+
+**A conferência de ordenação para de derrubar slots no corpus.** `DERRUBADOS_PELA_ORDENACAO`
+lista hoje os slots que a ordenação invalida em três prints; com a leitura correta, ela não
+derruba nada em nenhum dos sete, e o dicionário fica vazio.
+
+Isso **não** é a regra virando letra morta, e o dicionário vazio não pode ser lido como teste
+sem dentes: `tests/test_ordenacao.py` exercita `conferir_ordenacao` com listagens montadas à
+mão, e é lá que o comportamento dela é provado. O que o corpus passa a dizer é outra coisa, e é
+uma boa notícia: **nenhuma leitura do corpus viola mais a ordenação**. Se o OCR regredir, o
+dicionário vazio quebra na hora.
+
+**O tamanho do separador é medido, não escolhido.** Um teste percorre o corpus com separador de
+30, 40 e 60 e exige 84/84 nos três — é o que prova que o 40 está num platô. Sem ele, alguém
+"limpa" o número para 8 ou 100 e a suíte não reclama até a próxima execução no Windows.
 
 ## Documentação a atualizar
 
