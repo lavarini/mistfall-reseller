@@ -69,3 +69,17 @@ def test_toml_invalido_diz_qual_arquivo(tmp_path):
 
 def test_config_real_nao_declara_fracao_de_sanidade():
     assert not hasattr(carregar_config("config.toml"), "fracao_sanidade")
+
+def test_config_real_declara_trabalhadores():
+    assert carregar_config("config.toml").trabalhadores == 4
+
+def test_trabalhadores_ausente_usa_o_padrao(tmp_path):
+    arquivo = tmp_path / "c.toml"
+    arquivo.write_text("[precos_alvo]\nbroche = 188\n", encoding="utf-8")
+    assert carregar_config(arquivo).trabalhadores == 4
+
+def test_trabalhadores_invalido_diz_o_arquivo_e_a_chave(tmp_path):
+    arquivo = tmp_path / "c.toml"
+    arquivo.write_text("trabalhadores = 0\n[precos_alvo]\nbroche = 188\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="trabalhadores"):
+        carregar_config(arquivo)

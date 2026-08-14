@@ -1,11 +1,13 @@
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
+from mistfall.paralelo import TRABALHADORES_PADRAO
 from mistfall.tipos import ItemAlvo
 
 @dataclass(frozen=True)
 class Config:
     precos_alvo: dict[ItemAlvo, int]
+    trabalhadores: int = TRABALHADORES_PADRAO
 
 def carregar_config(caminho: str | Path = "config.toml") -> Config:
     """Le os Precos-alvo do arquivo de configuracao.
@@ -50,4 +52,11 @@ def carregar_config(caminho: str | Path = "config.toml") -> Config:
             )
         precos_alvo[item] = valor
 
-    return Config(precos_alvo=precos_alvo)
+    trabalhadores = dados.get("trabalhadores", TRABALHADORES_PADRAO)
+    if not isinstance(trabalhadores, int) or isinstance(trabalhadores, bool) or trabalhadores < 1:
+        raise ValueError(
+            f"{arquivo}: trabalhadores = {trabalhadores!r}; "
+            "precisa ser um inteiro maior que zero"
+        )
+
+    return Config(precos_alvo=precos_alvo, trabalhadores=trabalhadores)

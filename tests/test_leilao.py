@@ -2,7 +2,8 @@ import cv2
 import pytest
 from mistfall.config import Config
 from mistfall.decisao import escolher
-from mistfall.leilao import varrer
+from mistfall.leilao import varrer, varrer_bruto
+from mistfall.paralelo import TRABALHADORES_PADRAO
 from mistfall.tipos import ItemAlvo
 
 PRINT = "images/broche-tres-adaga-lanterna-rede-padrao.png"
@@ -87,3 +88,28 @@ def test_escolher_nao_compra_nada_atraves_do_modal(listagens_do_modal):
         precos_alvo={item: 2000 for item in ItemAlvo},  # alvo generoso de proposito
     )
     assert escolher(listagens_do_modal, config, random.Random(42)) is None
+
+
+# --- paralelismo da varredura ------------------------------------------------
+
+LISTA = "images/broche-dragao-orbe-codice-padrao.png"
+
+def test_paralelo_devolve_o_mesmo_que_sequencial():
+    img = cv2.imread(LISTA)
+    assert varrer(img, trabalhadores=4) == varrer(img, trabalhadores=1)
+
+def test_paralelo_preserva_a_posicao_de_cada_slot():
+    img = cv2.imread(LISTA)
+    posicoes = [(l.linha, l.coluna) for l in varrer(img, trabalhadores=8)]
+    assert posicoes == [
+        (0, 0), (0, 1), (1, 0), (1, 1), (2, 0), (2, 1),
+        (3, 0), (3, 1), (4, 0), (4, 1), (5, 0), (5, 1),
+    ]
+
+def test_varrer_bruto_tambem_bate_entre_paralelo_e_sequencial():
+    img = cv2.imread(LISTA)
+    assert varrer_bruto(img, trabalhadores=4) == varrer_bruto(img, trabalhadores=1)
+
+def test_o_padrao_e_o_do_helper():
+    import inspect
+    assert inspect.signature(varrer).parameters["trabalhadores"].default == TRABALHADORES_PADRAO
