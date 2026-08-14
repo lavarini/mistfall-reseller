@@ -66,10 +66,12 @@ def test_atraves_do_modal_ainda_sobra_um_item_alvo(listagens_do_modal):
     assert achados == {(0, 1): ItemAlvo.ADAGA}
 
 def test_atraves_do_modal_so_um_preco_e_legivel(listagens_do_modal):
-    # 1174 nao e Preco-unitario de Listagem nenhuma: e numero da Tendencia de
-    # Mercado do modal caindo dentro do recorte do slot (1,0).
+    # 4 nao e Preco-unitario de Listagem nenhuma: e sujeira do modal caindo
+    # dentro do recorte do slot (4,0). Antes da leitura em folha unica o que
+    # vazava era 1174, numero da Tendencia de Mercado, no slot (1,0) — o
+    # numero mudou, o fato de nao ser preco de verdade nao.
     precos = {(l.linha, l.coluna): l.preco_unitario for l in listagens_do_modal}
-    assert {slot: p for slot, p in precos.items() if p is not None} == {(1, 0): 1174}
+    assert {slot: p for slot, p in precos.items() if p is not None} == {(4, 0): 4}
 
 def test_nenhum_slot_do_modal_tem_item_e_preco_ao_mesmo_tempo(listagens_do_modal):
     # E so por isto que `escolher` nao compra nada aqui. E acidente, nao

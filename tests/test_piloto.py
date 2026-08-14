@@ -24,6 +24,17 @@ def cfg():
         },
     )
 
+def cfg_sem_alvo():
+    """Precos-alvo que nenhuma Listagem do corpus atinge.
+
+    Nenhum print do corpus e mais "nada compravel": era a leitura errada que
+    fazia a conferencia de ordenacao derrubar a tela inteira, e a folha unica
+    a corrigiu. O desfecho NADA_COMPRAVEL continua existindo em producao — a
+    tela sem nenhum Item-alvo no Preco-alvo e comum no jogo —, entao o que
+    muda e por onde o teste chega nele: pelos Precos-alvo, nao pelo print.
+    """
+    return dataclasses.replace(cfg(), precos_alvo={item: 1 for item in ItemAlvo})
+
 def roteiro_feliz():
     # pre-voo, apos o clique (modal), apos o Espaco (lista com Ouro debitado)
     return TelaFalsa([LISTA, JANELA_DRAGAO, LISTA_DEBITADA])
@@ -61,7 +72,6 @@ def test_caminho_feliz_salva_os_prints(tmp_path):
 
 
 JANELA_ESPELHO = "images/janela.png"          # modal com item que nao e alvo
-LISTA_SEM_NADA = "images/lanterna-dragao-orbe-rede.png"  # nada compravel
 RESET = "images/reset-forja.png"              # outra Categoria
 
 def test_icone_e_preco_divergentes_aborta_pelo_preco(tmp_path):
@@ -88,7 +98,7 @@ def test_janela_que_nao_abre_aborta_sem_apertar_nada(tmp_path):
 
 def test_nada_compravel_sai_limpo_sem_clicar(tmp_path):
     mao = MaoFalsa()
-    r = executar(TelaFalsa([LISTA_SEM_NADA]), mao, cfg(), tmp_path, ritmo=JA)
+    r = executar(TelaFalsa([LISTA]), mao, cfg_sem_alvo(), tmp_path, ritmo=JA)
     assert r.desfecho is Desfecho.NADA_COMPRAVEL
     assert mao.acoes == []
 
@@ -312,7 +322,7 @@ def test_relatorio_guarda_os_doze_slots_mesmo_sem_nada_compravel(tmp_path):
     # O desfecho nada_compravel era o mais opaco de todos: dizia que nao havia
     # Listagem abaixo do Preco-alvo e nao dizia o que tinha lido para concluir
     # isso. Sem os slots, diagnosticar exige reprocessar o PNG a mao.
-    executar(TelaFalsa([LISTA_SEM_NADA]), MaoFalsa(), cfg(), tmp_path, ritmo=JA)
+    executar(TelaFalsa([LISTA]), MaoFalsa(), cfg_sem_alvo(), tmp_path, ritmo=JA)
     dados = json.loads((tmp_path / "relatorio.json").read_text(encoding="utf-8"))
     assert dados["desfecho"] == "nada_compravel"
     assert len(dados["slots"]) == 12
@@ -350,16 +360,35 @@ def test_conferencia_do_modal_bate_entre_paralelo_e_sequencial(tmp_path):
            quatro.preco_total_esperado)
     assert um.desfecho is quatro.desfecho
 
-def test_relatorio_mostra_o_preco_bruto_que_a_conferencia_derrubou(tmp_path):
+def test_relatorio_mostra_o_preco_bruto_que_a_conferencia_derrubou(monkeypatch, tmp_path):
     # A regra de ordenacao e contagiosa de proposito: uma leitura fora de ordem
     # invalida os vizinhos. Guardar so o preco conferido deixaria o relatorio
     # cheio de null sem dizer qual numero causou a queda — que e exatamente o
     # que precisa ser lido para consertar o OCR.
-    executar(TelaFalsa([LISTA_SEM_NADA]), MaoFalsa(), cfg(), tmp_path, ritmo=JA)
+    #
+    # Desde a leitura em folha unica nenhum print do corpus tem preco fora de
+    # ordem, entao a tela que provoca a queda e montada aqui: um 24 no lugar de
+    # 241, que e o erro real que o corpus registrava antes. So a leitura e
+    # dublada — a conferencia que roda e a de verdade.
+    import mistfall.piloto as piloto
+    from mistfall.tipos import Listagem
+
+    slots = [(linha, coluna) for linha in range(6) for coluna in range(2)]
+    precos = [188, 215, 218, 237, 241, 246, 253, 268, 281, 281, 313, 357]
+    fora_de_ordem = [
+        Listagem(linha=linha, coluna=coluna, item=None,
+                 preco_unitario=24 if (linha, coluna) == (2, 0) else preco)
+        for (linha, coluna), preco in zip(slots, precos)
+    ]
+    monkeypatch.setattr(piloto, "varrer_bruto", lambda img: fora_de_ordem)
+
+    executar(TelaFalsa([LISTA]), MaoFalsa(), cfg(), tmp_path, ritmo=JA)
     dados = json.loads((tmp_path / "relatorio.json").read_text(encoding="utf-8"))
     derrubados = [s for s in dados["slots"]
                   if s["preco_bruto"] is not None and s["preco_conferido"] is None]
     assert derrubados, "nesta tela a conferencia derruba slots; o bruto tem de sobreviver"
+    assert any(s["preco_bruto"] == 24 for s in derrubados), (
+        "o numero que causou a queda tem de aparecer no relatorio")
 
 def test_ritmo_padrao_espera_a_janela_por_dez_segundos():
     # A spec pede 10 s. Numa execucao unica, esperar de graca nao custa nada;
