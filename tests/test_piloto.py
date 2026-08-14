@@ -1,3 +1,4 @@
+import dataclasses
 import json
 import random
 from dataclasses import replace
@@ -296,6 +297,37 @@ def test_relatorio_guarda_os_doze_slots_mesmo_sem_nada_compravel(tmp_path):
     assert len(dados["slots"]) == 12
     assert [(s["linha"], s["coluna"]) for s in dados["slots"]] == [
         (linha, coluna) for linha in range(6) for coluna in range(2)]
+
+
+def test_as_leituras_do_modal_passam_pelo_helper_de_paralelismo(monkeypatch, tmp_path):
+    # Sem isto o teste de equivalencia abaixo passaria trivialmente: as tres
+    # leituras sequenciais dao o mesmo resultado que as paralelas, entao so
+    # comparar resultado nao prova que o helper entrou no caminho.
+    import mistfall.piloto as piloto
+    from mistfall.paralelo import mapear as mapear_real
+
+    chamadas = []
+
+    def espiao(funcao, itens, trabalhadores):
+        itens = list(itens)
+        chamadas.append(len(itens))
+        return mapear_real(funcao, itens, trabalhadores)
+
+    monkeypatch.setattr(piloto, "mapear", espiao)
+    executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, ritmo=JA)
+    assert 3 in chamadas, "as tres leituras do modal nao passaram pelo mapear"
+
+def test_conferencia_do_modal_bate_entre_paralelo_e_sequencial(tmp_path):
+    def rodar(trabalhadores, pasta):
+        config = dataclasses.replace(cfg(), trabalhadores=trabalhadores)
+        return executar(roteiro_feliz(), MaoFalsa(), config, pasta, ritmo=JA)
+    um = rodar(1, tmp_path / "um")
+    quatro = rodar(4, tmp_path / "quatro")
+    assert (um.item_no_modal, um.preco_no_modal, um.quantidade_no_modal,
+            um.preco_total_esperado) == (
+           quatro.item_no_modal, quatro.preco_no_modal, quatro.quantidade_no_modal,
+           quatro.preco_total_esperado)
+    assert um.desfecho is quatro.desfecho
 
 def test_relatorio_mostra_o_preco_bruto_que_a_conferencia_derrubou(tmp_path):
     # A regra de ordenacao e contagiosa de proposito: uma leitura fora de ordem

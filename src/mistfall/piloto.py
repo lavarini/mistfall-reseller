@@ -27,6 +27,7 @@ from mistfall.janela import (
 )
 from mistfall.leilao import conferir_ordenacao, varrer_bruto
 from mistfall.ouro import ler_ouro
+from mistfall.paralelo import mapear
 from mistfall.perifericos.protocolos import Mao, Tela
 from mistfall.tipos import EstadoTela, ItemAlvo, Listagem
 
@@ -150,7 +151,7 @@ def _nome(item: ItemAlvo | None) -> str:
 
 
 def _conferir_a_janela(modal: np.ndarray, escolhida: Listagem,
-                       r: Resultado) -> str | None:
+                       r: Resultado, trabalhadores: int) -> str | None:
     """Le a Janela inteira, guarda tudo no Resultado e devolve a primeira
     divergencia contra a Listagem escolhida — None quando esta tudo certo.
 
@@ -163,9 +164,11 @@ def _conferir_a_janela(modal: np.ndarray, escolhida: Listagem,
     r.escala_do_icone, scores = pontuar_icone_da_janela(modal)
     r.scores_do_icone = {alvo.value: round(score, 4)
                          for alvo, score in scores.items()}
-    r.preco_no_modal = ler_preco_da_janela(modal)
-    r.quantidade_no_modal = ler_quantidade_da_janela(modal)
-    r.preco_total_esperado = ler_preco_total_da_janela(modal)
+    r.preco_no_modal, r.quantidade_no_modal, r.preco_total_esperado = mapear(
+        lambda ler: ler(modal),
+        (ler_preco_da_janela, ler_quantidade_da_janela, ler_preco_total_da_janela),
+        trabalhadores,
+    )
 
     if item is not escolhida.item:
         return (f"o modal mostra {_nome(item)}, "
@@ -277,7 +280,7 @@ def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
         if modal is None:
             return encerrar(Desfecho.ABORTOU, "a Janela de Confirmacao nao abriu")
 
-        divergencia = _conferir_a_janela(modal, escolhida, r)
+        divergencia = _conferir_a_janela(modal, escolhida, r, config.trabalhadores)
         if divergencia is not None:
             mao.apertar_esc()
             return encerrar(Desfecho.ABORTOU, divergencia)
