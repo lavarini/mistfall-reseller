@@ -112,13 +112,39 @@ def test_clicar_converte_pixel_para_coordenada_absoluta(monkeypatch, pixel, espe
 def test_clicar_move_antes_de_pressionar_e_soltar(monkeypatch):
     chamadas = []
     monkeypatch.setattr(windows, "_enviar", lambda *entradas: chamadas.append(entradas))
+    monkeypatch.setattr(windows.time, "sleep", lambda _: None)
     windows.MaoWindows().clicar(100, 200)
-    assert len(chamadas) == 2
-    (evento_move,) = chamadas[0]
-    evento_down, evento_up = chamadas[1]
+    assert len(chamadas) == 3
+    (evento_move,), (evento_down,), (evento_up,) = chamadas
     assert evento_move.uniao.mi.dwFlags == 0x8001  # MOVE | ABSOLUTE
     assert evento_down.uniao.mi.dwFlags == 0x0002  # LEFTDOWN
     assert evento_up.uniao.mi.dwFlags == 0x0004  # LEFTUP
+
+def test_clicar_segura_o_botao_entre_pressionar_e_soltar(monkeypatch):
+    # O jogo amostra o estado do mouse uma vez por quadro. Com LEFTDOWN e
+    # LEFTUP no mesmo lote o botao fica apertado por tempo zero, e na hora de
+    # amostrar ja esta solto — o clique nunca acontece para ele. Por isso o
+    # que importa aqui nao e a ordem dos eventos, e sim haver espera ENTRE
+    # pressionar e soltar.
+    linha = []
+    monkeypatch.setattr(windows, "_enviar",
+                        lambda *entradas: linha.append(("enviar", entradas[0].uniao.mi.dwFlags)))
+    monkeypatch.setattr(windows.time, "sleep", lambda s: linha.append(("dormir", s)))
+    windows.MaoWindows().clicar(100, 200)
+
+    tipos = [evento for evento, _ in linha]
+    assert tipos == ["enviar", "dormir", "enviar", "dormir", "enviar"]
+    _, segurou = linha[3]
+    assert segurou > 0, "o botao tem de ficar apertado por tempo maior que zero"
+
+def test_duracao_do_clique_e_ajustavel_sem_editar_o_modulo(monkeypatch):
+    # E o numero que precisa ser calibrado contra o jogo real, numa maquina
+    # onde ninguem consegue depurar. Tem de dar para mexer de fora.
+    esperas = []
+    monkeypatch.setattr(windows, "_enviar", lambda *entradas: None)
+    monkeypatch.setattr(windows.time, "sleep", esperas.append)
+    windows.MaoWindows(pausa_apos_mover=0.4, segundos_de_clique=0.7).clicar(1, 2)
+    assert esperas == [0.4, 0.7]
 
 def test_capturar_converte_bgra_para_bgr():
     # Sem passar pelo __init__ (que exige mss), injetamos um duble de

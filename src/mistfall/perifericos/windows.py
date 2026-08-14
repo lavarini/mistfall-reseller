@@ -14,6 +14,7 @@ jogo roda elevado. Sem elevacao, o input e ignorado em silencio, sem erro.
 """
 
 import ctypes
+import time
 from ctypes import wintypes
 
 import numpy as np
@@ -92,13 +93,32 @@ class TelaWindows:
         return quadro[:, :, :3]  # BGRA -> BGR
 
 
+# 50 ms sao ~3 quadros a 60 fps: o jogo amostra o estado do mouse ao menos uma
+# vez com o botao apertado. Velocidade nao e requisito, entao a espera e
+# generosa de proposito. Sao parametros, e nao constantes fechadas, porque e o
+# numero a calibrar contra o jogo real — numa maquina onde ninguem depura.
+PAUSA_APOS_MOVER = 0.05
+SEGUNDOS_DE_CLIQUE = 0.05
+
+
 class MaoWindows:
+    def __init__(self, pausa_apos_mover: float = PAUSA_APOS_MOVER,
+                 segundos_de_clique: float = SEGUNDOS_DE_CLIQUE) -> None:
+        self._pausa_apos_mover = pausa_apos_mover
+        self._segundos_de_clique = segundos_de_clique
+
     def clicar(self, x: int, y: int) -> None:
         # SendInput absoluto usa 0..65535 sobre a tela virtual.
         nx = x * 65535 // (LARGURA - 1)
         ny = y * 65535 // (ALTURA - 1)
         _enviar(_mouse(MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE, nx, ny))
-        _enviar(_mouse(MOUSEEVENTF_LEFTDOWN), _mouse(MOUSEEVENTF_LEFTUP))
+        # Pressionar e soltar em lotes separados, com o botao segurado entre os
+        # dois. Juntos num lote so o clique dura tempo zero: um jogo que le por
+        # amostragem, e nao pela fila de mensagens, nunca ve o botao apertado.
+        time.sleep(self._pausa_apos_mover)
+        _enviar(_mouse(MOUSEEVENTF_LEFTDOWN))
+        time.sleep(self._segundos_de_clique)
+        _enviar(_mouse(MOUSEEVENTF_LEFTUP))
 
     def apertar_espaco(self) -> None:
         _enviar(_tecla(SCANCODE_ESPACO, False), _tecla(SCANCODE_ESPACO, True))
