@@ -7,8 +7,23 @@ dependencies = [
     "numpy>=2.5",
     "pillow>=12.3",
     "pytesseract>=0.3.13",
+    # Captura de tela, so existe e so e usada no Windows. Declarada aqui para
+    # o `pip install -e .` da maquina Windows nao depender de um passo manual
+    # que ninguem lembra de rodar.
+    "mss; sys_platform == 'win32'",
 ]
+
+[project.scripts]
+mistfall-piloto = "ferramentas.piloto_cli:main"
 
 [tool.pytest.ini_options]
 pythonpath = ["src", "."]
 testpaths = ["tests"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src", "."]
+include = ["mistfall*", "ferramentas*"]
