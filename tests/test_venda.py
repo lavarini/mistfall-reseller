@@ -39,6 +39,14 @@ def test_executa_um_stack_com_cliques_dentro_das_areas_seguras(tmp_path):
     assert dentro(cliques[0], (cx - 20, cy - 26, cx + 20, cy + 26))
     assert cliques[1:3] == [CENTRO_PRECO_VENDA, CENTRO_QUANTIDADE_VENDA]
     assert dentro(cliques[3], AREA_SEGURA_BOTAO_LISTAR)
+    assert mao.acoes[1:7] == [
+        ("clicar", *CENTRO_PRECO_VENDA),
+        ("selecionar_tudo",),
+        ("digitar_numero", 226),
+        ("clicar", *CENTRO_QUANTIDADE_VENDA),
+        ("selecionar_tudo",),
+        ("digitar_numero", 3),
+    ]
     assert resultado.desfecho is DesfechoVenda.VENDEU
     assert resultado.quantidade == 3
 
@@ -53,6 +61,7 @@ def test_nao_digita_nem_confirma_quando_janela_nao_abre(tmp_path):
     cx, cy = centro_slot_armazem(SLOT)
     assert len(cliques) == 1
     assert dentro(cliques[0], (cx - 20, cy - 26, cx + 20, cy + 26))
+    assert mao.acoes == [("clicar", *cliques[0])]
     assert resultado.desfecho is DesfechoVenda.ABORTOU
     assert "nao abriu" in resultado.motivo
 
