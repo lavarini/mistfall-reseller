@@ -25,6 +25,10 @@ class Mao(Protocol):
         """Desfaz: fecha a Janela de Confirmacao sem comprar."""
         ...
 
+    def selecionar_tudo(self) -> None: ...
+
+    def digitar_numero(self, numero: int) -> None: ...
+
 
 class Interruptor(Protocol):
     """O par F2/F3 visto pelo bot.

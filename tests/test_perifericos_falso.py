@@ -48,6 +48,13 @@ def test_mao_falsa_comeca_vazia():
     assert MaoFalsa().acoes == []
 
 
+def test_mao_falsa_registra_selecao_e_numero():
+    mao = MaoFalsa()
+    mao.selecionar_tudo()
+    mao.digitar_numero(338)
+    assert mao.acoes == [("selecionar_tudo",), ("digitar_numero", 338)]
+
+
 from mistfall.perifericos.falso import InterruptorFalso
 
 

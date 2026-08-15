@@ -43,6 +43,12 @@ class MaoFalsa:
     def apertar_esc(self) -> None:
         self.acoes.append(("apertar_esc",))
 
+    def selecionar_tudo(self) -> None:
+        self.acoes.append(("selecionar_tudo",))
+
+    def digitar_numero(self, numero: int) -> None:
+        self.acoes.append(("digitar_numero", numero))
+
 
 class InterruptorFalso:
     """Interruptor roteirizado: para na enesima pergunta, ou nunca.

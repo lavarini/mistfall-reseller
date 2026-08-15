@@ -40,6 +40,9 @@ KEYEVENTF_KEYUP = 0x0002
 
 SCANCODE_ESPACO = 0x39
 SCANCODE_ESC = 0x01
+SCANCODE_CTRL_ESQUERDO = 0x1D
+SCANCODE_A = 0x1E
+SCANCODE_DIGITO = {"0": 0x0B, **{str(numero): numero + 1 for numero in range(1, 10)}}
 
 # Virtual-key das teclas de controle do operador. Aqui e virtual-key mesmo, e
 # nao scancode: GetAsyncKeyState le o teclado do lado de ca, e nao injeta
@@ -186,3 +189,14 @@ class MaoWindows:
 
     def apertar_esc(self) -> None:
         self._apertar(SCANCODE_ESC)
+
+    def selecionar_tudo(self) -> None:
+        _enviar(_tecla(SCANCODE_CTRL_ESQUERDO, False))
+        self._apertar(SCANCODE_A)
+        _enviar(_tecla(SCANCODE_CTRL_ESQUERDO, True))
+
+    def digitar_numero(self, numero: int) -> None:
+        if not isinstance(numero, int) or isinstance(numero, bool) or numero < 0:
+            raise ValueError("numero precisa ser inteiro nao negativo")
+        for digito in str(numero):
+            self._apertar(SCANCODE_DIGITO[digito])

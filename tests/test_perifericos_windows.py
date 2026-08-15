@@ -66,7 +66,10 @@ def test_windows_implementa_os_protocolos():
     assert "MaoWindows" in classes
     metodos = lambda c: {n.name for n in classes[c].body if isinstance(n, ast.FunctionDef)}
     assert "capturar" in metodos("TelaWindows")
-    assert {"clicar", "apertar_espaco", "apertar_esc"} <= metodos("MaoWindows")
+    assert {
+        "clicar", "apertar_espaco", "apertar_esc",
+        "selecionar_tudo", "digitar_numero",
+    } <= metodos("MaoWindows")
     # Confere aridade, nao so o nome: um `botao=None` extra passaria pela
     # checagem de nomes acima sem ser percebido.
     clicar = next(
@@ -120,6 +123,49 @@ def test_tecla_esc_solta_usa_scancode_e_marca_keyup():
     assert ki.wVk == 0
     assert ki.wScan == 0x01
     assert ki.dwFlags == 0x000A  # KEYEVENTF_SCANCODE | KEYEVENTF_KEYUP
+
+
+def test_ctrl_a_mantem_ctrl_pressionado_enquanto_aperta_a(monkeypatch):
+    eventos = []
+    monkeypatch.setattr(
+        windows,
+        "_enviar",
+        lambda *entradas: eventos.extend(
+            (entrada.uniao.ki.wScan, entrada.uniao.ki.dwFlags) for entrada in entradas
+        ),
+    )
+    monkeypatch.setattr(windows.time, "sleep", lambda _: None)
+    windows.MaoWindows().selecionar_tudo()
+    assert eventos == [
+        (0x1D, 0x0008),
+        (0x1E, 0x0008),
+        (0x1E, 0x000A),
+        (0x1D, 0x000A),
+    ]
+
+
+def test_digita_338_com_scancodes_da_fileira_superior(monkeypatch):
+    eventos = []
+    monkeypatch.setattr(
+        windows,
+        "_enviar",
+        lambda *entradas: eventos.extend(
+            (entrada.uniao.ki.wScan, entrada.uniao.ki.dwFlags) for entrada in entradas
+        ),
+    )
+    monkeypatch.setattr(windows.time, "sleep", lambda _: None)
+    windows.MaoWindows().digitar_numero(338)
+    assert eventos == [
+        (0x04, 0x0008), (0x04, 0x000A),
+        (0x04, 0x0008), (0x04, 0x000A),
+        (0x09, 0x0008), (0x09, 0x000A),
+    ]
+
+
+@pytest.mark.parametrize("numero", [-1, True, 1.5])
+def test_digitar_numero_recusa_valor_que_nao_e_inteiro_nao_negativo(numero):
+    with pytest.raises(ValueError, match="inteiro nao negativo"):
+        windows.MaoWindows().digitar_numero(numero)
 
 @pytest.mark.parametrize(
     "pixel, esperado",
