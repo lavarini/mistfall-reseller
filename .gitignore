@@ -19,6 +19,9 @@ venv/
 # Scratch de execucao de planos (ledger, briefs, review packages)
 .superpowers/
 
+# Worktrees locais de desenvolvimento
+.worktrees/
+
 # Saída do bot (log de Compras, capturas de depuração)
 *.log
 /out/
