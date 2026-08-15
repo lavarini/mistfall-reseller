@@ -2,6 +2,8 @@ import pathlib
 
 CONTEXT = pathlib.Path("CONTEXT.md").read_text(encoding="utf-8")
 README = pathlib.Path("README.md").read_text(encoding="utf-8")
+LEILAO = pathlib.Path("src/mistfall/leilao.py").read_text(encoding="utf-8")
+PRECOS = pathlib.Path("src/mistfall/precos.py").read_text(encoding="utf-8")
 
 
 def test_o_glossario_nao_promete_menor_ou_igual():
@@ -63,6 +65,19 @@ def test_o_readme_nao_promete_paralelismo_na_varredura():
 
 def test_o_readme_explica_a_leitura_em_folha_unica():
     assert "folha" in README.lower()
+
+
+def test_as_docstrings_nao_mandam_trabalhadores_para_a_janela():
+    # Achado do review final da folha unica: o README foi corrigido, mas
+    # leilao.py e precos.py continuaram dizendo que o helper de paralelismo
+    # serve as tres leituras da Janela de Confirmacao. Depois do ADR-0003
+    # aquelas leituras sairam do caminho, e no caso de precos.py a frase nunca
+    # foi verdade — janela.py tem o proprio _numero e nunca importou daqui.
+    #
+    # O guarda do README so olha o README. Quem le o codigo le a docstring, e
+    # ela estava dizendo o contrario da verdade.
+    assert "servindo as tres" not in LEILAO
+    assert "Serve as tres leituras" not in PRECOS
 
 
 def test_o_readme_diz_que_trabalhadores_esta_dormente():

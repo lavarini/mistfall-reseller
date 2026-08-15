@@ -2,9 +2,13 @@
 
 > **Nota de 2026-08-14.** A seção de paralelismo desta spec descreve a varredura dos 12 slots
 > rodando OCR em paralelo. Isso mudou: a varredura passou a ler os doze preços numa chamada só
-> — ver `2026-08-14-leitura-de-precos-em-folha-unica-design.md`. Os números de paralelismo
-> registrados aqui continuam válidos, mas valem agora só para as três leituras da Janela de
-> Confirmação, que é o único caminho que ainda usa `trabalhadores`.
+> — ver `2026-08-14-leitura-de-precos-em-folha-unica-design.md`.
+>
+> Os números medidos aqui continuam válidos como medição, mas **não descrevem mais nenhum
+> caminho vivo**. `trabalhadores` ficou sem consumidor: a varredura deixou de usá-lo, e as três
+> leituras da Janela de Confirmação saíram com o
+> [ADR-0003](../../adr/0003-nao-conferir-a-janela-de-confirmacao.md). A
+> [#20](https://github.com/lavarini/mistfall-reseller/issues/20) decide se o helper fica ou sai.
 
 Data: 2026-08-13
 Épico: [#1](https://github.com/lavarini/mistfall-reseller/issues/1)

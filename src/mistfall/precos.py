@@ -25,8 +25,13 @@ def _preparar(recorte: np.ndarray) -> np.ndarray:
 
 
 def ler_preco(recorte: np.ndarray) -> int | None:
-    """Le um recorte sozinho. Serve as tres leituras da Janela de Confirmacao,
-    que nao sao doze e nao formam bloco contiguo na tela."""
+    """Le um recorte sozinho, com --psm 7.
+
+    Nao tem chamador em producao. Era `varrer_bruto`, que passou a usar
+    `ler_precos`. A Janela de Confirmacao nunca usou esta funcao: `janela.py`
+    tem o proprio `_numero`, com preparo diferente. Fica como contraparte de um
+    recorte so, util na bancada e nos testes — a #20 decide se sai junto com o
+    helper de paralelismo."""
     texto = pytesseract.image_to_string(_preparar(recorte), config=_CONFIG_UM).strip()
     return int(texto) if texto.isdigit() else None
 
@@ -71,7 +76,15 @@ def ler_precos(recortes: list[np.ndarray]) -> list[int | None]:
         output_type=pytesseract.Output.DICT,
     )
 
-    achados: list[int | None] = [None] * len(recortes)
+    # Duas passadas: primeiro junta os numeros de cada faixa, depois decide.
+    # Faixa com mais de um numero e leitura duvidosa, nao um preco com um
+    # vizinho: significa que o tesseract partiu o preco (241 virando "24" e
+    # "1") ou colou lixo ao lado. Ficar com o primeiro devolveria 24 onde o
+    # preco e 241 — um preco MENOR que o verdadeiro, e preco menor aqui e
+    # leitura errada, nao pechincha. O --psm 7 antigo devolvia None nesse
+    # caso, porque conferia isdigit() na linha inteira; manter esse None e
+    # nao perder a rede que ele era.
+    por_faixa: list[list[int]] = [[] for _ in recortes]
     for texto, y, altura in zip(dados["text"], dados["top"], dados["height"]):
         texto = texto.strip()
         if not texto.isdigit():
@@ -79,7 +92,6 @@ def ler_precos(recortes: list[np.ndarray]) -> list[int | None]:
         centro = y + altura / 2
         for indice, (inicio, fim) in enumerate(faixas):
             if inicio <= centro < fim:
-                if achados[indice] is None:
-                    achados[indice] = int(texto)
+                por_faixa[indice].append(int(texto))
                 break
-    return achados
+    return [numeros[0] if len(numeros) == 1 else None for numeros in por_faixa]

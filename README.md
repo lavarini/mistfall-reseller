@@ -203,7 +203,7 @@ entre as linhas, onde antes julgava cada recorte sozinho.
 .venv/bin/python -m pytest
 ```
 
-São 274 testes, e todos rodam no Mac sem o jogo aberto.
+São 276 testes, e todos rodam no Mac sem o jogo aberto.
 
 ### Ferramentas de bancada
 

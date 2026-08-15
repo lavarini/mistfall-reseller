@@ -13,9 +13,11 @@ def varrer_bruto(img: np.ndarray) -> list[Listagem]:
 
     Os doze precos saem de UMA chamada ao tesseract, com os recortes empilhados
     numa folha — nao ha `trabalhadores` aqui porque nao ha o que paralelizar.
-    O helper de paralelismo continua no projeto e continua servindo as tres
-    leituras da Janela de Confirmacao; `config.trabalhadores` alimenta aquele
-    caminho, nao este.
+
+    O helper de paralelismo continua no projeto, mas nao serve mais ninguem:
+    esta varredura era o consumidor principal, e as leituras da Janela de
+    Confirmacao sairam com o ADR-0003. `config.trabalhadores` esta dormente —
+    a #20 decide se o helper fica ou sai.
     """
     icones = [regiao_icone(img, linha, coluna) for linha, coluna in TODOS_OS_SLOTS]
     precos = [recorte_preco(img, linha, coluna) for linha, coluna in TODOS_OS_SLOTS]
