@@ -1,6 +1,7 @@
 """Executa uma Venda de um stack de tres unidades de um Item-alvo."""
 
 import json
+import random
 import time
 from dataclasses import asdict, dataclass
 from enum import Enum
@@ -15,7 +16,9 @@ from mistfall.venda_visao import centro_slot_armazem, eh_janela_venda, eh_tela_v
 
 CENTRO_PRECO_VENDA = (1700, 806)
 CENTRO_QUANTIDADE_VENDA = (1700, 907)
-CENTRO_BOTAO_LISTAR = (1700, 1025)
+MEIA_LARGURA_CLIQUE_SLOT = 20
+MEIA_ALTURA_CLIQUE_SLOT = 26
+AREA_SEGURA_BOTAO_LISTAR = (1500, 1010, 1900, 1040)
 
 
 @dataclass(frozen=True)
@@ -72,6 +75,13 @@ def _gravar(pasta: Path, nome: str, frame) -> None:
     cv2.imwrite(str(pasta / nome), frame)
 
 
+def _sortear_ponto(
+    area: tuple[int, int, int, int], sorteio: random.Random,
+) -> tuple[int, int]:
+    x0, y0, x1, y1 = area
+    return sorteio.randint(x0, x1), sorteio.randint(y0, y1)
+
+
 def executar_venda(
     tela: Tela,
     mao: Mao,
@@ -79,6 +89,7 @@ def executar_venda(
     preco_venda: int,
     pasta: Path,
     ritmo: RitmoVenda = RITMO_VENDA_PADRAO,
+    sorteio: random.Random | None = None,
 ) -> ResultadoVenda:
     if (
         not isinstance(preco_venda, int)
@@ -88,6 +99,8 @@ def executar_venda(
         raise ValueError("Preco de Venda precisa ser inteiro maior que zero")
     if slot.item is None or slot.quantidade != 3:
         raise ValueError("Venda exige Item-alvo com stack de quantidade 3")
+    if sorteio is None:
+        sorteio = random.Random()
 
     pasta = Path(pasta)
     resultado = ResultadoVenda(
@@ -100,7 +113,14 @@ def executar_venda(
         antes = tela.capturar()
         _gravar(pasta, "00-antes.png", antes)
         time.sleep(ritmo.pausa_antes_do_clique)
-        mao.clicar(*centro_slot_armazem(slot))
+        cx, cy = centro_slot_armazem(slot)
+        area_slot = (
+            cx - MEIA_LARGURA_CLIQUE_SLOT,
+            cy - MEIA_ALTURA_CLIQUE_SLOT,
+            cx + MEIA_LARGURA_CLIQUE_SLOT,
+            cy + MEIA_ALTURA_CLIQUE_SLOT,
+        )
+        mao.clicar(*_sortear_ponto(area_slot, sorteio))
 
         janela, _ = _esperar_frame(
             tela,
@@ -123,7 +143,7 @@ def executar_venda(
         # estado, Espaco e inserido no campo em vez de acionar o atalho do
         # botao — observado na primeira execucao real de Venda. O clique
         # direto nao depende do foco e confirma a mesma acao.
-        mao.clicar(*CENTRO_BOTAO_LISTAR)
+        mao.clicar(*_sortear_ponto(AREA_SEGURA_BOTAO_LISTAR, sorteio))
 
         depois, ultimo = _esperar_frame(
             tela,
