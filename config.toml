@@ -8,3 +8,12 @@ dragao = 246
 orbe = 253
 rede = 260
 codice = 281
+
+[precos_venda]
+broche = 226
+adaga = 240
+lanterna = 281
+dragao = 295
+orbe = 304
+rede = 312
+codice = 338
