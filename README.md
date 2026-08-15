@@ -3,9 +3,6 @@
 Bot que observa a Casa de Leilão do jogo Mistfall e compra Itens-alvo quando o preço está no
 valor desejado, para revendê-los com lucro.
 
-Hoje ele faz **uma Compra e para**. Loop, Reset de Categoria e guardrails são os próximos
-passos — veja o [épico](https://github.com/lavarini/mistfall-reseller/issues/1).
-
 ## Como funciona
 
 Entrada: um print da tela em 2560×1440. Saída: a decisão de qual Listagem comprar, e a Compra.
@@ -42,9 +39,9 @@ Compra.
 
 ## Onde roda
 
-O jogo roda num PC **Windows**; o desenvolvimento acontece num **Mac**. Por isso existe uma
-única fronteira de IO — captura de tela, clique e teclado — atrás de dois protocolos, com
-dublês. Todo o resto é função pura de imagem → dado.
+O jogo roda num PC **Windows**; o desenvolvimento acontece num **Mac**. Por isso existem três
+fronteiras de IO — Tela, Mão e Interruptor — atrás de protocolos, com dublês. Todo o resto é
+função pura de imagem → dado.
 
 Consequência prática: **o bot inteiro é testável no macOS**, contra os prints em `images/`.
 `src/mistfall/perifericos/windows.py` é o único arquivo que não roda aqui, e ele não tem
@@ -141,6 +138,19 @@ três vivem do lado de fora do processo. Detalhes no
 O roteiro completo, com a execução de diagnóstico que roda sem administrador de propósito,
 está em [`docs/execucao-windows.md`](docs/execucao-windows.md).
 
+### Rodar o laço
+
+```
+mistfall-bot --pasta sessao
+```
+
+Aperte **F2** dentro do jogo para começar e **F3** para parar. Cada Volta imprime uma linha
+no console e guarda a própria pasta; as Voltas sem nada comprável descartam os prints e
+mantêm só o relatório.
+
+Não há piso de Ouro: o bot compra enquanto houver Listagem no Preço-alvo e Ouro na conta, e
+o único freio é o F3.
+
 ### Códigos de saída
 
 | Código | Significado |
@@ -203,7 +213,7 @@ entre as linhas, onde antes julgava cada recorte sozinho.
 .venv/bin/python -m pytest
 ```
 
-São 286 testes, e todos rodam no Mac sem o jogo aberto.
+São 332 testes, e todos rodam no Mac sem o jogo aberto.
 
 ### Ferramentas de bancada
 

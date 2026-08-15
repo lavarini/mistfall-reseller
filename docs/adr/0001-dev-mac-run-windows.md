@@ -61,11 +61,15 @@ distância entre mandar o evento e o alvo perceber o evento:
 - **O clique precisa de duração.** Pressionar e soltar vão em lotes separados, com espera entre
   eles. O padrão é 50 ms, ~3 quadros a 60 fps.
 
-## O que ainda não foi observado
+## O que a execução seguinte confirmou
 
-Que o clique com duração resolve. A correção saiu daqui, por eliminação, e **só a próxima
-execução na máquina do jogo confirma**.
+**O clique com duração resolve.** A execução guardada em `execucao-real/` clicou numa
+Listagem e a Janela de Confirmação abriu — o `01-janela.png` é a evidência. A correção
+derivada por eliminação acima está certa.
 
-E, uma vez que o clique funcione: se administrador é necessário para **alguma** coisa. Esta
-execução mostra que ele não muda o clique, mas o Espaço ainda não chegou a ser exercitado —
-o bot nunca passou da Janela de Confirmação.
+O que continua sem observação é o **Espaço**: aquela execução abortou lendo o modal, e
+nenhuma Compra jamais completou. É o que a [#9](https://github.com/lavarini/mistfall-reseller/issues/9)
+existe para responder, e a razão de o desfecho `OURO_NAO_CAIU` ser um código de saída
+próprio.
+
+Se administrador é necessário para alguma coisa também segue em aberto.

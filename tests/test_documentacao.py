@@ -87,3 +87,23 @@ def test_o_readme_diz_que_trabalhadores_esta_dormente():
     # afirmacao atual, que e mais forte — a chave nao controla nada. Config que
     # promete uma coisa e faz outra ja custou um review inteiro neste projeto.
     assert "dormente" in README
+
+
+def test_o_glossario_define_volta():
+    assert "**Volta**" in CONTEXT
+
+
+def test_o_glossario_define_interruptor():
+    assert "**Interruptor**" in CONTEXT
+
+
+def test_o_readme_documenta_as_teclas():
+    assert "F2" in README and "F3" in README
+
+
+def test_o_adr_nao_diz_mais_que_o_clique_nao_foi_confirmado():
+    # A execucao real confirmou: execucao-real/01-janela.png existe, ou seja
+    # o bot clicou e a Janela abriu.
+    adr = pathlib.Path("docs/adr/0001-dev-mac-run-windows.md").read_text(
+        encoding="utf-8")
+    assert "Que o clique com duração resolve" not in adr

@@ -72,3 +72,15 @@ A ação de forçar a recarga da lista trocando para outra Categoria e voltando 
 Material de Construção. Só é necessário quando não há nenhum Item-alvo comprável na
 tela — uma Compra (ou tentativa de Compra) já recarrega a lista automaticamente.
 _Avoid_: Refresh, Recarga, Atualizar.
+
+**Volta**:
+Uma iteração do laço de Compra: uma varredura e, conforme o desfecho, uma Compra ou um
+Reset. A sessão do bot é uma sequência de Voltas, e cada uma guarda a própria pasta de
+prints e relatório.
+_Avoid_: Iteração, Ciclo, Rodada.
+
+**Interruptor**:
+O par de teclas com que o operador liga e desliga o bot: F2 começa, F3 para. É a terceira
+fronteira de IO, ao lado da Tela e da Mão, e o F3 é consultado antes de cada clique e
+durante a espera pelo Ouro — nunca entre o clique e o Espaço, onde já não há o que abortar.
+_Avoid_: Hotkey, Atalho, Tecla de pânico.
