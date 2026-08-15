@@ -90,9 +90,8 @@ class Ritmo:
     # Respiro entre uma Volta e a proxima. Nao e cosmetico: como so o F3 para
     # o laco, uma tela que nao seja LISTA faz o pre-voo abortar na hora, e sem
     # esta espera o ciclo gira em rotacao maxima capturando a tela dezenas de
-    # vezes por segundo. Mesmo valor de espera_categoria_carregar, e pelo
-    # mesmo motivo: e palpite calibravel, nao medida.
-    espera_entre_voltas: float = 1.0
+    # vezes por segundo. E palpite calibravel, nao medida.
+    espera_entre_voltas: float = 0.15
 
     @classmethod
     def instantaneo(cls) -> "Ritmo":

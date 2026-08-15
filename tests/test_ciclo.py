@@ -1,6 +1,9 @@
 """O laco: quantas Voltas, quando reseta e com qual Categoria."""
 
+import json
 import pathlib
+import time
+from datetime import datetime
 
 import pytest
 
@@ -29,9 +32,19 @@ class _PilotoFalso:
         # O que o _Diario de verdade deixa: um PNG por captura e o relatorio.
         (pasta / "00-pre-voo.png").write_bytes(b"png de mentira")
         (pasta / "relatorio.json").write_text("{}", encoding="utf-8")
-        if self.roteiro:
-            return self.roteiro.pop(0)
-        return Resultado(Desfecho.NADA_COMPRAVEL)
+        resultado = (
+            self.roteiro.pop(0)
+            if self.roteiro
+            else Resultado(Desfecho.NADA_COMPRAVEL)
+        )
+        observador = kwargs.get("observador_ouro")
+        if observador is not None:
+            observador(
+                resultado.ouro_observado,
+                time.monotonic(),
+                datetime.now().astimezone(),
+            )
+        return resultado
 
 
 class _ResetFalso:
@@ -145,10 +158,53 @@ def test_a_sessao_conta_compras_enviadas(monkeypatch, tmp_path):
     assert sessao.compras_enviadas == 2
 
 
+def test_o_laco_escreve_ouro_de_cada_volta_em_jsonl(monkeypatch, tmp_path):
+    _rodar(
+        monkeypatch,
+        tmp_path,
+        [_compra_enviada(), _compra_enviada()],
+        parar_na_pergunta=3,
+    )
+
+    linhas = [
+        json.loads(linha)
+        for linha in (tmp_path / "telemetria-ouro.jsonl").read_text().splitlines()
+    ]
+
+    assert [linha["volta"] for linha in linhas] == [1, 2]
+    assert [linha["ouro"] for linha in linhas] == [1000, 1000]
+
+
+def test_o_laco_so_registra_intervalo_quando_a_proxima_volta_comeca(
+    monkeypatch, tmp_path
+):
+    _rodar(
+        monkeypatch,
+        tmp_path,
+        [_compra_enviada(), _compra_enviada()],
+        parar_na_pergunta=3,
+    )
+
+    linhas = [
+        json.loads(linha)
+        for linha in (tmp_path / "tempos-do-laco.jsonl").read_text().splitlines()
+    ]
+
+    assert [linha["volta"] for linha in linhas] == [1]
+    assert linhas[0]["espera_efetiva_ms"] >= 0
+    assert (
+        linhas[0]["intervalo_entre_inicios_ms"]
+        >= linhas[0]["espera_efetiva_ms"]
+    )
+
+
 def test_cada_volta_tem_a_propria_pasta(monkeypatch, tmp_path):
     _rodar(monkeypatch, tmp_path, [_compra_enviada(), _compra_enviada()],
            parar_na_pergunta=3)
-    assert sorted(p.name for p in tmp_path.iterdir()) == ["volta-0001", "volta-0002"]
+    assert sorted(p.name for p in tmp_path.iterdir() if p.is_dir()) == [
+        "volta-0001",
+        "volta-0002",
+    ]
 
 
 def test_volta_de_rotina_descarta_os_prints(monkeypatch, tmp_path):

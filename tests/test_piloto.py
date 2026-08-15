@@ -231,7 +231,7 @@ def test_parada_antes_do_clique_nao_clica(tmp_path):
 
 
 def test_o_ritmo_tem_espera_entre_voltas():
-    assert Ritmo().espera_entre_voltas == 1.0
+    assert Ritmo().espera_entre_voltas == 0.15
     assert Ritmo.instantaneo().espera_entre_voltas == 0.0
 
 def test_espera_do_modal_e_sorteada_dentro_da_faixa(tmp_path):

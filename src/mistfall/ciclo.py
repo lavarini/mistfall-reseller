@@ -21,6 +21,7 @@ from mistfall.config import Config
 from mistfall.perifericos.protocolos import Interruptor, Mao, Tela
 from mistfall.piloto import RITMO_PADRAO, Desfecho, Resultado, Ritmo, executar
 from mistfall.reset import CategoriaAlternativa, resetar_categoria
+from mistfall.telemetria import TelemetriaSessao
 
 # Sem acento e sem cor. O projeto inteiro escreve saida de console assim, por
 # causa da pagina de codigo do console do Windows: um mojibake na unica
@@ -107,12 +108,33 @@ def executar_ciclo(tela: Tela, mao: Mao, config: Config, pasta: Path,
     sem_aborto_anterior = object()
     ultimo_motivo_de_aborto: str | object = sem_aborto_anterior
     pasta = Path(pasta)
+    inicio_da_sessao = time.monotonic()
+    telemetria = TelemetriaSessao(pasta, inicio_da_sessao)
+    inicio_anterior = None
+    espera_anterior = None
+    volta_anterior = None
 
     while not interruptor.pediram_parada():
+        inicio_da_volta = time.monotonic()
+        if inicio_anterior is not None:
+            telemetria.registrar_intervalo(
+                volta_anterior,
+                inicio_da_volta,
+                espera_anterior * 1000,
+                (inicio_da_volta - inicio_anterior) * 1000,
+            )
+
         sessao.voltas += 1
         pasta_da_volta = pasta / f"volta-{sessao.voltas:04d}"
+
+        def registrar_ouro(ouro, instante, horario) -> None:
+            telemetria.registrar_ouro(
+                sessao.voltas, ouro, instante, horario
+            )
+
         resultado = executar(tela, mao, config, pasta_da_volta, ritmo=ritmo,
-                             sorteio=sorteio, interruptor=interruptor)
+                             sorteio=sorteio, interruptor=interruptor,
+                             observador_ouro=registrar_ouro)
         _contabilizar(sessao, resultado)
 
         resetou = None
@@ -149,7 +171,11 @@ def executar_ciclo(tela: Tela, mao: Mao, config: Config, pasta: Path,
         if resultado.desfecho is Desfecho.PAROU:
             break
 
+        inicio_anterior = inicio_da_volta
+        volta_anterior = sessao.voltas
+        inicio_espera = time.monotonic()
         time.sleep(ritmo.espera_entre_voltas)
+        espera_anterior = time.monotonic() - inicio_espera
 
     for linha in linhas_do_fecho(sessao):
         print(linha, flush=True)
