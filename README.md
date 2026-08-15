@@ -183,6 +183,10 @@ e a Quantidade `3`, e clica em **Listar para Venda**. O clique é direto porque 
 Quantidade continua focado e absorve o Espaço. Ele reconhece a abertura e o fechamento da
 Janela, mas não relê os campos digitados nem usa a Tendência de Mercado.
 
+Para evitar repetir exatamente o mesmo movimento, o clique no stack e o clique em
+"Listar para Venda" variam dentro de áreas centrais seguras. Baús e campos de input
+continuam com coordenadas fixas.
+
 ### Códigos de saída
 
 | Código | Significado |
@@ -230,7 +234,7 @@ codice = 281
 
 [precos_venda]
 broche = 226
-adaga = 240
+adaga = 239
 lanterna = 281
 dragao = 295
 orbe = 304

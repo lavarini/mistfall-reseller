@@ -18,6 +18,7 @@
 - Não adicionar configuração, dependência, captura de tela ou randomização de tempo.
 - Não persistir as coordenadas sorteadas no relatório.
 - Não depender do estado global de `random`.
+- Alterar somente `[precos_venda].adaga` de `240` para `239`; não alterar `[precos_alvo]`.
 - Preservar as pastas locais não versionadas `sessao/` e `sessao-venda/`.
 
 ---
@@ -30,6 +31,8 @@
 | `tests/test_venda.py` | Provar limites, diversidade, reprodução por semente, isolamento do `random` global e cliques fixos. |
 | `src/mistfall/ciclo_venda.py` | Criar/repassar uma única fonte de aleatoriedade por sessão. |
 | `tests/test_ciclo_venda.py` | Provar que todas as Vendas recebem a mesma instância e que Baús continuam fixos. |
+| `config.toml` | Corrigir o Preço de Venda da Adaga para 239. |
+| `tests/test_config.py` | Fixar 239 como o Preço de Venda esperado da Adaga. |
 | `README.md` | Explicar brevemente quais cliques da Venda variam e quais permanecem fixos. |
 
 ### Task 1: Sortear os dois cliques seguros de uma Venda
@@ -201,6 +204,8 @@ git commit -m "Randomiza cliques seguros da Venda"
 **Files:**
 - Modify: `src/mistfall/ciclo_venda.py`
 - Modify: `tests/test_ciclo_venda.py`
+- Modify: `config.toml`
+- Modify: `tests/test_config.py`
 - Modify: `README.md`
 
 **Interfaces:**
@@ -278,7 +283,47 @@ Run:
 
 Expected: PASS. A CLI continua usando o padrão não determinístico sem receber nova opção.
 
-- [ ] **Step 5: Documentar o comportamento operacional**
+- [ ] **Step 5: Escrever o teste vermelho do Preço de Venda da Adaga**
+
+Em `tests/test_config.py`, alterar somente a expectativa de `precos_venda`:
+
+```python
+ItemAlvo.ADAGA: 239,
+```
+
+Run:
+
+```bash
+/Users/lavarini/lavarini/projects/mistfall-reseller/.venv/bin/python -m pytest tests/test_config.py::test_carrega_os_sete_precos_de_venda_do_config_do_projeto -q
+```
+
+Expected: FAIL mostrando `240 != 239` enquanto `config.toml` ainda contém o valor antigo.
+
+- [ ] **Step 6: Corrigir somente o Preço de Venda da Adaga**
+
+Em `config.toml`, dentro de `[precos_venda]`, substituir:
+
+```toml
+adaga = 240
+```
+
+por:
+
+```toml
+adaga = 239
+```
+
+Não alterar o `adaga = 199` de `[precos_alvo]`.
+
+Run:
+
+```bash
+/Users/lavarini/lavarini/projects/mistfall-reseller/.venv/bin/python -m pytest tests/test_config.py -q
+```
+
+Expected: PASS.
+
+- [ ] **Step 7: Documentar o comportamento operacional**
 
 No trecho da Venda em `README.md`, acrescentar:
 
@@ -290,7 +335,7 @@ continuam com coordenadas fixas.
 
 Não adicionar opção de configuração ou mencionar mudança na Compra.
 
-- [ ] **Step 6: Rodar verificação completa**
+- [ ] **Step 8: Rodar verificação completa**
 
 Run:
 
@@ -301,21 +346,21 @@ git diff --check
 
 Expected: todos os testes passam e `git diff --check` não produz saída.
 
-- [ ] **Step 7: Revisar o diff contra o escopo**
+- [ ] **Step 9: Revisar o diff contra o escopo**
 
 Run:
 
 ```bash
 git status --short
 git diff --stat
-git diff -- src/mistfall/venda.py src/mistfall/ciclo_venda.py tests/test_venda.py tests/test_ciclo_venda.py README.md
+git diff -- src/mistfall/venda.py src/mistfall/ciclo_venda.py tests/test_venda.py tests/test_ciclo_venda.py config.toml tests/test_config.py README.md
 ```
 
 Confirmar que nenhum módulo da Compra foi alterado e que `sessao/`/`sessao-venda/` seguem não versionadas.
 
-- [ ] **Step 8: Commitar integração e documentação**
+- [ ] **Step 10: Commitar integração e documentação**
 
 ```bash
-git add src/mistfall/ciclo_venda.py tests/test_ciclo_venda.py README.md
+git add src/mistfall/ciclo_venda.py tests/test_ciclo_venda.py config.toml tests/test_config.py README.md
 git commit -m "Compartilha sorteio na sessao de Venda"
 ```

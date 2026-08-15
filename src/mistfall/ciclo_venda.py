@@ -1,6 +1,7 @@
 """Percorre os Baús à direita e vende cada stack alvo de quantidade tres."""
 
 import json
+import random
 import time
 from dataclasses import asdict, dataclass, field
 from enum import Enum
@@ -68,9 +69,12 @@ def executar_ciclo_venda(
     pasta: Path,
     interruptor: Interruptor,
     ritmo: RitmoVenda = RITMO_VENDA_PADRAO,
+    sorteio: random.Random | None = None,
 ) -> SessaoVenda:
     pasta = Path(pasta)
     sessao = SessaoVenda()
+    if sorteio is None:
+        sorteio = random.Random()
     interruptor.esperar_inicio()
 
     def encerrar(desfecho, motivo=""):
@@ -113,6 +117,7 @@ def executar_ciclo_venda(
                     config.precos_venda[slot.item],
                     pasta / f"venda-{sessao.vendas + 1:04d}",
                     ritmo,
+                    sorteio,
                 )
                 if resultado.desfecho is not DesfechoVenda.VENDEU:
                     return encerrar(DesfechoSessaoVenda.ABORTOU, resultado.motivo)

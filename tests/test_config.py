@@ -34,7 +34,7 @@ def test_carrega_os_sete_precos_de_venda_do_config_do_projeto():
     config = carregar_config("config.toml")
     assert config.precos_venda == {
         ItemAlvo.BROCHE: 226,
-        ItemAlvo.ADAGA: 240,
+        ItemAlvo.ADAGA: 239,
         ItemAlvo.LANTERNA: 281,
         ItemAlvo.DRAGAO: 295,
         ItemAlvo.ORBE: 304,
