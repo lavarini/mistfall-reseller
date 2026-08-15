@@ -1,6 +1,9 @@
 """O laco: quantas Voltas, quando reseta e com qual Categoria."""
 
+import json
 import pathlib
+import time
+from datetime import datetime
 
 import pytest
 
@@ -29,9 +32,19 @@ class _PilotoFalso:
         # O que o _Diario de verdade deixa: um PNG por captura e o relatorio.
         (pasta / "00-pre-voo.png").write_bytes(b"png de mentira")
         (pasta / "relatorio.json").write_text("{}", encoding="utf-8")
-        if self.roteiro:
-            return self.roteiro.pop(0)
-        return Resultado(Desfecho.NADA_COMPRAVEL)
+        resultado = (
+            self.roteiro.pop(0)
+            if self.roteiro
+            else Resultado(Desfecho.NADA_COMPRAVEL)
+        )
+        observador = kwargs.get("observador_ouro")
+        if observador is not None:
+            observador(
+                resultado.ouro_observado,
+                time.monotonic(),
+                datetime.now().astimezone(),
+            )
+        return resultado
 
 
 class _ResetFalso:
@@ -44,9 +57,8 @@ class _ResetFalso:
         return self.funcionou
 
 
-def _comprou(preco: int = 200) -> Resultado:
-    return Resultado(Desfecho.COMPROU, ouro_antes=1000, ouro_depois=1000 - preco,
-                     preco_total_esperado=preco)
+def _compra_enviada() -> Resultado:
+    return Resultado(Desfecho.COMPRA_ENVIADA, ouro_observado=1000)
 
 
 def _rodar(monkeypatch, tmp_path, roteiro, parar_na_pergunta,
@@ -73,13 +85,15 @@ def test_o_laco_espera_o_inicio_antes_de_qualquer_coisa(monkeypatch, tmp_path):
 
 
 def test_a_parada_encerra_o_laco_sem_rodar_volta(monkeypatch, tmp_path):
-    _, piloto, _ = _rodar(monkeypatch, tmp_path, [_comprou()], parar_na_pergunta=1)
+    _, piloto, _ = _rodar(
+        monkeypatch, tmp_path, [_compra_enviada()], parar_na_pergunta=1)
     assert piloto.chamadas == 0
 
 
 def test_o_laco_roda_ate_a_parada(monkeypatch, tmp_path):
     sessao, piloto, _ = _rodar(
-        monkeypatch, tmp_path, [_comprou(), _comprou(), _comprou()],
+        monkeypatch, tmp_path,
+        [_compra_enviada(), _compra_enviada(), _compra_enviada()],
         parar_na_pergunta=4)
     assert piloto.chamadas == 3
     assert sessao.voltas == 3
@@ -114,7 +128,7 @@ def test_reset_que_falha_avisa_preserva_print_e_nao_avanca(
 
 
 @pytest.mark.parametrize("desfecho", [
-    Desfecho.COMPROU, Desfecho.OURO_NAO_CAIU, Desfecho.ABORTOU])
+    Desfecho.COMPRA_ENVIADA, Desfecho.ABORTOU])
 def test_os_outros_desfechos_nao_resetam(monkeypatch, tmp_path, desfecho):
     # A lista recarrega sozinha depois de uma Compra ou tentativa; abortar
     # nem chegou a mexer na tela.
@@ -134,19 +148,63 @@ def test_a_categoria_do_reset_alterna(monkeypatch, tmp_path):
                                 CategoriaAlternativa.FORJA]
 
 
-def test_a_sessao_conta_compras_e_ouro_gasto(monkeypatch, tmp_path):
+def test_a_sessao_conta_compras_enviadas(monkeypatch, tmp_path):
     sessao, _, _ = _rodar(
         monkeypatch, tmp_path,
-        [_comprou(200), Resultado(Desfecho.NADA_COMPRAVEL), _comprou(150)],
+        [_compra_enviada(), Resultado(Desfecho.NADA_COMPRAVEL),
+         _compra_enviada()],
         parar_na_pergunta=4)
     assert sessao.voltas == 3
-    assert sessao.compras == 2
-    assert sessao.ouro_gasto == 350
+    assert sessao.compras_enviadas == 2
+
+
+def test_o_laco_escreve_ouro_de_cada_volta_em_jsonl(monkeypatch, tmp_path):
+    _rodar(
+        monkeypatch,
+        tmp_path,
+        [_compra_enviada(), _compra_enviada()],
+        parar_na_pergunta=3,
+    )
+
+    linhas = [
+        json.loads(linha)
+        for linha in (tmp_path / "telemetria-ouro.jsonl").read_text().splitlines()
+    ]
+
+    assert [linha["volta"] for linha in linhas] == [1, 2]
+    assert [linha["ouro"] for linha in linhas] == [1000, 1000]
+
+
+def test_o_laco_so_registra_intervalo_quando_a_proxima_volta_comeca(
+    monkeypatch, tmp_path
+):
+    _rodar(
+        monkeypatch,
+        tmp_path,
+        [_compra_enviada(), _compra_enviada()],
+        parar_na_pergunta=3,
+    )
+
+    linhas = [
+        json.loads(linha)
+        for linha in (tmp_path / "tempos-do-laco.jsonl").read_text().splitlines()
+    ]
+
+    assert [linha["volta"] for linha in linhas] == [1]
+    assert linhas[0]["espera_efetiva_ms"] >= 0
+    assert (
+        linhas[0]["intervalo_entre_inicios_ms"]
+        >= linhas[0]["espera_efetiva_ms"]
+    )
 
 
 def test_cada_volta_tem_a_propria_pasta(monkeypatch, tmp_path):
-    _rodar(monkeypatch, tmp_path, [_comprou(), _comprou()], parar_na_pergunta=3)
-    assert sorted(p.name for p in tmp_path.iterdir()) == ["volta-0001", "volta-0002"]
+    _rodar(monkeypatch, tmp_path, [_compra_enviada(), _compra_enviada()],
+           parar_na_pergunta=3)
+    assert sorted(p.name for p in tmp_path.iterdir() if p.is_dir()) == [
+        "volta-0001",
+        "volta-0002",
+    ]
 
 
 def test_volta_de_rotina_descarta_os_prints(monkeypatch, tmp_path):
@@ -166,7 +224,7 @@ def test_volta_de_rotina_mantem_o_relatorio(monkeypatch, tmp_path):
 
 
 @pytest.mark.parametrize("desfecho", [
-    Desfecho.COMPROU, Desfecho.OURO_NAO_CAIU, Desfecho.ABORTOU])
+    Desfecho.COMPRA_ENVIADA, Desfecho.ABORTOU])
 def test_volta_interessante_guarda_os_prints(monkeypatch, tmp_path, desfecho):
     _rodar(monkeypatch, tmp_path, [Resultado(desfecho)], parar_na_pergunta=2)
     assert (tmp_path / "volta-0001" / "00-pre-voo.png").exists()
@@ -175,7 +233,7 @@ def test_volta_interessante_guarda_os_prints(monkeypatch, tmp_path, desfecho):
 def test_so_o_primeiro_aborto_consecutivo_com_o_mesmo_motivo_guarda_print(
         monkeypatch, tmp_path):
     roteiro = [
-        Resultado(Desfecho.OURO_NAO_CAIU),
+        Resultado(Desfecho.COMPRA_ENVIADA),
         Resultado(Desfecho.ABORTOU, motivo="janela aberta"),
         Resultado(Desfecho.ABORTOU, motivo="janela aberta"),
         Resultado(Desfecho.ABORTOU, motivo="tela errada"),
@@ -203,33 +261,24 @@ def _sem_acento(texto: str) -> bool:
         "ascii", "ignore").decode("ascii")
 
 
-def test_a_linha_da_compra_mostra_item_preco_e_ouro():
+def test_a_linha_da_compra_enviada_mostra_item_e_preco():
     listagem = Listagem(linha=0, coluna=0, item=ItemAlvo.BROCHE,
                         preco_unitario=200)
     linha = linha_da_volta(
-        1, Resultado(Desfecho.COMPROU, listagem=listagem, ouro_antes=59227,
-                     ouro_depois=59027), None, "23:47:12")
+        1, Resultado(Desfecho.COMPRA_ENVIADA, listagem=listagem,
+                     ouro_observado=59227), None, "23:47:12")
     assert "[0001]" in linha
     assert "23:47:12" in linha
-    assert "comprou" in linha
+    assert "compra enviada" in linha
     assert ItemAlvo.BROCHE.value in linha
     assert "200g" in linha
-    assert "59227" in linha and "59027" in linha
+    assert "59227" not in linha
 
 
 def test_a_linha_do_nada_compravel_diz_para_onde_resetou():
     linha = linha_da_volta(2, Resultado(Desfecho.NADA_COMPRAVEL),
                            CategoriaAlternativa.FORJA, "23:47:19")
     assert "Reset" in linha and "forja" in linha
-
-
-def test_a_linha_do_ouro_nao_caiu_grita():
-    # E o desfecho mais provavel da primeira execucao real (#9): tem de
-    # saltar aos olhos numa tela que rola sozinha.
-    linha = linha_da_volta(4, Resultado(Desfecho.OURO_NAO_CAIU,
-                                        motivo="o Ouro nao se moveu"),
-                           None, "23:47:33")
-    assert "OURO NAO CAIU" in linha
 
 
 def test_a_linha_do_aborto_carrega_o_motivo():
@@ -251,14 +300,16 @@ def test_nenhuma_linha_tem_acento(desfecho):
 
 
 def test_o_fecho_resume_a_sessao():
-    linhas = linhas_do_fecho(Sessao(voltas=12, compras=3, ouro_gasto=550))
+    linhas = linhas_do_fecho(Sessao(voltas=12, compras_enviadas=3))
     texto = "\n".join(linhas)
-    assert "12" in texto and "3" in texto and "550" in texto
+    assert "12" in texto and "3 Compras enviadas" in texto
+    assert "Ouro gasto" not in texto
     assert _sem_acento(texto)
 
 
 def test_o_laco_imprime_uma_linha_por_volta(monkeypatch, tmp_path, capsys):
-    _rodar(monkeypatch, tmp_path, [_comprou(), _comprou()], parar_na_pergunta=3)
+    _rodar(monkeypatch, tmp_path, [_compra_enviada(), _compra_enviada()],
+           parar_na_pergunta=3)
     saida = capsys.readouterr().out
     assert "[0001]" in saida and "[0002]" in saida
-    assert saida.count("comprou") == 2
+    assert saida.count("compra enviada") == 2

@@ -1,4 +1,4 @@
-"""Orquestra uma unica Compra: varre, decide, clica e aperta Espaco.
+"""Orquestra uma unica Compra: analisa, decide, clica e aperta Espaco.
 
 Uma Compra e para. Sem loop, sem Reset — esses sao a #6 e a #7.
 
@@ -28,21 +28,24 @@ O que continua cobrindo, e por isso a decisao nao deixa o bot cego:
 - `decisao._compravel` so aceita preco EXATAMENTE igual ao Preco-alvo,
   entao leitura baixa nao vira pechincha.
 - `leilao.conferir_ordenacao` invalida preco fora da ordem crescente.
-- A queda do Ouro tem de bater com o Preco-unitario da Listagem escolhida.
-  E a unica conferencia que sobrou no caminho, e ela acontece depois do
-  Espaco: nao impede a Compra errada, mas nao deixa passar calada.
+
+O Ouro da captura inicial e somente telemetria. O Espaco encerra o caminho
+vivo: depois dele nao ha captura, OCR nem espera.
 """
 
 import json
 import random
 import time
+from datetime import datetime
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
+from typing import Callable
 
 import cv2
 import numpy as np
 
+from mistfall.analise import analisar_inicial
 from mistfall.config import Config
 from mistfall.decisao import escolher
 from mistfall.estado import identificar_estado
@@ -52,8 +55,7 @@ from mistfall.janela import (
     ler_preco_total_da_janela, ler_quantidade_da_janela,
     pontuar_icone_da_janela,
 )
-from mistfall.leilao import conferir_ordenacao, varrer_bruto
-from mistfall.ouro import ler_ouro
+from mistfall.leilao import conferir_ordenacao
 from mistfall.paralelo import mapear
 from mistfall.perifericos.protocolos import Interruptor, Mao, Tela
 from mistfall.tipos import EstadoTela, Listagem
@@ -67,7 +69,7 @@ class Ritmo:
     sleep.
     """
 
-    pausa_antes_do_clique: tuple[float, float] = (0.2, 0.6)
+    pausa_antes_do_clique: tuple[float, float] = (0.05, 0.15)
     intervalo_entre_perguntas: float = 0.1
     # 10 s, como na spec. Ha informacao verbal de que o modal e instantaneo,
     # mas ela nao vale a viagem: esperar de graca custa 10 s numa execucao
@@ -82,17 +84,14 @@ class Ritmo:
     # valor calibrado e o sorteio vai para CIMA dele, nunca para baixo: curto
     # demais faz o Espaco chegar antes de a Janela abrir, e a Compra se perde.
     espera_para_o_modal_abrir: tuple[float, float] = (0.08, 0.12)
-    espera_apos_espaco: float = 2.0
-    teto_espera_ouro: float = 5.0
     # Tempo dado ao Leilao para redesenhar a lista depois da troca de
     # Categoria. Tambem serve ao Reset standalone, antes de o loop existir.
     espera_categoria_carregar: float = 1.0
     # Respiro entre uma Volta e a proxima. Nao e cosmetico: como so o F3 para
     # o laco, uma tela que nao seja LISTA faz o pre-voo abortar na hora, e sem
     # esta espera o ciclo gira em rotacao maxima capturando a tela dezenas de
-    # vezes por segundo. Mesmo valor de espera_categoria_carregar, e pelo
-    # mesmo motivo: e palpite calibravel, nao medida.
-    espera_entre_voltas: float = 1.0
+    # vezes por segundo. E palpite calibravel, nao medida.
+    espera_entre_voltas: float = 0.15
 
     @classmethod
     def instantaneo(cls) -> "Ritmo":
@@ -103,8 +102,6 @@ class Ritmo:
             intervalo_entre_perguntas=0.0,
             teto_espera_janela=0.05,
             espera_para_o_modal_abrir=(0.0, 0.0),
-            espera_apos_espaco=0.0,
-            teto_espera_ouro=0.05,
             espera_categoria_carregar=0.0,
             espera_entre_voltas=0.0,
         )
@@ -114,11 +111,7 @@ RITMO_PADRAO = Ritmo()
 
 
 class Desfecho(Enum):
-    COMPROU = "comprou"
-    # Apertamos Espaco e o Ouro nao se moveu. Nao e Compra, e nao pode sair
-    # com o mesmo codigo de COMPROU: "o Espaco nao registrou" e exatamente a
-    # pergunta que a execucao no Windows existe para responder.
-    OURO_NAO_CAIU = "ouro_nao_caiu"
+    COMPRA_ENVIADA = "compra_enviada"
     NADA_COMPRAVEL = "nada_compravel"
     # Separado de NADA_COMPRAVEL: o roteiro usa "nada_compravel" como portao
     # ("se nao bater, pare aqui"), e uma simulacao bem-sucedida imprimindo
@@ -134,9 +127,7 @@ class Resultado:
     desfecho: Desfecho
     motivo: str = ""
     listagem: Listagem | None = None
-    ouro_antes: int | None = None
-    ouro_depois: int | None = None
-    preco_total_esperado: int | None = None
+    ouro_observado: int | None = None
     segundos_ate_a_janela: float | None = None
     # Tudo que foi lido dentro da Janela, gravado mesmo quando aborta: e o
     # diagnostico que volta da maquina Windows, onde ninguem pode depurar.
@@ -266,7 +257,7 @@ def _conferir_a_janela(modal: np.ndarray, escolhida: Listagem,
     r.escala_do_icone, scores = pontuar_icone_da_janela(modal)
     r.scores_do_icone = {alvo.value: round(score, 4)
                          for alvo, score in scores.items()}
-    r.preco_no_modal, r.quantidade_no_modal, r.preco_total_esperado = mapear(
+    r.preco_no_modal, r.quantidade_no_modal, preco_total = mapear(
         lambda ler: ler(modal),
         (ler_preco_da_janela, ler_quantidade_da_janela, ler_preco_total_da_janela),
         trabalhadores,
@@ -281,51 +272,24 @@ def _conferir_a_janela(modal: np.ndarray, escolhida: Listagem,
         return "Quantidade ilegivel no modal"
     if r.quantidade_no_modal != 1:
         return f"a Quantidade e {r.quantidade_no_modal}, esperava 1"
-    if r.preco_total_esperado is None:
+    if preco_total is None:
         return "Preco Total ilegivel no modal"
-    if r.preco_total_esperado != r.preco_no_modal:
+    if preco_total != r.preco_no_modal:
         # Redundancia de graca com Quantidade 1: pega o OCR que perde um
         # digito da Quantidade e le 1 onde o modal mostra outra coisa.
-        return (f"o Preco Total e {r.preco_total_esperado}, "
+        return (f"o Preco Total e {preco_total}, "
                 f"e 1 unidade a {r.preco_no_modal} nao fecha com isso")
     return None
-
-
-def _esperar_o_ouro_cair(tela: Tela, diario: _Diario, r: Resultado,
-                         ritmo: Ritmo,
-                         interruptor: Interruptor | None = None) -> None:
-    """Enquete o Ouro ate a queda bater com o Preco Total, guardando sempre a
-    ultima leitura legivel.
-
-    Nao para na primeira leitura legivel: o Ouro quase sempre e legivel, entao
-    parar ali le o valor *antigo* se o jogo ainda nao debitou, e o bot reporta
-    Compra com queda zero. Tambem nao para em "mudou de valor": um frame de
-    OCR ruidoso encerraria a espera com um numero inventado. O alvo e a queda
-    exata; nao alcanca-la custa `teto_espera_ouro` numa execucao que ja deu
-    errado de qualquer jeito.
-    """
-    ultima = None
-    inicio = time.monotonic()
-    primeira_volta = True
-    while primeira_volta or time.monotonic() - inicio < ritmo.teto_espera_ouro:
-        primeira_volta = False
-        if interruptor is not None and interruptor.pediram_parada():
-            break
-        ultima = tela.capturar()
-        lido = ler_ouro(ultima)
-        if lido is not None:
-            r.ouro_depois = lido
-            if r.ouro_antes - lido == r.preco_total_esperado:
-                break
-        time.sleep(ritmo.intervalo_entre_perguntas)
-    if ultima is not None:
-        diario.registrar(ultima, "apos-espaco")
 
 
 def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
              simular: bool = False, ritmo: Ritmo = RITMO_PADRAO,
              sorteio: random.Random | None = None,
-             interruptor: Interruptor | None = None) -> Resultado:
+             interruptor: Interruptor | None = None,
+             observador_ouro: Callable[
+                 [int | None, float, datetime], None
+             ] | None = None,
+             concorrente: bool = False) -> Resultado:
     diario = _Diario(Path(pasta))
     r = Resultado(Desfecho.ABORTOU, "explodiu antes da primeira captura")
     if sorteio is None:
@@ -339,26 +303,37 @@ def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
     # o finally, uma excecao inesperada deixa o operador com PNGs soltos
     # depois de ja ter mexido no jogo.
     try:
-        t_pre_voo = time.monotonic()
+        inicio = time.monotonic()
         inicial = tela.capturar()
-        diario.registrar(inicial, "pre-voo")
+        instante_captura = time.monotonic()
+        horario_captura = datetime.now().astimezone()
+        r.tempos["captura_pre_voo"] = (instante_captura - inicio) * 1000
 
+        inicio = time.monotonic()
+        diario.registrar(inicial, "pre-voo")
+        r.tempos["gravacao_pre_voo"] = (time.monotonic() - inicio) * 1000
+
+        inicio = time.monotonic()
         estado = identificar_estado(inicial)
+        r.tempos["estado"] = (time.monotonic() - inicio) * 1000
         if estado is not EstadoTela.LISTA:
             return encerrar(Desfecho.ABORTOU,
                             f"pre-voo viu {estado.value}, esperava lista")
 
-        r.ouro_antes = ler_ouro(inicial)
-        if r.ouro_antes is None:
-            return encerrar(Desfecho.ABORTOU, "Ouro inicial ilegivel")
-
-        r.tempos["pre_voo"] = (time.monotonic() - t_pre_voo) * 1000
+        analise = analisar_inicial(inicial, concorrente=concorrente)
+        r.ouro_observado = analise.ouro_observado
+        r.tempos.update(analise.tempos)
+        if observador_ouro is not None:
+            observador_ouro(r.ouro_observado, instante_captura, horario_captura)
 
         # Em dois passos, e nao pelo `varrer`, para o relatorio poder mostrar
         # o que o OCR entregou ao lado do que a conferencia deixou passar.
-        t_varredura = time.monotonic()
-        brutas = varrer_bruto(inicial)
+        inicio = time.monotonic()
+        brutas = analise.brutas
         conferidas = conferir_ordenacao(brutas)
+        escolhida = escolher(conferidas, config, sorteio)
+        r.tempos["conferencia_e_decisao"] = (time.monotonic() - inicio) * 1000
+
         r.slots = [
             {
                 "linha": bruta.linha,
@@ -370,9 +345,6 @@ def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
             for bruta, conferida in zip(brutas, conferidas)
         ]
 
-        escolhida = escolher(conferidas, config, sorteio)
-        r.tempos["varredura"] = (time.monotonic() - t_varredura) * 1000
-
         if escolhida is None:
             return encerrar(Desfecho.NADA_COMPRAVEL,
                             "nenhuma Listagem no Preco-alvo")
@@ -382,49 +354,32 @@ def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
             return encerrar(Desfecho.SIMULOU, "modo simulado: nao clicou")
 
         # Ultimo ponto em que ainda ha o que abortar. Depois do Espaco a
-        # Compra ja aconteceu, e entre o clique e o Espaco sobram 80-120 ms.
+        # Compra ja foi enviada, e entre o clique e o Espaco sobram 80-120 ms.
         if interruptor is not None and interruptor.pediram_parada():
             return encerrar(Desfecho.PAROU, "parada pedida antes do clique")
 
         x0, y0, x1, y1 = caixa_slot(escolhida.linha, escolhida.coluna)
-        time.sleep(random.uniform(*ritmo.pausa_antes_do_clique))
+        inicio = time.monotonic()
+        time.sleep(sorteio.uniform(*ritmo.pausa_antes_do_clique))
+        r.tempos["pausa_antes_do_clique"] = (time.monotonic() - inicio) * 1000
+
+        inicio = time.monotonic()
         mao.clicar((x0 + x1) // 2, (y0 + y1) // 2)
+        r.tempos["clique"] = (time.monotonic() - inicio) * 1000
 
         # A Janela nao e olhada para nada: nem capturada, nem lida, nem
         # conferida. Espera-se ela abrir e aperta-se Espaco. Ver o docstring
         # do modulo para o porque e para o que isso deixa descoberto.
-        t_modal = time.monotonic()
+        inicio = time.monotonic()
         espera = sorteio.uniform(*ritmo.espera_para_o_modal_abrir)
         r.espera_do_modal_ms = round(espera * 1000, 1)
         time.sleep(espera)
-        r.tempos["modal"] = (time.monotonic() - t_modal) * 1000
+        r.tempos["espera_modal"] = (time.monotonic() - inicio) * 1000
 
-        # Quantidade 1 e premissa, e nao leitura: o modal nao e consultado.
-        # Este numero e o que a queda do Ouro vai ter de bater, e a queda e a
-        # unica conferencia que sobrou no caminho.
-        r.preco_total_esperado = escolhida.preco_unitario
-
-        t_confirmacao = time.monotonic()
+        inicio = time.monotonic()
         mao.apertar_espaco()
-        time.sleep(ritmo.espera_apos_espaco)
-        _esperar_o_ouro_cair(tela, diario, r, ritmo, interruptor)
-        r.tempos["confirmacao_do_ouro"] = (time.monotonic() - t_confirmacao) * 1000
-
-        if r.ouro_depois is None:
-            return encerrar(Desfecho.ABORTOU,
-                            "Ouro final ilegivel: Compra indeterminada")
-
-        caiu = r.ouro_antes - r.ouro_depois
-        if caiu == r.preco_total_esperado:
-            return encerrar(Desfecho.COMPROU)
-        if caiu == 0:
-            return encerrar(
-                Desfecho.OURO_NAO_CAIU,
-                f"apertamos Espaco e o Ouro continua em {r.ouro_depois} depois "
-                f"de {ritmo.teto_espera_ouro:.0f}s: ou o Espaco nao registrou, "
-                "ou a Compra nao foi debitada")
-        return encerrar(Desfecho.COMPROU,
-                        f"Ouro caiu {caiu}, esperava {r.preco_total_esperado}")
+        r.tempos["espaco"] = (time.monotonic() - inicio) * 1000
+        return encerrar(Desfecho.COMPRA_ENVIADA)
     # BaseException, e nao Exception: o operador pode dar Ctrl+C no meio (nao
     # existe tecla de panico, e a #8 que traz), e o relatorio tem de dizer que
     # foi isso, nao ficar com o motivo de partida.

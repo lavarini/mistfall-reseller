@@ -44,8 +44,11 @@ def _rodar(args: argparse.Namespace) -> int:
     )
 
     piso = args.espera_modal / 1000
+    teto = args.espera_modal * 1.5 / 1000
     ritmo = dataclasses.replace(
-        RITMO_PADRAO, espera_para_o_modal_abrir=(piso, piso * 1.5))
+        RITMO_PADRAO,
+        espera_para_o_modal_abrir=(piso, teto),
+    )
 
     print("aperte F2 no jogo para comecar, F3 para parar", flush=True)
     executar_ciclo(

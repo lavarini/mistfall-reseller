@@ -68,6 +68,13 @@ def test_ler_precos_sem_recortes_devolve_lista_vazia():
     assert ler_precos([]) == []
 
 
+def test_ler_precos_registra_preparo_e_tesseract_sem_mudar_resultado():
+    tempos = {}
+    assert ler_precos(_recortes(LISTA), tempos) == PRECOS_DA_LISTA
+    assert set(tempos) == {"preparo_folha", "tesseract_precos"}
+    assert all(ms >= 0 for ms in tempos.values())
+
+
 def test_faixa_com_dois_numeros_vira_none():
     # Achado do review final. O tesseract pode partir um preco em dois tokens
     # na mesma faixa — 241 saindo como "24" e "1". Ficar com o primeiro

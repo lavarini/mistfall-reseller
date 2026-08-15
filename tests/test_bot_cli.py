@@ -31,9 +31,18 @@ def test_parar_antes_da_primeira_volta_sai_com_sucesso(monkeypatch, tmp_path):
     perifericos.TelaWindows = type("TelaWindows", (), {})
     monkeypatch.setitem(sys.modules, "mistfall.perifericos.windows", perifericos)
     monkeypatch.setattr(bot_cli, "carregar_config", lambda _: None)
-    monkeypatch.setattr(
-        bot_cli, "executar_ciclo", lambda *args, **kwargs: Sessao(voltas=0))
+    visto = {}
+
+    def executar_ciclo(*args, **kwargs):
+        visto.update(kwargs)
+        return Sessao(voltas=0)
+
+    monkeypatch.setattr(bot_cli, "executar_ciclo", executar_ciclo)
     args = argparse.Namespace(
         pasta=str(tmp_path), config="config.toml", espera_modal=100)
 
     assert bot_cli._rodar(args) == 0
+    ritmo = visto["ritmo"]
+    assert ritmo.pausa_antes_do_clique == (0.05, 0.15)
+    assert ritmo.espera_entre_voltas == 0.15
+    assert ritmo.espera_para_o_modal_abrir == (0.1, 0.15)

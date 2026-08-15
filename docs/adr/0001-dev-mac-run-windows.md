@@ -67,9 +67,14 @@ distância entre mandar o evento e o alvo perceber o evento:
 Listagem e a Janela de Confirmação abriu — o `01-janela.png` é a evidência. A correção
 derivada por eliminação acima está certa.
 
-O que continua sem observação é o **Espaço**: aquela execução abortou lendo o modal, e
-nenhuma Compra jamais completou. É o que a [#9](https://github.com/lavarini/mistfall-reseller/issues/9)
-existe para responder, e a razão de o desfecho `OURO_NAO_CAIU` ser um código de saída
-próprio.
+Naquela execução, o Espaço ainda não tinha sido observado: ela abortou lendo o modal, e
+nenhuma Compra havia completado. A
+[#9](https://github.com/lavarini/mistfall-reseller/issues/9) existia para responder a essa
+pergunta, e `OURO_NAO_CAIU` era um código de saída próprio. Isso é histórico: o Espaço foi
+posteriormente incorporado ao caminho vivo e a confirmação pelo Ouro foi removida.
+
+Hoje, `COMPRA_ENVIADA` é o desfecho depois de enviar clique e Espaço. O Ouro observado no
+frame inicial é telemetria, não confirmação; não há leitura nem espera pós-Espaço, e
+`OURO_NAO_CAIU` não é mais um desfecho do código atual.
 
 Se administrador é necessário para alguma coisa também segue em aberto.

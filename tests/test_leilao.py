@@ -126,6 +126,14 @@ def test_a_varredura_faz_uma_unica_chamada_ao_tesseract(monkeypatch):
     assert um_a_um == [], f"a varredura voltou a ler recorte a recorte: {len(um_a_um)} chamadas"
 
 
+def test_varredura_bruta_registra_itens_e_tempos_da_folha():
+    tempos = {}
+    listagens = varrer_bruto(cv2.imread(LISTA), tempos)
+    assert len(listagens) == 12
+    assert set(tempos) == {"itens", "preparo_folha", "tesseract_precos"}
+    assert all(ms >= 0 for ms in tempos.values())
+
+
 def test_a_varredura_preserva_a_posicao_de_cada_slot():
     posicoes = [(l.linha, l.coluna) for l in varrer(cv2.imread(LISTA))]
     assert posicoes == [

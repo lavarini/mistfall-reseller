@@ -1,7 +1,7 @@
 import dataclasses
 import json
 import random
-from dataclasses import replace
+from types import SimpleNamespace
 
 import cv2
 import pytest
@@ -14,7 +14,6 @@ from mistfall.tipos import ItemAlvo, Listagem
 
 LISTA = "images/broche-dragao-orbe-codice-padrao.png"
 JANELA_DRAGAO = "fixtures/sinteticas/janela-dragao-246.png"
-LISTA_DEBITADA = "fixtures/sinteticas/lista-ouro-65914.png"
 
 def cfg():
     return Config(
@@ -37,12 +36,7 @@ def cfg_sem_alvo():
     return dataclasses.replace(cfg(), precos_alvo={item: 1 for item in ItemAlvo})
 
 def roteiro_feliz():
-    # pre-voo e, depois do Espaco, a lista com o Ouro debitado.
-    #
-    # Nao ha frame de Janela: o piloto nao captura a tela entre o clique e o
-    # Espaco. Um frame de modal aqui seria consumido pela leitura do Ouro, que
-    # e a proxima captura, e o teste mediria outra coisa.
-    return TelaFalsa([LISTA, LISTA_DEBITADA])
+    return TelaFalsa([LISTA])
 
 
 JA = Ritmo.instantaneo()  # nenhum teste espera de verdade
@@ -50,7 +44,7 @@ JA = Ritmo.instantaneo()  # nenhum teste espera de verdade
 def test_caminho_feliz_compra(tmp_path):
     mao = MaoFalsa()
     r = executar(roteiro_feliz(), mao, cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
-    assert r.desfecho is Desfecho.COMPROU
+    assert r.desfecho is Desfecho.COMPRA_ENVIADA
 
 def test_caminho_feliz_clica_no_slot_certo(tmp_path):
     mao = MaoFalsa()
@@ -65,18 +59,12 @@ def test_caminho_feliz_aperta_espaco_e_nunca_esc(tmp_path):
 
 def test_caminho_feliz_registra_os_numeros(tmp_path):
     r = executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
-    assert r.ouro_antes == 66160
-    assert r.ouro_depois == 65914
-    assert r.preco_total_esperado == 246
+    assert r.ouro_observado == 66160
     assert r.listagem.item is ItemAlvo.DRAGAO
 
 def test_caminho_feliz_salva_os_prints(tmp_path):
-    # Duas capturas, e nao mais tres: sumiu a da Janela, que nao e mais
-    # olhada. Restam o pre-voo e a tela com o Ouro debitado — as duas pontas
-    # da unica conferencia que sobrou.
     executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
-    assert sorted(p.name for p in tmp_path.glob("*.png")) == [
-        "00-pre-voo.png", "01-apos-espaco.png"]
+    assert sorted(p.name for p in tmp_path.glob("*.png")) == ["00-pre-voo.png"]
     assert (tmp_path / "relatorio.json").exists()
 
 
@@ -112,7 +100,7 @@ def test_modo_simulado_nao_toca_em_nada(tmp_path):
     r = executar(roteiro_feliz(), mao, cfg(), tmp_path, simular=True, ritmo=JA, sorteio=random.Random(1))
     assert mao.acoes == []
     assert r.listagem.item is ItemAlvo.DRAGAO
-    assert r.ouro_antes == 66160
+    assert r.ouro_observado == 66160
 
 def test_modo_simulado_tem_desfecho_proprio(tmp_path):
     # Nao pode ser nada_compravel: o roteiro usa esse desfecho como portao
@@ -129,20 +117,6 @@ JANELA_DRAGAO_999 = "fixtures/sinteticas/janela-dragao-999.png"
 JANELA_DRAGAO_QTD_5 = "fixtures/sinteticas/janela-dragao-246-qtd-5.png"
 JANELA_ORBE_246 = "fixtures/sinteticas/janela-orbe-246.png"
 
-def test_ouro_que_cai_valor_inesperado_e_reportado(tmp_path):
-    # Depois do Espaco a tela mostra um print real cujo Ouro e 64735, nao
-    # os 65914 esperados. A Compra aconteceu, mas a queda nao bate.
-    #
-    # Com o modal fora do caminho, esta e a unica conferencia que sobrou: o
-    # esperado vem da Listagem escolhida, e a queda tem de bater com ele.
-    OUTRA_LISTA = "images/broche-tres-adaga-lanterna-rede-padrao.png"  # Ouro 64735
-    tela = TelaFalsa([LISTA, OUTRA_LISTA])
-    r = executar(tela, MaoFalsa(), cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
-    assert r.desfecho is Desfecho.COMPROU
-    assert r.ouro_depois == 64735
-    assert "esperava 246" in r.motivo
-
-
 # ---------------------------------------------------------------------------
 # Leitura ilegivel dentro da Janela: cada campo apagado em sua propria fixture.
 # Sem uma fixture por campo, apagar a conferencia inteira nao derruba teste
@@ -153,8 +127,6 @@ JANELA_QTD_ILEGIVEL = "fixtures/sinteticas/janela-dragao-quantidade-ilegivel.png
 JANELA_TOTAL_ILEGIVEL = "fixtures/sinteticas/janela-dragao-total-ilegivel.png"
 JANELA_ESPELHO_246 = "fixtures/sinteticas/janela-espelho-246.png"
 JANELA_TOTAL_250 = "fixtures/sinteticas/janela-dragao-246-total-250.png"
-LISTA_OURO_ILEGIVEL = "fixtures/sinteticas/lista-ouro-ilegivel.png"
-
 @pytest.mark.parametrize("fixture, pedaco_do_motivo", [
     (JANELA_PRECO_ILEGIVEL, "Preco Unitario ilegivel"),
     (JANELA_QTD_ILEGIVEL, "Quantidade ilegivel"),
@@ -202,60 +174,23 @@ JANELA_EM_ANIMACAO = "images/janela-em-animacao-rede-260.png"
 # Janela e intermitente e estava custando mais do que entregava. As funcoes
 # continuam no codigo, sem chamador. Ver o docstring de _conferir_a_janela.
 
-class MaoQueAnotaQuandoApertou:
-    """MaoFalsa que registra quantas capturas a tela ja tinha feito."""
-
-    def __init__(self, tela) -> None:
-        self.tela = tela
-        self.acoes: list[tuple] = []
-        self.capturas_ao_apertar: int | None = None
-
-    def clicar(self, x: int, y: int) -> None:
-        self.acoes.append(("clicar", x, y))
-
-    def apertar_espaco(self) -> None:
-        self.capturas_ao_apertar = self.tela.capturas_feitas
-        self.acoes.append(("apertar_espaco",))
-
-    def apertar_esc(self) -> None:
-        self.acoes.append(("apertar_esc",))
-
 def test_compra_sem_a_Janela_aparecer_no_roteiro_da_tela(tmp_path):
-    # O roteiro vai do pre-voo direto para a lista com o Ouro debitado: nao ha
-    # frame de Janela nenhum. O piloto compra assim mesmo, porque nao olha.
-    #
-    # Este roteiro seria impossivel antes: sem um frame reconhecido como
-    # JANELA_CONFIRMACAO o piloto abortava com "a Janela nao abriu".
-    tela = TelaFalsa([LISTA, LISTA_DEBITADA])
+    tela = TelaFalsa([LISTA])
     mao = MaoFalsa()
     r = executar(tela, mao, cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
     nomes = [a[0] for a in mao.acoes]
-    assert r.desfecho is Desfecho.COMPROU, r.motivo
+    assert r.desfecho is Desfecho.COMPRA_ENVIADA, r.motivo
     assert nomes == ["clicar", "apertar_espaco"]
     assert "apertar_esc" not in nomes
 
-def test_nenhuma_captura_entre_o_clique_e_o_espaco(tmp_path):
-    # A prova de que o modal nao e olhado: entre o pre-voo e o Espaco a tela
-    # nao e consultada nenhuma vez. Sem isto, reintroduzir uma captura de
-    # diagnostico passaria despercebido e traria o custo de volta.
-    tela = TelaFalsa([LISTA, JANELA_DRAGAO, LISTA_DEBITADA])
-    mao = MaoQueAnotaQuandoApertou(tela)
-    executar(tela, mao, cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
-    assert mao.capturas_ao_apertar == 1, "so o pre-voo deve ter sido capturado"
-
-def test_preco_total_esperado_vem_da_listagem_e_nao_do_modal(tmp_path):
-    # Com o modal fora do caminho, a queda do Ouro e a unica conferencia que
-    # sobra — e o valor esperado passa a vir da Listagem escolhida, assumindo
-    # Quantidade 1.
-    #
-    # Sem frame de Janela no roteiro, o unico lugar de onde 246 pode ter vindo
-    # e a Listagem escolhida. Se ainda viesse do modal seria None, e a
-    # comparacao com a queda do Ouro nunca bateria.
-    tela = TelaFalsa([LISTA, LISTA_DEBITADA])
-    r = executar(tela, MaoFalsa(), cfg(), tmp_path, ritmo=JA,
+def test_espaco_encerra_a_compra_sem_captura_posterior(tmp_path):
+    tela = TelaFalsa([LISTA])
+    mao = MaoFalsa()
+    r = executar(tela, mao, cfg(), tmp_path, ritmo=JA,
                  sorteio=random.Random(1))
-    assert r.preco_total_esperado == r.listagem.preco_unitario == 246
-    assert r.desfecho is Desfecho.COMPROU, r.motivo
+    assert r.desfecho is Desfecho.COMPRA_ENVIADA
+    assert tela.capturas_feitas == 1
+    assert [acao[0] for acao in mao.acoes] == ["clicar", "apertar_espaco"]
 
 def test_a_conferencia_reprovaria_o_frame_em_animacao(tmp_path):
     # Captura real da maquina do jogo: a Janela e reconhecivel como
@@ -280,7 +215,7 @@ def test_sem_interruptor_o_piloto_se_comporta_como_antes(tmp_path):
     mao = MaoFalsa()
     r = executar(roteiro_feliz(), mao, cfg(), tmp_path, ritmo=JA,
                  sorteio=random.Random(1))
-    assert r.desfecho is Desfecho.COMPROU
+    assert r.desfecho is Desfecho.COMPRA_ENVIADA
     assert mao.acoes[0][0] == "clicar"
 
 
@@ -295,28 +230,8 @@ def test_parada_antes_do_clique_nao_clica(tmp_path):
     assert mao.acoes == []
 
 
-def test_a_parada_encurta_a_enquete_do_ouro(tmp_path):
-    # Pergunta 1 e a de antes do clique, e passa. A 2 e a primeira volta da
-    # enquete do Ouro, e para — antes de a enquete capturar qualquer coisa.
-    tela = TelaFalsa([LISTA, LISTA_DEBITADA])
-    mao = MaoFalsa()
-    r = executar(tela, mao, cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1),
-                 interruptor=InterruptorFalso(parar_na_pergunta=2))
-    # A Compra ja aconteceu: o Espaco foi apertado antes da enquete. O que a
-    # parada faz e nao cumprir o teto de espera.
-    assert ("apertar_espaco",) in mao.acoes
-    # So a captura do pre-voo: a enquete parou antes de olhar de novo.
-    assert tela.capturas_feitas == 1
-    # E ABORTOU, e nao PAROU, de proposito: sem ler o Ouro depois do Espaco,
-    # o piloto nao sabe se a Compra aconteceu. "Compra indeterminada" e a
-    # verdade, e o operador que apertou F3 no meio da confirmacao precisa
-    # ver isso, nao um "parou" limpo.
-    assert r.desfecho is Desfecho.ABORTOU
-    assert r.ouro_depois is None
-
-
 def test_o_ritmo_tem_espera_entre_voltas():
-    assert Ritmo().espera_entre_voltas == 1.0
+    assert Ritmo().espera_entre_voltas == 0.15
     assert Ritmo.instantaneo().espera_entre_voltas == 0.0
 
 def test_espera_do_modal_e_sorteada_dentro_da_faixa(tmp_path):
@@ -362,65 +277,60 @@ def test_o_frame_em_animacao_realmente_engana_a_deteccao_de_estado(tmp_path):
     from mistfall.tipos import EstadoTela
     assert identificar_estado(cv2.imread(JANELA_EM_ANIMACAO)) is EstadoTela.JANELA_CONFIRMACAO
 
-def test_ouro_inicial_ilegivel_aborta_antes_de_clicar(tmp_path):
+def test_ouro_ilegivel_e_telemetria_e_nao_aborto(tmp_path, monkeypatch):
+    import mistfall.piloto as piloto
+    real = piloto.analisar_inicial
+
+    def sem_ouro(img, **kwargs):
+        resultado = real(img, **kwargs)
+        return dataclasses.replace(resultado, ouro_observado=None)
+
+    monkeypatch.setattr(piloto, "analisar_inicial", sem_ouro)
+    r = executar(TelaFalsa([LISTA]), MaoFalsa(), cfg(), tmp_path, ritmo=JA)
+    assert r.desfecho is Desfecho.COMPRA_ENVIADA
+    assert r.ouro_observado is None
+
+
+def test_ouro_ilegivel_e_publicado_uma_vez_sem_impedir_compra(tmp_path, monkeypatch):
+    import mistfall.piloto as piloto
+    real = piloto.analisar_inicial
+
+    def sem_ouro(img, **kwargs):
+        resultado = real(img, **kwargs)
+        return dataclasses.replace(resultado, ouro_observado=None)
+
+    monkeypatch.setattr(piloto, "analisar_inicial", sem_ouro)
+    observacoes = []
     mao = MaoFalsa()
-    r = executar(TelaFalsa([LISTA_OURO_ILEGIVEL]), mao, cfg(), tmp_path, ritmo=JA)
-    assert r.desfecho is Desfecho.ABORTOU
-    assert "Ouro inicial ilegivel" in r.motivo
-    assert mao.acoes == []
+    r = executar(
+        TelaFalsa([LISTA]), mao, cfg(), tmp_path, ritmo=JA,
+        observador_ouro=lambda ouro, _monotonic, _horario: observacoes.append(ouro),
+    )
 
-# ---------------------------------------------------------------------------
-# Confirmacao pelo Ouro.
-
-ESPERA_DE_VERDADE = replace(JA, teto_espera_ouro=1.0)
-
-def test_ouro_ainda_nao_debitado_continua_esperando(tmp_path):
-    # O frame logo apos o Espaco ainda mostra o Ouro antigo (o jogo debita
-    # com atraso); o seguinte ja mostra o debito. Quem para na primeira
-    # leitura legivel reporta Compra com queda zero.
-    tela = TelaFalsa([LISTA, JANELA_DRAGAO, LISTA, LISTA_DEBITADA])
-    r = executar(tela, MaoFalsa(), cfg(), tmp_path, ritmo=ESPERA_DE_VERDADE, sorteio=random.Random(1))
-    assert r.desfecho is Desfecho.COMPROU
-    assert r.ouro_depois == 65914
-    assert r.motivo == ""
-
-def test_ouro_que_nunca_se_move_nao_e_compra(tmp_path):
-    # Espaco apertado e o Ouro parado ate o teto: e "o Espaco nao registrou",
-    # que e a pergunta numero 1 da viagem. Nao pode sair como COMPROU.
-    tela = TelaFalsa([LISTA, JANELA_DRAGAO, LISTA])
-    r = executar(tela, MaoFalsa(), cfg(), tmp_path, ritmo=ESPERA_DE_VERDADE, sorteio=random.Random(1))
-    assert r.desfecho is Desfecho.OURO_NAO_CAIU
-    assert r.desfecho is not Desfecho.COMPROU
-    assert r.ouro_antes == 66160
-    assert r.ouro_depois == 66160
+    assert observacoes == [None]
+    assert r.desfecho is Desfecho.COMPRA_ENVIADA
+    assert [acao[0] for acao in mao.acoes] == ["clicar", "apertar_espaco"]
 
 
-# ---------------------------------------------------------------------------
-# O relatorio e o produto desta branch.
+def test_publica_observacao_com_instante_da_captura(tmp_path):
+    vistos = []
+    executar(TelaFalsa([LISTA]), MaoFalsa(), cfg(), tmp_path, ritmo=JA,
+             observador_ouro=lambda ouro, monotonic, horario:
+                 vistos.append((ouro, monotonic, horario)))
+    assert len(vistos) == 1
+    ouro, monotonic, horario = vistos[0]
+    assert ouro == 66160
+    assert monotonic > 0
+    assert horario.tzinfo is not None
 
-class TelaQueExplodeDepoisDoPrimeiroFrame:
-    """Serve a lista e depois estoura, como um mss que morre no meio."""
 
-    def __init__(self) -> None:
-        self.capturas = 0
-
-    def capturar(self):
-        self.capturas += 1
-        if self.capturas > 1:
-            raise RuntimeError("mss caiu")
-        return cv2.imread(LISTA)
-
-def test_excecao_depois_do_clique_ainda_escreve_o_relatorio(tmp_path):
-    mao = MaoFalsa()
-    with pytest.raises(RuntimeError):
-        executar(TelaQueExplodeDepoisDoPrimeiroFrame(), mao, cfg(), tmp_path,
-                 ritmo=JA)
-    # O bot ja mexeu no jogo: clicou e apertou Espaco antes de a tela cair.
-    assert [a[0] for a in mao.acoes] == ["clicar", "apertar_espaco"]
+def test_relatorio_remove_campos_da_confirmacao_do_ouro(tmp_path):
+    executar(TelaFalsa([LISTA]), MaoFalsa(), cfg(), tmp_path, ritmo=JA)
     dados = json.loads((tmp_path / "relatorio.json").read_text(encoding="utf-8"))
-    assert dados["desfecho"] == "abortou"
-    assert "explodiu" in dados["motivo"]
-    assert "mss caiu" in dados["motivo"]
+    assert dados["ouro_observado"] == 66160
+    for campo in ("ouro_antes", "ouro_depois", "preco_total_esperado",
+                  "confirmacao_do_ouro"):
+        assert campo not in dados and campo not in dados["tempos"]
 
 def test_relatorio_nao_traz_mais_nada_do_modal(tmp_path):
     # O modal nao e lido, entao estes campos ficam vazios de proposito. Se um
@@ -446,9 +356,7 @@ def test_relatorio_guarda_os_doze_slots_mesmo_sem_nada_compravel(tmp_path):
 
 
 def test_as_leituras_do_modal_passam_pelo_helper_de_paralelismo(monkeypatch, tmp_path):
-    # Sem isto o teste de equivalencia abaixo passaria trivialmente: as tres
-    # leituras sequenciais dao o mesmo resultado que as paralelas, entao so
-    # comparar resultado nao prova que o helper entrou no caminho.
+    # Comparar apenas o resultado nao prova que o helper entrou no caminho.
     import mistfall.piloto as piloto
     from mistfall.paralelo import mapear as mapear_real
 
@@ -464,18 +372,6 @@ def test_as_leituras_do_modal_passam_pelo_helper_de_paralelismo(monkeypatch, tmp
     _conferir_a_janela(cv2.imread(JANELA_DRAGAO), escolhida, Resultado(Desfecho.ABORTOU), 2)
     assert 3 in chamadas, "as tres leituras do modal nao passaram pelo mapear"
 
-def test_conferencia_do_modal_bate_entre_paralelo_e_sequencial(tmp_path):
-    def rodar(trabalhadores, pasta):
-        config = dataclasses.replace(cfg(), trabalhadores=trabalhadores)
-        return executar(roteiro_feliz(), MaoFalsa(), config, pasta, ritmo=JA, sorteio=random.Random(1))
-    um = rodar(1, tmp_path / "um")
-    quatro = rodar(4, tmp_path / "quatro")
-    assert (um.item_no_modal, um.preco_no_modal, um.quantidade_no_modal,
-            um.preco_total_esperado) == (
-           quatro.item_no_modal, quatro.preco_no_modal, quatro.quantidade_no_modal,
-           quatro.preco_total_esperado)
-    assert um.desfecho is quatro.desfecho
-
 def test_relatorio_mostra_o_preco_bruto_que_a_conferencia_derrubou(monkeypatch, tmp_path):
     # A regra de ordenacao e contagiosa de proposito: uma leitura fora de ordem
     # invalida os vizinhos. Guardar so o preco conferido deixaria o relatorio
@@ -486,7 +382,7 @@ def test_relatorio_mostra_o_preco_bruto_que_a_conferencia_derrubou(monkeypatch, 
     # ordem, entao a tela que provoca a queda e montada aqui: um 24 no lugar de
     # 241, que e o erro real que o corpus registrava antes. So a leitura e
     # dublada — a conferencia que roda e a de verdade.
-    import mistfall.piloto as piloto
+    import mistfall.analise as analise
     from mistfall.tipos import Listagem
 
     slots = [(linha, coluna) for linha in range(6) for coluna in range(2)]
@@ -496,7 +392,11 @@ def test_relatorio_mostra_o_preco_bruto_que_a_conferencia_derrubou(monkeypatch, 
                  preco_unitario=24 if (linha, coluna) == (2, 0) else preco)
         for (linha, coluna), preco in zip(slots, precos)
     ]
-    monkeypatch.setattr(piloto, "varrer_bruto", lambda img: fora_de_ordem)
+    def varrer(_img, tempos):
+        tempos.update(itens=0.0, preparo_folha=0.0, tesseract_precos=0.0)
+        return fora_de_ordem
+
+    monkeypatch.setattr(analise, "varrer_bruto", varrer)
 
     executar(TelaFalsa([LISTA]), MaoFalsa(), cfg(), tmp_path, ritmo=JA)
     dados = json.loads((tmp_path / "relatorio.json").read_text(encoding="utf-8"))
@@ -531,14 +431,68 @@ def test_sorteio_injetado_torna_a_escolha_deterministica(tmp_path):
     }
     assert len(escolhas) == 1
 
-def test_o_relatorio_registra_o_tempo_de_cada_etapa(tmp_path):
-    r = executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, ritmo=JA,
+def test_o_relatorio_separa_processamento_e_esperas(tmp_path):
+    r = executar(TelaFalsa([LISTA]), MaoFalsa(), cfg(), tmp_path, ritmo=JA,
                  sorteio=random.Random(99))
-    assert set(r.tempos) >= {"pre_voo", "varredura", "modal"}
-    assert all(v >= 0 for v in r.tempos.values())
+    assert set(r.tempos) == {
+        "captura_pre_voo", "gravacao_pre_voo", "estado", "ouro",
+        "varredura_total", "itens", "preparo_folha", "tesseract_precos",
+        "analise_inicial_parede", "conferencia_e_decisao",
+        "pausa_antes_do_clique", "clique", "espera_modal", "espaco",
+    }
+    assert all(ms >= 0 for ms in r.tempos.values())
+
+
+def test_conferencia_e_decisao_exclui_montagem_diagnostica(
+        tmp_path, monkeypatch):
+    import mistfall.piloto as piloto
+
+    class Relogio:
+        valor = 0.0
+
+        def agora(self):
+            return self.valor
+
+        def avancar(self):
+            self.valor += 1.0
+
+    class BrutaComDiagnosticoLento:
+        linha = 0
+        coluna = 0
+        item = ItemAlvo.BROCHE
+
+        @property
+        def preco_unitario(self):
+            relogio.avancar()
+            return 188
+
+    relogio = Relogio()
+    bruta = BrutaComDiagnosticoLento()
+    escolhida = Listagem(0, 0, ItemAlvo.BROCHE, 188)
+    monkeypatch.setattr(
+        piloto, "time",
+        SimpleNamespace(monotonic=relogio.agora, sleep=lambda _segundos: None),
+    )
+    monkeypatch.setattr(
+        piloto, "analisar_inicial",
+        lambda *_a, **_k: SimpleNamespace(
+            ouro_observado=66160, brutas=[bruta], tempos={}),
+    )
+    monkeypatch.setattr(piloto, "conferir_ordenacao", lambda _brutas: [escolhida])
+    monkeypatch.setattr(piloto, "escolher", lambda *_a: escolhida)
+
+    r = executar(TelaFalsa([LISTA]), MaoFalsa(), cfg(), tmp_path,
+                 simular=True, ritmo=JA)
+
+    assert r.tempos["conferencia_e_decisao"] == 0
 
 def test_o_tempo_por_etapa_vai_para_o_json(tmp_path):
-    executar(roteiro_feliz(), MaoFalsa(), cfg(), tmp_path, ritmo=JA,
+    executar(TelaFalsa([LISTA]), MaoFalsa(), cfg(), tmp_path, ritmo=JA,
              sorteio=random.Random(99))
     dados = json.loads((tmp_path / "relatorio.json").read_text(encoding="utf-8"))
-    assert "tempos" in dados and "varredura" in dados["tempos"]
+    assert set(dados["tempos"]) == {
+        "captura_pre_voo", "gravacao_pre_voo", "estado", "ouro",
+        "varredura_total", "itens", "preparo_folha", "tesseract_precos",
+        "analise_inicial_parede", "conferencia_e_decisao",
+        "pausa_antes_do_clique", "clique", "espera_modal", "espaco",
+    }
