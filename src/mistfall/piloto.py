@@ -332,6 +332,9 @@ def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
         inicio = time.monotonic()
         brutas = analise.brutas
         conferidas = conferir_ordenacao(brutas)
+        escolhida = escolher(conferidas, config, sorteio)
+        r.tempos["conferencia_e_decisao"] = (time.monotonic() - inicio) * 1000
+
         r.slots = [
             {
                 "linha": bruta.linha,
@@ -343,9 +346,6 @@ def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
             for bruta, conferida in zip(brutas, conferidas)
         ]
 
-        escolhida = escolher(conferidas, config, sorteio)
-        r.tempos["conferencia_e_decisao"] = (time.monotonic() - inicio) * 1000
-
         if escolhida is None:
             return encerrar(Desfecho.NADA_COMPRAVEL,
                             "nenhuma Listagem no Preco-alvo")
@@ -355,7 +355,7 @@ def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
             return encerrar(Desfecho.SIMULOU, "modo simulado: nao clicou")
 
         # Ultimo ponto em que ainda ha o que abortar. Depois do Espaco a
-        # Compra ja aconteceu, e entre o clique e o Espaco sobram 80-120 ms.
+        # Compra ja foi enviada, e entre o clique e o Espaco sobram 80-120 ms.
         if interruptor is not None and interruptor.pediram_parada():
             return encerrar(Desfecho.PAROU, "parada pedida antes do clique")
 

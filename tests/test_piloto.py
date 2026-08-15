@@ -1,6 +1,7 @@
 import dataclasses
 import json
 import random
+from types import SimpleNamespace
 
 import cv2
 import pytest
@@ -419,6 +420,50 @@ def test_o_relatorio_separa_processamento_e_esperas(tmp_path):
         "pausa_antes_do_clique", "clique", "espera_modal", "espaco",
     }
     assert all(ms >= 0 for ms in r.tempos.values())
+
+
+def test_conferencia_e_decisao_exclui_montagem_diagnostica(
+        tmp_path, monkeypatch):
+    import mistfall.piloto as piloto
+
+    class Relogio:
+        valor = 0.0
+
+        def agora(self):
+            return self.valor
+
+        def avancar(self):
+            self.valor += 1.0
+
+    class BrutaComDiagnosticoLento:
+        linha = 0
+        coluna = 0
+        item = ItemAlvo.BROCHE
+
+        @property
+        def preco_unitario(self):
+            relogio.avancar()
+            return 188
+
+    relogio = Relogio()
+    bruta = BrutaComDiagnosticoLento()
+    escolhida = Listagem(0, 0, ItemAlvo.BROCHE, 188)
+    monkeypatch.setattr(
+        piloto, "time",
+        SimpleNamespace(monotonic=relogio.agora, sleep=lambda _segundos: None),
+    )
+    monkeypatch.setattr(
+        piloto, "analisar_inicial",
+        lambda *_a, **_k: SimpleNamespace(
+            ouro_observado=66160, brutas=[bruta], tempos={}),
+    )
+    monkeypatch.setattr(piloto, "conferir_ordenacao", lambda _brutas: [escolhida])
+    monkeypatch.setattr(piloto, "escolher", lambda *_a: escolhida)
+
+    r = executar(TelaFalsa([LISTA]), MaoFalsa(), cfg(), tmp_path,
+                 simular=True, ritmo=JA)
+
+    assert r.tempos["conferencia_e_decisao"] == 0
 
 def test_o_tempo_por_etapa_vai_para_o_json(tmp_path):
     executar(TelaFalsa([LISTA]), MaoFalsa(), cfg(), tmp_path, ritmo=JA,

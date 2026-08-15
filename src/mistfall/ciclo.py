@@ -26,9 +26,8 @@ from mistfall.reset import CategoriaAlternativa, resetar_categoria
 # causa da pagina de codigo do console do Windows: um mojibake na unica
 # superficie que o operador ve enquanto o bot roda custa caro e nao avisa.
 ROTULO_POR_DESFECHO = {
-    Desfecho.COMPROU: "comprou",
+    Desfecho.COMPRA_ENVIADA: "compra enviada",
     Desfecho.NADA_COMPRAVEL: "nada",
-    Desfecho.OURO_NAO_CAIU: "OURO NAO CAIU",
     Desfecho.ABORTOU: "abortou",
     Desfecho.SIMULOU: "simulou",
     Desfecho.PAROU: "parou",
@@ -41,7 +40,7 @@ ALTERNANCIA = (CategoriaAlternativa.FORJA, CategoriaAlternativa.CHAVE)
 # Desfechos cuja Volta vale guardar inteira. O complemento — NADA_COMPRAVEL —
 # e o caso comum e o unico que nao carrega diagnostico nenhum.
 DESFECHOS_QUE_VALEM_PRINT = frozenset({
-    Desfecho.COMPROU, Desfecho.OURO_NAO_CAIU, Desfecho.ABORTOU, Desfecho.PAROU,
+    Desfecho.COMPRA_ENVIADA, Desfecho.ABORTOU, Desfecho.PAROU,
 })
 
 
@@ -54,8 +53,7 @@ class Sessao:
     """
 
     voltas: int = 0
-    compras: int = 0
-    ouro_gasto: int = 0
+    compras_enviadas: int = 0
 
 
 def texto_do_console(texto: str) -> str:
@@ -75,12 +73,11 @@ def linha_da_volta(numero: int, resultado: Resultado,
     # duas horas de sessao, e tres digitos estourariam antes do fim do dia.
     partes = [f"[{numero:04d}]", relogio, ROTULO_POR_DESFECHO[resultado.desfecho]]
 
-    if resultado.desfecho is Desfecho.COMPROU and resultado.listagem is not None:
+    if (resultado.desfecho is Desfecho.COMPRA_ENVIADA
+            and resultado.listagem is not None):
         item = resultado.listagem.item
         partes.append(item.value if item is not None else "?")
         partes.append(f"{resultado.listagem.preco_unitario}g")
-    if resultado.ouro_antes is not None and resultado.ouro_depois is not None:
-        partes.append(f"Ouro {resultado.ouro_antes} -> {resultado.ouro_depois}")
     if resetou is not None:
         partes.append(f"-> Reset ({resetou.value})")
     if reset_falhou is not None:
@@ -94,8 +91,8 @@ def linha_da_volta(numero: int, resultado: Resultado,
 def linhas_do_fecho(sessao: Sessao) -> list[str]:
     return [
         "",
-        f"parado. {sessao.voltas} Voltas, {sessao.compras} Compras, "
-        f"{sessao.ouro_gasto} de Ouro gasto",
+        f"parado. {sessao.voltas} Voltas, "
+        f"{sessao.compras_enviadas} Compras enviadas",
     ]
 
 
@@ -161,11 +158,9 @@ def executar_ciclo(tela: Tela, mao: Mao, config: Config, pasta: Path,
 
 
 def _contabilizar(sessao: Sessao, resultado: Resultado) -> None:
-    if resultado.desfecho is not Desfecho.COMPROU:
+    if resultado.desfecho is not Desfecho.COMPRA_ENVIADA:
         return
-    sessao.compras += 1
-    if resultado.ouro_antes is not None and resultado.ouro_depois is not None:
-        sessao.ouro_gasto += resultado.ouro_antes - resultado.ouro_depois
+    sessao.compras_enviadas += 1
 
 
 def _descartar_os_prints(pasta: Path) -> None:
