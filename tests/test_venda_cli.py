@@ -28,7 +28,14 @@ def test_parser_nao_oferece_limite_de_listagens():
 
 def test_rodar_valida_config_e_monta_perifericos_windows(monkeypatch, tmp_path):
     perifericos = types.ModuleType("mistfall.perifericos.windows")
-    perifericos.InterruptorWindows = type("InterruptorWindows", (), {})
+    perifericos.VK_F3 = 0x72
+    perifericos.VK_F4 = 0x73
+
+    class InterruptorWindows:
+        def __init__(self, vk_inicio, vk_parada):
+            self.teclas = (vk_inicio, vk_parada)
+
+    perifericos.InterruptorWindows = InterruptorWindows
     perifericos.MaoWindows = type("MaoWindows", (), {})
     perifericos.TelaWindows = type("TelaWindows", (), {})
     monkeypatch.setitem(sys.modules, "mistfall.perifericos.windows", perifericos)
@@ -48,6 +55,7 @@ def test_rodar_valida_config_e_monta_perifericos_windows(monkeypatch, tmp_path):
     assert isinstance(tela, perifericos.TelaWindows)
     assert isinstance(mao, perifericos.MaoWindows)
     assert isinstance(interruptor, perifericos.InterruptorWindows)
+    assert interruptor.teclas == (perifericos.VK_F3, perifericos.VK_F4)
     assert recebido is config
     assert pasta == tmp_path
 

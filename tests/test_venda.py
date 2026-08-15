@@ -5,6 +5,7 @@ import pytest
 from mistfall.perifericos.falso import MaoFalsa, TelaFalsa
 from mistfall.tipos import ItemAlvo, SlotArmazem
 from mistfall.venda import (
+    CENTRO_BOTAO_LISTAR,
     CENTRO_PRECO_VENDA,
     CENTRO_QUANTIDADE_VENDA,
     DesfechoVenda,
@@ -33,7 +34,7 @@ def test_executa_um_stack_de_tres_com_preco_configurado(tmp_path):
         ("clicar", *CENTRO_QUANTIDADE_VENDA),
         ("selecionar_tudo",),
         ("digitar_numero", 3),
-        ("apertar_espaco",),
+        ("clicar", *CENTRO_BOTAO_LISTAR),
     ]
     assert resultado.desfecho is DesfechoVenda.VENDEU
     assert resultado.quantidade == 3
@@ -50,15 +51,17 @@ def test_nao_digita_nem_confirma_quando_janela_nao_abre(tmp_path):
     assert "nao abriu" in resultado.motivo
 
 
-def test_nao_repete_espaco_quando_janela_nao_fecha(tmp_path):
+def test_nao_repete_clique_de_confirmacao_quando_janela_nao_fecha(tmp_path):
     mao = MaoFalsa()
     resultado = executar_venda(
         TelaFalsa([STASH, MODAL]), mao, SLOT, 226, tmp_path,
         ritmo=RitmoVenda.instantaneo(),
     )
-    assert mao.acoes.count(("apertar_espaco",)) == 1
+    assert mao.acoes.count(("clicar", *CENTRO_BOTAO_LISTAR)) == 1
+    assert ("apertar_espaco",) not in mao.acoes
     assert resultado.desfecho is DesfechoVenda.ABORTOU
     assert "nao fechou" in resultado.motivo
+    assert (tmp_path / "02-nao-fechou.png").exists()
 
 
 @pytest.mark.parametrize("preco", [0, -1, True, 2.5])

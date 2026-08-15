@@ -80,15 +80,17 @@ prints e relatório.
 _Avoid_: Iteração, Ciclo, Rodada.
 
 **Interruptor**:
-O par de teclas com que o operador liga e desliga o bot: F2 começa, F3 para. É a terceira
-fronteira de IO, ao lado da Tela e da Mão, e o F3 é consultado antes de cada clique e
-durante a espera pelo Ouro — nunca entre o clique e o Espaço, onde já não há o que abortar.
+O par de teclas com que o operador liga e desliga o bot. Na Compra, F2 começa e F3 para;
+na Venda, F3 começa e F4 para. É a terceira
+fronteira de IO, ao lado da Tela e da Mão. Na Compra, o F3 é consultado antes de cada
+clique e durante a espera pelo Ouro — nunca entre o clique e o Espaço, onde já não há o
+que abortar. Na Venda, o F4 é consultado antes de cada Venda e antes da troca de Baú.
 _Avoid_: Hotkey, Atalho, Tecla de pânico.
 
 **Venda**:
 A ação de criar uma Listagem a partir de um stack de 3 unidades de um Item-alvo no
 Armazém. Uma Venda consome uma posição da Capacidade de Venda. O bot preenche o Preço
-de Venda e a Quantidade 3 na Janela de Confirmação e aperta Espaço.
+de Venda e a Quantidade 3 na Janela de Confirmação e clica em "Listar para Venda".
 _Avoid_: Transação, Publicação.
 
 **Preço de Venda**:

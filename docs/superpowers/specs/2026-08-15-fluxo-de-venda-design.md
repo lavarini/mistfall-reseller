@@ -17,7 +17,7 @@ contém mais candidatos.
 **Venda** é a ação de criar uma Listagem a partir de um stack de `3` unidades de um
 Item-alvo no Armazém. Uma Venda consome uma posição de `X/Y`. Ela começa
 com o clique no slot, passa pela Janela de Confirmação "Listar para Venda" e termina
-quando essa janela fecha após o Espaço.
+quando essa janela fecha após o clique em "Listar para Venda".
 
 **Preço de Venda** é o Preço-unitário fixo pelo qual um Item-alvo deve ser listado.
 Ele vem da configuração e não é inferido da Tendência de Mercado nem relido da Janela
@@ -33,7 +33,7 @@ pois `Y` depende do nível do NPC e pode mudar entre seasons.
 ## Premissas
 
 1. A resolução é fixa em 2560×1440, conforme o ADR-0002.
-2. O operador abre a aba Vender e seleciona Armazém antes de apertar F2.
+2. O operador abre a aba Vender e seleciona Armazém antes de apertar F3.
 3. Qualquer um dos quatro Baús pode estar selecionado no início.
 4. Os Itens-alvo continuam sendo Broche, Adaga, Lanterna, Dragão, Orbe, Rede e Códice.
 5. Somente stacks cuja quantidade visível seja exatamente `3` são vendidos.
@@ -65,7 +65,7 @@ fonte autoritativa; o valor `12` das imagens é exemplo, não regra de produçã
 
 ## Fluxo
 
-1. Espera F2. F3 solicita a parada.
+1. Espera F3. F4 solicita a parada.
 2. Captura a tela e verifica resolução, aba Vender, painel Armazém e Baú selecionado.
 3. Lê a Capacidade de Venda `X/Y`. Leitura ilegível ou incoerente aborta.
 4. Se `X >= Y`, encerra com capacidade cheia, sem clicar em slot.
@@ -73,19 +73,20 @@ fonte autoritativa; o valor `12` das imagens é exemplo, não regra de produçã
    lê a quantidade do stack.
 6. Escolhe o primeiro candidato em ordem de cima para baixo e da esquerda para a direita:
    Item-alvo reconhecido com segurança e quantidade exatamente `3`.
-7. Antes de começar a Venda, consulta F3. Se a parada foi pedida, encerra sem clicar no slot.
+7. Antes de começar a Venda, consulta F4. Se a parada foi pedida, encerra sem clicar no slot.
 8. Clica no centro do slot e espera a Janela de Confirmação "Listar para Venda" abrir.
-   Se ela não abrir dentro do teto, aborta sem digitar nem apertar Espaço.
+   Se ela não abrir dentro do teto, aborta sem digitar nem confirmar.
 9. Clica no campo Preço-unitário, usa `Ctrl+A` e digita o Preço de Venda configurado.
 10. Clica no campo Quantidade, usa `Ctrl+A` e digita `3`.
-11. Aperta Espaço uma vez para confirmar.
+11. Clica uma vez no botão "Listar para Venda". O clique direto é necessário porque o
+    campo Quantidade permanece focado e absorve o Espaço.
 12. Espera a Janela de Confirmação fechar e a tela de Venda reaparecer. Se isso não
-    acontecer dentro do teto, aborta sem repetir o Espaço.
+    acontecer dentro do teto, aborta sem repetir o clique.
 13. Relê `X/Y`. Os dois números substituem a leitura anterior. Se estiverem ilegíveis
     ou incoerentes, aborta; se `X >= Y`, encerra com capacidade cheia.
 14. Consome o próximo candidato da lista já extraída para o Baú atual. Os slots não se
     reorganizam depois de uma Venda, portanto a imagem não é processada novamente.
-15. Quando a lista de candidatos do Baú atual acabar, consulta F3, avança exatamente um Baú à
+15. Quando a lista de candidatos do Baú atual acabar, consulta F4, avança exatamente um Baú à
     direita e espera a tela estabilizar.
 16. Repete a partir do passo 3. Se o Baú atual já for o quarto, encerra automaticamente.
 
@@ -134,9 +135,9 @@ registram cliques, teclas e texto para que os testes verifiquem a sequência rea
 - Tela, Armazém, Baú selecionado ou `X/Y` irreconhecível: aborta sem adivinhar.
 - `X > Y`, `X < 0` ou `Y <= 0`: leitura incoerente; aborta.
 - Slot não alvo, quantidade diferente de `3` ou quantidade ilegível: ignora o slot.
-- Janela de Confirmação não abriu: aborta sem digitar e sem Espaço.
-- Janela não fechou depois do Espaço: aborta sem repetir a confirmação.
-- F3 é consultado antes de começar uma Venda e antes de avançar de Baú. Depois do clique
+- Janela de Confirmação não abriu: aborta sem digitar e sem confirmar.
+- Janela não fechou depois do clique de confirmação: aborta sem repetir o clique.
+- F4 é consultado antes de começar uma Venda e antes de avançar de Baú. Depois do clique
   no slot, a Venda em andamento é concluída, inclusive os cliques nos dois campos, para
   não deixar a Janela parcialmente preenchida.
 - O relatório registra Baú, slot, Item-alvo, Preço de Venda, Quantidade, leituras `X/Y`,
@@ -145,7 +146,7 @@ registram cliques, teclas e texto para que os testes verifiquem a sequência rea
 ## Comando
 
 `python -m ferramentas.venda_cli` executa o ciclo de Venda. Ele não recebe limite de
-Listagens; carrega os Preços de Venda do `config.toml`, usa F2/F3 e recebe apenas opções
+Listagens; carrega os Preços de Venda do `config.toml`, usa F3/F4 e recebe apenas opções
 operacionais já compatíveis com o bot, como pasta de relatórios e tempos calibráveis.
 O comando de Compra permanece `python -m ferramentas.bot_cli`.
 
@@ -160,14 +161,14 @@ A suíte cobre:
 - reconhecimento de todos os Itens-alvo observáveis e de stacks `3`;
 - rejeição de stacks `2`, `5`, ilegíveis e slots não alvo;
 - validação completa de `[precos_venda]` sem mudar `[precos_alvo]`;
-- sequência de clique, `Ctrl+A`, Preço de Venda, Quantidade `3` e Espaço;
-- ausência de digitação e Espaço quando a Janela não abre;
-- ausência de um segundo Espaço quando a Janela não fecha;
+- sequência de clique, `Ctrl+A`, Preço de Venda, Quantidade `3` e clique no botão;
+- ausência de digitação e confirmação quando a Janela não abre;
+- ausência de um segundo clique no botão quando a Janela não fecha;
 - uma única varredura por Baú e consumo dos candidatos já processados depois de cada Venda;
 - avanço somente para a direita e parada no quarto Baú;
 - releitura autoritativa de `X/Y` depois de cada Venda;
 - parada quando `X == Y` e aborto para leituras ilegíveis ou incoerentes;
-- parada por F3 antes de novos cliques;
+- parada por F4 antes de novos cliques;
 - regressão completa do fluxo e do comando de Compra.
 
 ## Fora do escopo

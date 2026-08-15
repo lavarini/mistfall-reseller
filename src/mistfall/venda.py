@@ -15,6 +15,7 @@ from mistfall.venda_visao import centro_slot_armazem, eh_janela_venda, eh_tela_v
 
 CENTRO_PRECO_VENDA = (1700, 806)
 CENTRO_QUANTIDADE_VENDA = (1700, 907)
+CENTRO_BOTAO_LISTAR = (1700, 1025)
 
 
 @dataclass(frozen=True)
@@ -56,13 +57,14 @@ class ResultadoVenda:
 def _esperar_frame(tela: Tela, predicado, teto: float, intervalo: float):
     inicio = time.monotonic()
     primeira = True
+    ultimo = None
     while primeira or time.monotonic() - inicio < teto:
         primeira = False
-        frame = tela.capturar()
-        if predicado(frame):
-            return frame
+        ultimo = tela.capturar()
+        if predicado(ultimo):
+            return ultimo, ultimo
         time.sleep(intervalo)
-    return None
+    return None, ultimo
 
 
 def _gravar(pasta: Path, nome: str, frame) -> None:
@@ -100,7 +102,7 @@ def executar_venda(
         time.sleep(ritmo.pausa_antes_do_clique)
         mao.clicar(*centro_slot_armazem(slot))
 
-        janela = _esperar_frame(
+        janela, _ = _esperar_frame(
             tela,
             eh_janela_venda,
             ritmo.teto_espera_janela,
@@ -117,15 +119,21 @@ def executar_venda(
         mao.clicar(*CENTRO_QUANTIDADE_VENDA)
         mao.selecionar_tudo()
         mao.digitar_numero(3)
-        mao.apertar_espaco()
+        # O campo Quantidade continua com foco depois da digitacao. Nesse
+        # estado, Espaco e inserido no campo em vez de acionar o atalho do
+        # botao — observado na primeira execucao real de Venda. O clique
+        # direto nao depende do foco e confirma a mesma acao.
+        mao.clicar(*CENTRO_BOTAO_LISTAR)
 
-        depois = _esperar_frame(
+        depois, ultimo = _esperar_frame(
             tela,
             eh_tela_venda,
             ritmo.teto_espera_fechamento,
             ritmo.intervalo_entre_perguntas,
         )
         if depois is None:
+            if ultimo is not None:
+                _gravar(pasta, "02-nao-fechou.png", ultimo)
             resultado.motivo = "Janela de Confirmacao nao fechou"
             return resultado
         _gravar(pasta, "02-depois.png", depois)

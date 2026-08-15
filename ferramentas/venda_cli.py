@@ -37,6 +37,8 @@ def _rodar(args: argparse.Namespace) -> int:
         InterruptorWindows,
         MaoWindows,
         TelaWindows,
+        VK_F3,
+        VK_F4,
     )
 
     ritmo = dataclasses.replace(
@@ -44,13 +46,13 @@ def _rodar(args: argparse.Namespace) -> int:
         teto_espera_janela=args.teto_janela,
         teto_espera_fechamento=args.teto_fechamento,
     )
-    print("aperte F2 no jogo para comecar, F3 para parar", flush=True)
+    print("aperte F3 no jogo para comecar, F4 para parar", flush=True)
     executar_ciclo_venda(
         TelaWindows(),
         MaoWindows(),
         config,
         Path(args.pasta),
-        InterruptorWindows(),
+        InterruptorWindows(vk_inicio=VK_F3, vk_parada=VK_F4),
         ritmo,
     )
     print(f"relatorios da Venda em {args.pasta}")

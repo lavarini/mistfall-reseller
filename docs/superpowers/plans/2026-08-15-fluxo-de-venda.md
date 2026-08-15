@@ -15,7 +15,8 @@
 - Somente stacks de quantidade exatamente **3** são vendidos.
 - A tela `X/Y` é a única fonte da Capacidade de Venda; leitura ilegível ou incoerente aborta.
 - A Janela de Confirmação só é reconhecida como aberta/fechada; seus campos não são relidos.
-- Depois do clique no slot, a Venda em andamento termina sem consultar F3 no meio.
+- A confirmação usa clique direto em "Listar para Venda"; Espaço é absorvido pelo campo Quantidade focado.
+- Depois do clique no slot, a Venda em andamento termina sem consultar F4 no meio.
 - O bot nunca navega para um Baú à esquerda do Baú inicial.
 - `src/mistfall/perifericos/windows.py` continua sendo o único arquivo dependente de Windows.
 - Cada alteração de produção nasce de teste vermelho observado, seguido do mínimo código verde.
@@ -30,7 +31,7 @@
 | `src/mistfall/tipos.py` | Tipos puros `Bau`, `CapacidadeVenda` e `SlotArmazem`. |
 | `src/mistfall/venda_visao.py` | Geometria, OCR e reconhecimento puro da tela de Venda. |
 | `src/mistfall/perifericos/{protocolos,falso,windows}.py` | `Ctrl+A` e digitação numérica atrás de `Mao`. |
-| `src/mistfall/venda.py` | Uma Venda: slot → Janela → preencher → Espaço → tela de Venda. |
+| `src/mistfall/venda.py` | Uma Venda: slot → Janela → preencher → clicar em Listar → tela de Venda. |
 | `src/mistfall/ciclo_venda.py` | Sessão: capacidade, uma varredura por Baú e avanço à direita. |
 | `ferramentas/venda_cli.py` | Comando Windows `mistfall-venda`. |
 | `tests/test_{config,venda_visao,perifericos_falso,perifericos_windows,venda,ciclo_venda,venda_cli}.py` | Regressões unitárias e verticais. |
@@ -352,7 +353,7 @@ Expected: FAIL por módulo ausente.
 
 - [ ] **Step 4: Adicionar testes vermelhos de segurança**
 
-Cobrir: modal nunca abre (somente clique no slot); modal não fecha (um único Espaço); preço inválido antes de IO; exceção no meio ainda fecha relatório. Testar que nenhuma função de leitura interna de `janela.py` é chamada.
+Cobrir: modal nunca abre (somente clique no slot); modal não fecha (um único clique no botão); preço inválido antes de IO; exceção no meio ainda fecha relatório. Testar que nenhuma função de leitura interna de `janela.py` é chamada.
 
 - [ ] **Step 5: Rodar o módulo e testes de estado existentes**
 
@@ -389,13 +390,13 @@ Expected: FAIL por módulo ausente.
 
 - [ ] **Step 3: Implementar o laço e a releitura autoritativa**
 
-Ao entrar em um Baú, capturar, validar tela/Baú/capacidade e chamar `varrer_armazem` uma única vez. Guardar em ordem visual todos os candidatos com Item-alvo e quantidade `3`. Para cada candidato, reler a capacidade da captura atual, parar se cheia e delegar uma Venda. Depois de `VENDEU`, atualizar a captura e `X/Y`, mas consumir o próximo candidato armazenado sem novo OCR nem template matching. Ao esgotar a lista, consultar F3 e clicar em `Bau(valor + 1)`; se `QUARTO`, encerrar `ARMAZEM_ESGOTADO`.
+Ao entrar em um Baú, capturar, validar tela/Baú/capacidade e chamar `varrer_armazem` uma única vez. Guardar em ordem visual todos os candidatos com Item-alvo e quantidade `3`. Para cada candidato, reler a capacidade da captura atual, parar se cheia e delegar uma Venda. Depois de `VENDEU`, atualizar a captura e `X/Y`, mas consumir o próximo candidato armazenado sem novo OCR nem template matching. Ao esgotar a lista, consultar F4 e clicar em `Bau(valor + 1)`; se `QUARTO`, encerrar `ARMAZEM_ESGOTADO`.
 
 Não incrementar capacidade localmente. A única contagem de sucesso da sessão é diagnóstica; a decisão sempre usa o novo `X/Y`.
 
 - [ ] **Step 4: Adicionar testes vermelhos dos términos e guardas**
 
-Cobrir: começa no segundo Baú e nunca clica no primeiro; percorre segundo→terceiro→quarto; termina no quarto; `X == Y`; `X/Y` ilegível; Baú ambíguo; Venda abortada encerra sessão; F3 antes do slot e antes do próximo Baú; mudança de limite `1/12 → 2/20` é aceita porque a nova leitura substitui a anterior.
+Cobrir: começa no segundo Baú e nunca clica no primeiro; percorre segundo→terceiro→quarto; termina no quarto; `X == Y`; `X/Y` ilegível; Baú ambíguo; Venda abortada encerra sessão; F4 antes do slot e antes do próximo Baú; mudança de limite `1/12 → 2/20` é aceita porque a nova leitura substitui a anterior.
 
 - [ ] **Step 5: Rodar ciclo e regressão do ciclo de Compra**
 
@@ -435,7 +436,7 @@ Expected: FAIL por CLI e documentação ausentes.
 
 - [ ] **Step 3: Implementar CLI e entry point**
 
-Seguir `ferramentas.bot_cli`: mensagem ASCII `aperte F2 no jogo para comecar, F3 para parar`, import local de Windows e pasta padrão `sessao-venda`. Não adicionar `--limite-listagens`.
+Seguir `ferramentas.bot_cli`: mensagem ASCII `aperte F3 no jogo para comecar, F4 para parar`, import local de Windows e pasta padrão `sessao-venda`. Não adicionar `--limite-listagens`.
 
 ```toml
 [project.scripts]
@@ -446,7 +447,7 @@ mistfall-venda = "ferramentas.venda_cli:main"
 
 - [ ] **Step 4: Documentar o fluxo operacional e o glossário**
 
-Adicionar a `CONTEXT.md` as definições exatas de Venda, Preço de Venda, Capacidade de Venda e Baú da especificação. No README, documentar pré-condição (Vender + Armazém), F2/F3, preços fixos, stack 3, leitura `X/Y`, movimento somente à direita e exemplos:
+Adicionar a `CONTEXT.md` as definições exatas de Venda, Preço de Venda, Capacidade de Venda e Baú da especificação. No README, documentar pré-condição (Vender + Armazém), F3/F4, preços fixos, stack 3, leitura `X/Y`, movimento somente à direita e exemplos:
 
 ```bash
 mistfall-venda --pasta sessao-venda

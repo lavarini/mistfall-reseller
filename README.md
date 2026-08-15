@@ -162,7 +162,7 @@ mistfall-venda --pasta sessao-venda
 python -m ferramentas.venda_cli --pasta sessao-venda
 ```
 
-Aperte **F2** dentro do jogo para começar e **F3** para parar. O comando identifica os
+Aperte **F3** dentro do jogo para começar e **F4** para parar. O comando identifica os
 Itens-alvo no Baú atual e cria uma Listagem para cada stack cuja quantidade seja
 exatamente `3`. Cada Baú é processado uma vez; depois ele avança somente para a direita
 e encerra no quarto Baú.
@@ -172,7 +172,8 @@ cada Venda e para quando `X == Y`; não existe limite fixo nem opção de linha 
 para substituí-lo.
 
 Na Janela de Confirmação, o bot usa `Ctrl+A` para preencher o Preço de Venda configurado
-e a Quantidade `3`, e confirma com Espaço. Ele reconhece a abertura e o fechamento da
+e a Quantidade `3`, e clica em **Listar para Venda**. O clique é direto porque o campo
+Quantidade continua focado e absorve o Espaço. Ele reconhece a abertura e o fechamento da
 Janela, mas não relê os campos digitados nem usa a Tendência de Mercado.
 
 ### Códigos de saída
