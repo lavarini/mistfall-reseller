@@ -42,3 +42,23 @@ class MaoFalsa:
 
     def apertar_esc(self) -> None:
         self.acoes.append(("apertar_esc",))
+
+
+class InterruptorFalso:
+    """Interruptor roteirizado: para na enesima pergunta, ou nunca.
+
+    Conta perguntas e inicios para os testes do ciclo poderem afirmar quantas
+    vezes o laco consultou a parada, e nao so o efeito dela.
+    """
+
+    def __init__(self, parar_na_pergunta: int | None = None) -> None:
+        self.perguntas = 0
+        self.inicios = 0
+        self._parar_na = parar_na_pergunta
+
+    def esperar_inicio(self) -> None:
+        self.inicios += 1
+
+    def pediram_parada(self) -> bool:
+        self.perguntas += 1
+        return self._parar_na is not None and self.perguntas >= self._parar_na

@@ -46,3 +46,34 @@ def test_mao_falsa_grava_na_ordem():
 
 def test_mao_falsa_comeca_vazia():
     assert MaoFalsa().acoes == []
+
+
+from mistfall.perifericos.falso import InterruptorFalso
+
+
+def test_o_interruptor_falso_nunca_para_por_padrao():
+    interruptor = InterruptorFalso()
+    assert [interruptor.pediram_parada() for _ in range(5)] == [False] * 5
+
+
+def test_o_interruptor_falso_para_na_pergunta_pedida():
+    interruptor = InterruptorFalso(parar_na_pergunta=3)
+    # A terceira pergunta e as seguintes devolvem True: uma vez pedida, a
+    # parada nao volta atras.
+    assert [interruptor.pediram_parada() for _ in range(4)] == [
+        False, False, True, True]
+
+
+def test_o_interruptor_falso_conta_as_perguntas():
+    interruptor = InterruptorFalso()
+    interruptor.pediram_parada()
+    interruptor.pediram_parada()
+    assert interruptor.perguntas == 2
+
+
+def test_o_interruptor_falso_registra_o_inicio():
+    # esperar_inicio nao bloqueia no duble: so anota que foi chamado, para o
+    # teste do ciclo poder afirmar que o laco espera pelo F2 antes de agir.
+    interruptor = InterruptorFalso()
+    interruptor.esperar_inicio()
+    assert interruptor.inicios == 1
