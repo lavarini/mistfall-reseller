@@ -3,6 +3,7 @@ import pytest
 from mistfall.geometria import (
     caixa_slot, conferir_resolucao, regiao_icone, recorte_preco,
     TODOS_OS_SLOTS, RESOLUCAO,
+    CATEGORIA_MATERIAL_CONSTRUCAO, CATEGORIA_MATERIAL_FORJA,
 )
 
 def test_existem_doze_slots():
@@ -42,6 +43,13 @@ def test_recorte_rejeita_resolucao_errada():
 def test_conferir_resolucao_aceita_a_resolucao_medida():
     # Literal escrito a mao: 2560 de largura por 1440 de altura, nessa ordem.
     conferir_resolucao(np.zeros((1440, 2560, 3), dtype=np.uint8))
+
+def test_categorias_vizinhas_mantem_x_e_avancam_72_px():
+    x_construcao, y_construcao = CATEGORIA_MATERIAL_CONSTRUCAO
+    x_forja, y_forja = CATEGORIA_MATERIAL_FORJA
+    assert x_construcao == x_forja == 220
+    assert y_construcao == 705
+    assert y_forja - y_construcao == 72
 
 @pytest.mark.parametrize("largura,altura", [(3840, 2160), (1920, 1080), (1440, 2560)])
 def test_conferir_resolucao_recusa_qualquer_outra(largura, altura):

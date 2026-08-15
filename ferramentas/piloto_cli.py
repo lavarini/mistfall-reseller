@@ -8,14 +8,18 @@ from pathlib import Path
 
 from mistfall.config import carregar_config
 from mistfall.piloto import RITMO_PADRAO, Desfecho, Resultado, executar
+from mistfall.reset import resetar_categoria
 
 SEGUNDOS_DE_CONTAGEM = 5
 
 
 def montar_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Faz uma Compra no Leilao e para.")
-    p.add_argument("--simular", action="store_true",
-                   help="varre e decide, mas nao clica nem aperta nada")
+    modo = p.add_mutually_exclusive_group()
+    modo.add_argument("--simular", action="store_true",
+                      help="varre e decide, mas nao clica nem aperta nada")
+    modo.add_argument("--resetar", action="store_true",
+                      help="executa somente o Reset de Categoria e para")
     p.add_argument("--pasta", default="execucao",
                    help="onde salvar prints e relatorio")
     p.add_argument("--config", default="config.toml")
@@ -58,7 +62,9 @@ def main() -> int:
 
 
 def _rodar(args: argparse.Namespace) -> int:
-    config = carregar_config(args.config)
+    # O Reset nao consulta Precos-alvo; alem de desnecessario, carregar a
+    # configuracao aqui impediria o teste isolado por um arquivo irrelevante.
+    config = None if args.resetar else carregar_config(args.config)
 
     from mistfall.perifericos.windows import MaoWindows, TelaWindows
 
@@ -71,12 +77,19 @@ def _rodar(args: argparse.Namespace) -> int:
                   "(nao clique nele) e tire a mao do mouse", flush=True)
             time.sleep(1)
 
+    tela, mao = TelaWindows(), MaoWindows()
+
+    if args.resetar:
+        sucesso = resetar_categoria(tela, mao, RITMO_PADRAO)
+        print(f"Reset: {'concluido' if sucesso else 'falhou'}")
+        return 0 if sucesso else 1
+
     # Faixa, e nao numero: o piso e o que o operador pediu, e o sorteio vai
     # para cima. Variar para baixo do valor calibrado perde Compra.
     piso = args.espera_modal / 1000
     ritmo = dataclasses.replace(
         RITMO_PADRAO, espera_para_o_modal_abrir=(piso, piso * 1.5))
-    resultado = executar(TelaWindows(), MaoWindows(), config,
+    resultado = executar(tela, mao, config,
                          Path(args.pasta), simular=args.simular, ritmo=ritmo)
 
     print(f"desfecho: {resultado.desfecho.value}")

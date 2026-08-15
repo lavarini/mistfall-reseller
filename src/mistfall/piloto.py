@@ -84,6 +84,9 @@ class Ritmo:
     espera_para_o_modal_abrir: tuple[float, float] = (0.08, 0.12)
     espera_apos_espaco: float = 2.0
     teto_espera_ouro: float = 5.0
+    # Tempo dado ao Leilao para redesenhar a lista depois da troca de
+    # Categoria. Tambem serve ao Reset standalone, antes de o loop existir.
+    espera_categoria_carregar: float = 1.0
 
     @classmethod
     def instantaneo(cls) -> "Ritmo":
@@ -96,6 +99,7 @@ class Ritmo:
             espera_para_o_modal_abrir=(0.0, 0.0),
             espera_apos_espaco=0.0,
             teto_espera_ouro=0.05,
+            espera_categoria_carregar=0.0,
         )
 
 

@@ -15,6 +15,12 @@ BUSCA_ICONE_REL = (69, 29, 197, 145)
 MARGEM_TEMPLATE = 14
 PRECO_REL = (931, 98, 1011, 143)
 
+# Centros das linhas do menu lateral medidos nos prints 2560x1440. O x=220
+# fica no centro da faixa horizontal 80-360 usada para reconhecer a Categoria;
+# as linhas vizinhas mantem o mesmo x e avancam 72 px em y.
+CATEGORIA_MATERIAL_CONSTRUCAO = (220, 705)
+CATEGORIA_MATERIAL_FORJA = (220, 777)
+
 TODOS_OS_SLOTS = [(linha, coluna) for linha in range(LINHAS) for coluna in range(2)]
 
 def conferir_resolucao(img: np.ndarray) -> None:
