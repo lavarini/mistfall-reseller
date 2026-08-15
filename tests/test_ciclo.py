@@ -167,7 +167,8 @@ def test_a_linha_da_compra_mostra_item_preco_e_ouro():
     assert "[0001]" in linha
     assert "23:47:12" in linha
     assert "comprou" in linha
-    assert "200" in linha
+    assert ItemAlvo.BROCHE.value in linha
+    assert "200g" in linha
     assert "59227" in linha and "59027" in linha
 
 
@@ -198,8 +199,9 @@ def test_nenhuma_linha_tem_acento(desfecho):
     # A pagina de codigo do console do Windows: o projeto inteiro escreve
     # saida sem acento, e esta e a unica superficie que o operador ve
     # enquanto o bot roda.
-    linha = linha_da_volta(1, Resultado(desfecho, motivo="qualquer"),
-                           CategoriaAlternativa.CHAVE, "00:00:00")
+    linha = linha_da_volta(
+        1, Resultado(desfecho, motivo="operação inválida; exceção não prevista"),
+        CategoriaAlternativa.CHAVE, "00:00:00")
     assert _sem_acento(linha), linha
 
 

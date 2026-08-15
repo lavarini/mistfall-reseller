@@ -13,6 +13,7 @@ laco em rotacao maxima.
 import itertools
 import random
 import time
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -57,6 +58,13 @@ class Sessao:
     ouro_gasto: int = 0
 
 
+def texto_do_console(texto: str) -> str:
+    # A pagina de codigo do console do Windows pode rejeitar acentos. O motivo
+    # pode carregar texto de excecao vindo do sistema operacional.
+    return unicodedata.normalize("NFKD", texto).encode(
+        "ascii", "ignore").decode("ascii")
+
+
 def linha_da_volta(numero: int, resultado: Resultado,
                    resetou: CategoriaAlternativa | None,
                    relogio: str) -> str:
@@ -75,7 +83,7 @@ def linha_da_volta(numero: int, resultado: Resultado,
     if resetou is not None:
         partes.append(f"-> Reset ({resetou.value})")
     if resultado.motivo:
-        partes.append(resultado.motivo)
+        partes.append(texto_do_console(resultado.motivo))
 
     return "  ".join(partes)
 
