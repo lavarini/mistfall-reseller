@@ -36,3 +36,18 @@ A camada de visão roda no macOS contra os prints em `images/`, sem jogo e sem W
 
 Antes de mexer em detecção, ler `docs/adr/`. A detecção é acoplada de propósito à
 resolução 2560×1440 (ADR-0002); isso é decisão registrada, não descuido.
+
+## Agent skills
+
+### Issue tracker
+
+Issues são gerenciadas no GitHub em `lavarini/mistfall-reseller`. Veja
+`docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+A triagem usa os rótulos padrão já existentes. Veja `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+O projeto usa contexto único. Veja `docs/agents/domain.md`.
