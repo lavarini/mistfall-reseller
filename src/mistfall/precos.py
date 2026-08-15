@@ -1,3 +1,5 @@
+import time
+
 import cv2
 import numpy as np
 import pytesseract
@@ -36,7 +38,9 @@ def ler_preco(recorte: np.ndarray) -> int | None:
     return int(texto) if texto.isdigit() else None
 
 
-def ler_precos(recortes: list[np.ndarray]) -> list[int | None]:
+def ler_precos(
+    recortes: list[np.ndarray], tempos: dict[str, float] | None = None
+) -> list[int | None]:
     """Le varios recortes numa chamada so, empilhados numa folha.
 
     O pytesseract nao faz OCR em Python: grava a imagem num arquivo temporario
@@ -58,8 +62,12 @@ def ler_precos(recortes: list[np.ndarray]) -> list[int | None]:
     o image_to_data devolve, e recorte ilegivel vira None no lugar certo.
     """
     if not recortes:
+        if tempos is not None:
+            tempos["preparo_folha"] = 0.0
+            tempos["tesseract_precos"] = 0.0
         return []
 
+    inicio = time.monotonic()
     pilha = [_preparar(recorte) for recorte in recortes]
     pecas: list[np.ndarray] = []
     faixas: list[tuple[int, int]] = []
@@ -71,10 +79,17 @@ def ler_precos(recortes: list[np.ndarray]) -> list[int | None]:
         pecas.append(np.zeros((SEPARADOR, preparado.shape[1]), dtype=np.uint8))
         topo += SEPARADOR
 
+    folha = np.vstack(pecas)
+    if tempos is not None:
+        tempos["preparo_folha"] = (time.monotonic() - inicio) * 1000
+
+    inicio = time.monotonic()
     dados = pytesseract.image_to_data(
-        np.vstack(pecas), config=_CONFIG_FOLHA,
+        folha, config=_CONFIG_FOLHA,
         output_type=pytesseract.Output.DICT,
     )
+    if tempos is not None:
+        tempos["tesseract_precos"] = (time.monotonic() - inicio) * 1000
 
     # Duas passadas: primeiro junta os numeros de cada faixa, depois decide.
     # Faixa com mais de um numero e leitura duvidosa, nao um preco com um

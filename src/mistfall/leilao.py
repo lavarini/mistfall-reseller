@@ -1,11 +1,15 @@
 import dataclasses
+import time
+
 import numpy as np
 from mistfall.geometria import TODOS_OS_SLOTS, regiao_icone, recorte_preco
 from mistfall.itens import identificar_item
 from mistfall.precos import ler_precos
 from mistfall.tipos import Listagem
 
-def varrer_bruto(img: np.ndarray) -> list[Listagem]:
+def varrer_bruto(
+    img: np.ndarray, tempos: dict[str, float] | None = None
+) -> list[Listagem]:
     """Le os doze slots como estao, sem conferir nada entre eles.
 
     Existe separada de `varrer` para o corpus de regressao poder documentar o
@@ -21,8 +25,11 @@ def varrer_bruto(img: np.ndarray) -> list[Listagem]:
     """
     icones = [regiao_icone(img, linha, coluna) for linha, coluna in TODOS_OS_SLOTS]
     precos = [recorte_preco(img, linha, coluna) for linha, coluna in TODOS_OS_SLOTS]
+    inicio = time.monotonic()
     itens = [identificar_item(icone) for icone in icones]
-    lidos = ler_precos(precos)
+    if tempos is not None:
+        tempos["itens"] = (time.monotonic() - inicio) * 1000
+    lidos = ler_precos(precos, tempos)
     return [
         Listagem(linha=linha, coluna=coluna, item=item, preco_unitario=preco)
         for (linha, coluna), item, preco in zip(TODOS_OS_SLOTS, itens, lidos)
