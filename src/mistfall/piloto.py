@@ -55,7 +55,7 @@ from mistfall.janela import (
 from mistfall.leilao import conferir_ordenacao, varrer_bruto
 from mistfall.ouro import ler_ouro
 from mistfall.paralelo import mapear
-from mistfall.perifericos.protocolos import Mao, Tela
+from mistfall.perifericos.protocolos import Interruptor, Mao, Tela
 from mistfall.tipos import EstadoTela, Listagem
 
 @dataclass(frozen=True)
@@ -87,6 +87,12 @@ class Ritmo:
     # Tempo dado ao Leilao para redesenhar a lista depois da troca de
     # Categoria. Tambem serve ao Reset standalone, antes de o loop existir.
     espera_categoria_carregar: float = 1.0
+    # Respiro entre uma Volta e a proxima. Nao e cosmetico: como so o F3 para
+    # o laco, uma tela que nao seja LISTA faz o pre-voo abortar na hora, e sem
+    # esta espera o ciclo gira em rotacao maxima capturando a tela dezenas de
+    # vezes por segundo. Mesmo valor de espera_categoria_carregar, e pelo
+    # mesmo motivo: e palpite calibravel, nao medida.
+    espera_entre_voltas: float = 1.0
 
     @classmethod
     def instantaneo(cls) -> "Ritmo":
@@ -100,6 +106,7 @@ class Ritmo:
             espera_apos_espaco=0.0,
             teto_espera_ouro=0.05,
             espera_categoria_carregar=0.0,
+            espera_entre_voltas=0.0,
         )
 
 
@@ -118,6 +125,8 @@ class Desfecho(Enum):
     # esse desfecho convida o operador ao erro.
     SIMULOU = "simulou"
     ABORTOU = "abortou"
+    # O operador pediu parada. Nao e falha: sai 0, ao contrario de ABORTOU.
+    PAROU = "parou"
 
 
 @dataclass
@@ -283,7 +292,8 @@ def _conferir_a_janela(modal: np.ndarray, escolhida: Listagem,
 
 
 def _esperar_o_ouro_cair(tela: Tela, diario: _Diario, r: Resultado,
-                         ritmo: Ritmo) -> None:
+                         ritmo: Ritmo,
+                         interruptor: Interruptor | None = None) -> None:
     """Enquete o Ouro ate a queda bater com o Preco Total, guardando sempre a
     ultima leitura legivel.
 
@@ -299,6 +309,8 @@ def _esperar_o_ouro_cair(tela: Tela, diario: _Diario, r: Resultado,
     primeira_volta = True
     while primeira_volta or time.monotonic() - inicio < ritmo.teto_espera_ouro:
         primeira_volta = False
+        if interruptor is not None and interruptor.pediram_parada():
+            break
         ultima = tela.capturar()
         lido = ler_ouro(ultima)
         if lido is not None:
@@ -312,7 +324,8 @@ def _esperar_o_ouro_cair(tela: Tela, diario: _Diario, r: Resultado,
 
 def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
              simular: bool = False, ritmo: Ritmo = RITMO_PADRAO,
-             sorteio: random.Random | None = None) -> Resultado:
+             sorteio: random.Random | None = None,
+             interruptor: Interruptor | None = None) -> Resultado:
     diario = _Diario(Path(pasta))
     r = Resultado(Desfecho.ABORTOU, "explodiu antes da primeira captura")
     if sorteio is None:
@@ -368,6 +381,11 @@ def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
         if simular:
             return encerrar(Desfecho.SIMULOU, "modo simulado: nao clicou")
 
+        # Ultimo ponto em que ainda ha o que abortar. Depois do Espaco a
+        # Compra ja aconteceu, e entre o clique e o Espaco sobram 80-120 ms.
+        if interruptor is not None and interruptor.pediram_parada():
+            return encerrar(Desfecho.PAROU, "parada pedida antes do clique")
+
         x0, y0, x1, y1 = caixa_slot(escolhida.linha, escolhida.coluna)
         time.sleep(random.uniform(*ritmo.pausa_antes_do_clique))
         mao.clicar((x0 + x1) // 2, (y0 + y1) // 2)
@@ -389,7 +407,7 @@ def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
         t_confirmacao = time.monotonic()
         mao.apertar_espaco()
         time.sleep(ritmo.espera_apos_espaco)
-        _esperar_o_ouro_cair(tela, diario, r, ritmo)
+        _esperar_o_ouro_cair(tela, diario, r, ritmo, interruptor)
         r.tempos["confirmacao_do_ouro"] = (time.monotonic() - t_confirmacao) * 1000
 
         if r.ouro_depois is None:

@@ -271,6 +271,54 @@ def test_a_conferencia_reprovaria_o_frame_em_animacao(tmp_path):
     assert divergencia is not None
     assert "ilegivel" in divergencia, divergencia
 
+
+from mistfall.perifericos.falso import InterruptorFalso
+
+
+def test_sem_interruptor_o_piloto_se_comporta_como_antes(tmp_path):
+    # Guarda os 286: o parametro novo tem default None, e com ele nada muda.
+    mao = MaoFalsa()
+    r = executar(roteiro_feliz(), mao, cfg(), tmp_path, ritmo=JA,
+                 sorteio=random.Random(1))
+    assert r.desfecho is Desfecho.COMPROU
+    assert mao.acoes[0][0] == "clicar"
+
+
+def test_parada_antes_do_clique_nao_clica(tmp_path):
+    mao = MaoFalsa()
+    r = executar(roteiro_feliz(), mao, cfg(), tmp_path, ritmo=JA,
+                 sorteio=random.Random(1),
+                 interruptor=InterruptorFalso(parar_na_pergunta=1))
+    assert r.desfecho is Desfecho.PAROU
+    # O ponto da abordagem cooperativa: F3 durante a varredura nao pode
+    # deixar o bot completar mais uma Compra.
+    assert mao.acoes == []
+
+
+def test_a_parada_encurta_a_enquete_do_ouro(tmp_path):
+    # Pergunta 1 e a de antes do clique, e passa. A 2 e a primeira volta da
+    # enquete do Ouro, e para — antes de a enquete capturar qualquer coisa.
+    tela = TelaFalsa([LISTA, LISTA_DEBITADA])
+    mao = MaoFalsa()
+    r = executar(tela, mao, cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1),
+                 interruptor=InterruptorFalso(parar_na_pergunta=2))
+    # A Compra ja aconteceu: o Espaco foi apertado antes da enquete. O que a
+    # parada faz e nao cumprir o teto de espera.
+    assert ("apertar_espaco",) in mao.acoes
+    # So a captura do pre-voo: a enquete parou antes de olhar de novo.
+    assert tela.capturas_feitas == 1
+    # E ABORTOU, e nao PAROU, de proposito: sem ler o Ouro depois do Espaco,
+    # o piloto nao sabe se a Compra aconteceu. "Compra indeterminada" e a
+    # verdade, e o operador que apertou F3 no meio da confirmacao precisa
+    # ver isso, nao um "parou" limpo.
+    assert r.desfecho is Desfecho.ABORTOU
+    assert r.ouro_depois is None
+
+
+def test_o_ritmo_tem_espera_entre_voltas():
+    assert Ritmo().espera_entre_voltas == 1.0
+    assert Ritmo.instantaneo().espera_entre_voltas == 0.0
+
 def test_espera_do_modal_e_sorteada_dentro_da_faixa(tmp_path):
     # Ritmo identico em tudo, sementes diferentes: se a espera fosse fixa os
     # dois valores seriam iguais. O sorteio existe para o ritmo do bot nao

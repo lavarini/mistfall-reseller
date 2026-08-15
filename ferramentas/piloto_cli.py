@@ -35,15 +35,17 @@ def montar_parser() -> argparse.ArgumentParser:
     return p
 
 
-# 0 correu como esperado, 1 abortou por seguranca, 2 problema de ambiente
-# (em main), 3 apertou Espaco e o Ouro nao se moveu — que nao pode sair como
-# 0, sob pena de ficar indistinguivel de uma Compra confirmada.
+# 0 correu como esperado ou o operador pediu parada, 1 abortou por seguranca,
+# 2 problema de ambiente (em main), 3 apertou Espaco e o Ouro nao se moveu —
+# que nao pode sair como 0, sob pena de ficar indistinguivel de uma Compra
+# confirmada.
 CODIGO_POR_DESFECHO = {
     Desfecho.COMPROU: 0,
     Desfecho.NADA_COMPRAVEL: 0,
     Desfecho.SIMULOU: 0,
     Desfecho.ABORTOU: 1,
     Desfecho.OURO_NAO_CAIU: 3,
+    Desfecho.PAROU: 0,
 }
 
 

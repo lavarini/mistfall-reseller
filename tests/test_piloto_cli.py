@@ -2,7 +2,7 @@ import sys
 
 import pytest
 
-from ferramentas.piloto_cli import codigo_de_saida, montar_parser
+from ferramentas.piloto_cli import CODIGO_POR_DESFECHO, codigo_de_saida, montar_parser
 from mistfall.config import Config
 from mistfall.piloto import Desfecho, Resultado
 from mistfall.tipos import ItemAlvo
@@ -168,3 +168,20 @@ def test_cli_imprime_o_tempo_de_cada_etapa(monkeypatch, capsys, tmp_path):
     saida = capsys.readouterr().out
     assert "Tempo por etapa" in saida
     assert "varredura: 456.7" in saida
+
+
+test_todo_desfecho_tem_codigo_de_saida_pelo_resultado = (
+    test_todo_desfecho_tem_codigo_de_saida
+)
+
+
+def test_todo_desfecho_tem_codigo_de_saida():
+    # O mapa foi escrito sem default de proposito: desfecho novo sem codigo
+    # tem de estourar, nao sair 0 e virar indistinguivel de sucesso.
+    for desfecho in Desfecho:
+        assert desfecho in CODIGO_POR_DESFECHO
+
+
+def test_parada_pedida_sai_com_zero():
+    # F3 e decisao do operador, nao falha do bot.
+    assert CODIGO_POR_DESFECHO[Desfecho.PAROU] == 0
