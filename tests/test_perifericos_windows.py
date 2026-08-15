@@ -194,3 +194,31 @@ def test_capturar_converte_bgra_para_bgr():
     assert resultado.shape == (2, 2, 3)
     assert list(resultado[0, 0]) == [10, 20, 30]
     assert list(resultado[1, 1]) == [40, 50, 60]
+
+
+def test_esperar_inicio_bloqueia_ate_o_f2(monkeypatch):
+    # A primeira chamada limpa o trinco: sem isso, um F2 apertado antes de o
+    # bot subir faria o laco comecar sozinho.
+    respostas = [False, False, False, True]
+    vistos = []
+
+    def falso(vk):
+        vistos.append(vk)
+        return respostas.pop(0)
+
+    monkeypatch.setattr(windows, "_tecla_foi_pressionada", falso)
+    monkeypatch.setattr(windows.time, "sleep", lambda _: None)
+    windows.InterruptorWindows().esperar_inicio()
+    assert vistos == [windows.VK_F2] * 4
+    assert respostas == []
+
+
+def test_pediram_parada_le_o_f3(monkeypatch):
+    monkeypatch.setattr(windows, "_tecla_foi_pressionada",
+                        lambda vk: vk == windows.VK_F3)
+    assert windows.InterruptorWindows().pediram_parada() is True
+
+
+def test_pediram_parada_e_falso_sem_f3(monkeypatch):
+    monkeypatch.setattr(windows, "_tecla_foi_pressionada", lambda vk: False)
+    assert windows.InterruptorWindows().pediram_parada() is False

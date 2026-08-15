@@ -35,3 +35,9 @@ def test_piloto_cli_importa_de_fora_da_raiz(tmp_path):
         cwd=tmp_path, capture_output=True, text=True, env=_ambiente_limpo(),
     )
     assert r.returncode == 0, r.stderr
+
+
+def test_o_entry_point_do_bot_existe():
+    import tomllib, pathlib
+    dados = tomllib.loads(pathlib.Path("pyproject.toml").read_text(encoding="utf-8"))
+    assert dados["project"]["scripts"]["mistfall-bot"] == "ferramentas.bot_cli:main"

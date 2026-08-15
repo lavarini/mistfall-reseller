@@ -41,6 +41,12 @@ KEYEVENTF_KEYUP = 0x0002
 SCANCODE_ESPACO = 0x39
 SCANCODE_ESC = 0x01
 
+# Virtual-key das teclas de controle do operador. Aqui e virtual-key mesmo, e
+# nao scancode: GetAsyncKeyState le o teclado do lado de ca, e nao injeta
+# evento no jogo — e o oposto do que o SendInput faz.
+VK_F2 = 0x71
+VK_F3 = 0x72
+
 
 class _MOUSEINPUT(ctypes.Structure):
     _fields_ = [("dx", wintypes.LONG), ("dy", wintypes.LONG),
@@ -74,6 +80,38 @@ def _enviar(*entradas: _INPUT) -> None:
             f"SendInput aceitou {enviados} de {quantidade} eventos. "
             "Rodando como administrador?"
         )
+
+
+def _tecla_foi_pressionada(vk: int) -> bool:
+    """Trinco: a tecla foi pressionada desde a chamada anterior?
+
+    O bit 0x0001 do GetAsyncKeyState guarda a transicao, e nao o estado
+    atual. E o que faz o F3 ser notado mesmo quando apertado e solto durante
+    um time.sleep do piloto — sem ele, so pegaria a tecla segurada no
+    instante exato da pergunta.
+
+    Se esse comportamento se mostrar instavel na maquina do jogo, o plano B
+    e uma thread de fundo enquetando esta mesma funcao e guardando o flag:
+    mesma interface, mesmos testes, mudanca contida neste arquivo.
+    """
+    return bool(ctypes.windll.user32.GetAsyncKeyState(vk) & 0x0001)
+
+
+class InterruptorWindows:
+    """F2 comeca, F3 para."""
+
+    def __init__(self, intervalo: float = 0.05) -> None:
+        self._intervalo = intervalo
+
+    def esperar_inicio(self) -> None:
+        # A primeira leitura descarta o trinco acumulado: sem ela, um F2
+        # apertado antes de o bot subir faria o laco comecar sozinho.
+        _tecla_foi_pressionada(VK_F2)
+        while not _tecla_foi_pressionada(VK_F2):
+            time.sleep(self._intervalo)
+
+    def pediram_parada(self) -> bool:
+        return _tecla_foi_pressionada(VK_F3)
 
 
 def _mouse(dwFlags: int, dx: int = 0, dy: int = 0) -> _INPUT:
