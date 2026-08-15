@@ -7,7 +7,8 @@ import numpy as np
 import pytesseract
 
 from mistfall.geometria import conferir_resolucao
-from mistfall.tipos import Bau, CapacidadeVenda
+from mistfall.itens import identificar_item, pontuar
+from mistfall.tipos import Bau, CapacidadeVenda, SlotArmazem
 
 
 REGIAO_CAPACIDADE = (345, 200, 415, 250)
@@ -26,6 +27,9 @@ LINHAS_ARMAZEM = 7
 LIMIAR_DOURADO = 0.50
 MARGEM_DOURADA = 0.20
 _CONFIG_CAPACIDADE = "--psm 7 -c tessedit_char_whitelist=0123456789/"
+_CONFIG_QUANTIDADE = "--psm 13 -c tessedit_char_whitelist=0123456789"
+ESCALAS_SLOT = tuple(indice / 20 for indice in range(28, 41))
+QUANTIDADE_REL = (50, 70, 83, 106)
 
 
 def _recortar(img: np.ndarray, regiao: tuple[int, int, int, int]) -> np.ndarray:
@@ -95,3 +99,55 @@ def caixa_slot_armazem(linha: int, coluna: int) -> tuple[int, int, int, int]:
     x0 = SLOT_ESQUERDA + SLOT_PASSO_X * coluna
     y0 = SLOT_TOPO + SLOT_PASSO_Y * linha
     return x0, y0, x0 + SLOT_LARGURA, y0 + SLOT_ALTURA
+
+
+def _recortar_slot(img: np.ndarray, linha: int, coluna: int) -> np.ndarray:
+    return _recortar(img, caixa_slot_armazem(linha, coluna))
+
+
+def _identificar_item_do_slot(slot: np.ndarray):
+    candidatos = []
+    for escala in ESCALAS_SLOT:
+        ampliado = cv2.resize(
+            slot, None, fx=escala, fy=escala, interpolation=cv2.INTER_CUBIC
+        )
+        scores = pontuar(ampliado)
+        candidatos.append((max(scores.values()), ampliado))
+    _, melhor_regiao = max(candidatos, key=lambda candidato: candidato[0])
+    return identificar_item(melhor_regiao)
+
+
+def _ler_quantidade(slot: np.ndarray) -> int | None:
+    x0, y0, x1, y1 = QUANTIDADE_REL
+    recorte = slot[y0:y1, x0:x1]
+    cinza = cv2.cvtColor(recorte, cv2.COLOR_BGR2GRAY)
+    ampliado = cv2.resize(cinza, None, fx=6, fy=6, interpolation=cv2.INTER_CUBIC)
+    _, binaria = cv2.threshold(
+        ampliado, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
+    )
+    texto = pytesseract.image_to_string(binaria, config=_CONFIG_QUANTIDADE).strip()
+    return int(texto) if texto.isdigit() else None
+
+
+def varrer_armazem(img: np.ndarray) -> list[SlotArmazem]:
+    conferir_resolucao(img)
+    resultado = []
+    for linha in range(LINHAS_ARMAZEM):
+        for coluna in range(COLUNAS_ARMAZEM):
+            regiao = _recortar_slot(img, linha, coluna)
+            item = _identificar_item_do_slot(regiao)
+            quantidade = _ler_quantidade(regiao) if item is not None else None
+            resultado.append(SlotArmazem(linha, coluna, item, quantidade))
+    return resultado
+
+
+def escolher_slot_de_venda(slots: list[SlotArmazem]) -> SlotArmazem | None:
+    return next(
+        (slot for slot in slots if slot.item is not None and slot.quantidade == 3),
+        None,
+    )
+
+
+def centro_slot_armazem(slot: SlotArmazem) -> tuple[int, int]:
+    x0, y0, x1, y1 = caixa_slot_armazem(slot.linha, slot.coluna)
+    return (x0 + x1) // 2, (y0 + y1) // 2

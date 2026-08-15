@@ -2,12 +2,15 @@ import cv2
 import numpy as np
 import pytest
 
-from mistfall.tipos import Bau, CapacidadeVenda
+from mistfall.tipos import Bau, CapacidadeVenda, ItemAlvo, SlotArmazem
 from mistfall.venda_visao import (
     caixa_slot_armazem,
     centro_bau,
+    centro_slot_armazem,
+    escolher_slot_de_venda,
     ler_bau_selecionado,
     ler_capacidade,
+    varrer_armazem,
 )
 
 
@@ -69,3 +72,49 @@ def test_bau_ambiguo_e_recusado(monkeypatch, stash_2):
 def test_resolucao_errada_e_erro():
     with pytest.raises(ValueError, match="2560x1440"):
         ler_capacidade(np.zeros((720, 1280, 3), dtype=np.uint8))
+
+
+def test_bau_dois_le_os_tres_stacks_de_broche(stash_2):
+    por_posicao = {(s.linha, s.coluna): s for s in varrer_armazem(stash_2)}
+    assert por_posicao[(6, 1)] == SlotArmazem(6, 1, ItemAlvo.BROCHE, 3)
+    assert por_posicao[(6, 2)] == SlotArmazem(6, 2, ItemAlvo.BROCHE, 3)
+    assert por_posicao[(6, 3)] == SlotArmazem(6, 3, ItemAlvo.BROCHE, 2)
+
+
+def test_bau_dois_escolhe_primeiro_stack_tres_em_ordem_visual(stash_2):
+    escolhido = escolher_slot_de_venda(varrer_armazem(stash_2))
+    assert escolhido == SlotArmazem(6, 1, ItemAlvo.BROCHE, 3)
+
+
+def test_bau_tres_le_os_stacks_alvo_da_primeira_linha(stash_3):
+    por_posicao = {(s.linha, s.coluna): s for s in varrer_armazem(stash_3)}
+    assert por_posicao[(0, 0)] == SlotArmazem(0, 0, ItemAlvo.ORBE, 3)
+    assert por_posicao[(0, 1)] == SlotArmazem(0, 1, ItemAlvo.ORBE, 2)
+    assert por_posicao[(0, 2)] == SlotArmazem(0, 2, ItemAlvo.REDE, 3)
+    assert por_posicao[(0, 3)] == SlotArmazem(0, 3, ItemAlvo.REDE, 3)
+    assert por_posicao[(0, 6)] == SlotArmazem(0, 6, ItemAlvo.LANTERNA, 3)
+    assert por_posicao[(0, 7)] == SlotArmazem(0, 7, ItemAlvo.LANTERNA, 3)
+
+
+def test_quantidade_ausente_nunca_vira_um_implicitamente(stash_3):
+    por_posicao = {(s.linha, s.coluna): s for s in varrer_armazem(stash_3)}
+    assert por_posicao[(0, 4)].item is ItemAlvo.REDE
+    assert por_posicao[(0, 4)].quantidade is None
+
+
+def test_so_item_alvo_com_quantidade_tres_e_escolhido():
+    slots = [
+        SlotArmazem(0, 0, ItemAlvo.BROCHE, 2),
+        SlotArmazem(0, 1, None, 3),
+        SlotArmazem(0, 2, ItemAlvo.ADAGA, None),
+        SlotArmazem(0, 3, ItemAlvo.ADAGA, 3),
+    ]
+    assert escolher_slot_de_venda(slots) == slots[-1]
+
+
+def test_centro_do_slot_fica_dentro_da_caixa():
+    slot = SlotArmazem(2, 4, ItemAlvo.ORBE, 3)
+    x, y = centro_slot_armazem(slot)
+    x0, y0, x1, y1 = caixa_slot_armazem(2, 4)
+    assert x0 < x < x1
+    assert y0 < y < y1

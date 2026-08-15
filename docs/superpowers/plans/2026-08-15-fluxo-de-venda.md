@@ -31,7 +31,7 @@
 | `src/mistfall/venda_visao.py` | Geometria, OCR e reconhecimento puro da tela de Venda. |
 | `src/mistfall/perifericos/{protocolos,falso,windows}.py` | `Ctrl+A` e digitação numérica atrás de `Mao`. |
 | `src/mistfall/venda.py` | Uma Venda: slot → Janela → preencher → Espaço → tela de Venda. |
-| `src/mistfall/ciclo_venda.py` | Sessão: capacidade, varredura repetida e avanço à direita. |
+| `src/mistfall/ciclo_venda.py` | Sessão: capacidade, uma varredura por Baú e avanço à direita. |
 | `ferramentas/venda_cli.py` | Comando Windows `mistfall-venda`. |
 | `tests/test_{config,venda_visao,perifericos_falso,perifericos_windows,venda,ciclo_venda,venda_cli}.py` | Regressões unitárias e verticais. |
 | `CONTEXT.md`, `README.md`, `pyproject.toml` | Vocabulário e operação do novo comando. |
@@ -377,9 +377,9 @@ git commit -m "Executa uma Venda com valores fixos"
 - Produces: `SessaoVenda`; `DesfechoSessaoVenda`; `executar_ciclo_venda(tela, mao, config, pasta, interruptor, ritmo) -> SessaoVenda`
 - Consumes: `ler_capacidade`, `ler_bau_selecionado`, `varrer_armazem`, `escolher_slot_de_venda`, `centro_bau`, `executar_venda`.
 
-- [ ] **Step 1: Escrever teste vermelho de repetição no mesmo Baú**
+- [ ] **Step 1: Escrever teste vermelho de consumo dos candidatos do mesmo Baú**
 
-Usar dublês de visão e de `executar_venda` para provar a lógica sem OCR: capacidade `0/12 → 1/12 → 2/12`, dois candidatos sucessivos e depois nenhum. Afirmar duas Vendas antes do primeiro clique de Baú.
+Usar dublês de visão e de `executar_venda` para provar a lógica sem OCR: a primeira imagem entrega capacidade `0/12` e dois candidatos; as capturas seguintes atualizam a capacidade para `1/12` e `2/12`. Afirmar duas Vendas antes do primeiro clique de Baú e uma única chamada a `varrer_armazem` naquele Baú.
 
 - [ ] **Step 2: Confirmar o vermelho**
 
@@ -389,7 +389,7 @@ Expected: FAIL por módulo ausente.
 
 - [ ] **Step 3: Implementar o laço e a releitura autoritativa**
 
-Em cada passagem, capturar uma vez, validar tela/Baú/capacidade, parar se cheia, escolher candidato e delegar uma Venda. Depois de `VENDEU`, voltar ao topo e descartar os números anteriores. Sem candidato, consultar F3 e clicar em `Bau(valor + 1)`; se `QUARTO`, encerrar `ARMAZEM_ESGOTADO`.
+Ao entrar em um Baú, capturar, validar tela/Baú/capacidade e chamar `varrer_armazem` uma única vez. Guardar em ordem visual todos os candidatos com Item-alvo e quantidade `3`. Para cada candidato, reler a capacidade da captura atual, parar se cheia e delegar uma Venda. Depois de `VENDEU`, atualizar a captura e `X/Y`, mas consumir o próximo candidato armazenado sem novo OCR nem template matching. Ao esgotar a lista, consultar F3 e clicar em `Bau(valor + 1)`; se `QUARTO`, encerrar `ARMAZEM_ESGOTADO`.
 
 Não incrementar capacidade localmente. A única contagem de sucesso da sessão é diagnóstica; a decisão sempre usa o novo `X/Y`.
 

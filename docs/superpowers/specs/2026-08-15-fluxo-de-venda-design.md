@@ -14,7 +14,8 @@ contém mais candidatos.
 
 ## Vocabulário novo
 
-**Venda** é a ação de criar uma Listagem a partir de um stack no Armazém. Ela começa
+**Venda** é a ação de criar uma Listagem a partir de um stack de `3` unidades de um
+Item-alvo no Armazém. Uma Venda consome uma posição de `X/Y`. Ela começa
 com o clique no slot, passa pela Janela de Confirmação "Listar para Venda" e termina
 quando essa janela fecha após o Espaço.
 
@@ -82,8 +83,9 @@ fonte autoritativa; o valor `12` das imagens é exemplo, não regra de produçã
     acontecer dentro do teto, aborta sem repetir o Espaço.
 13. Relê `X/Y`. Os dois números substituem a leitura anterior. Se estiverem ilegíveis
     ou incoerentes, aborta; se `X >= Y`, encerra com capacidade cheia.
-14. Varre novamente o mesmo Baú, pois a remoção do stack pode reorganizar os slots.
-15. Quando não houver candidato no Baú atual, consulta F3, avança exatamente um Baú à
+14. Consome o próximo candidato da lista já extraída para o Baú atual. Os slots não se
+    reorganizam depois de uma Venda, portanto a imagem não é processada novamente.
+15. Quando a lista de candidatos do Baú atual acabar, consulta F3, avança exatamente um Baú à
     direita e espera a tela estabilizar.
 16. Repete a partir do passo 3. Se o Baú atual já for o quarto, encerra automaticamente.
 
@@ -114,7 +116,7 @@ Preço-unitário, Quantidade, ganhos estimados ou Tendência de Mercado dentro d
 
 ### Ciclo de Venda
 
-Outro orquestrador controla a Capacidade de Venda, repete a varredura, avança Baús e
+Outro orquestrador controla a Capacidade de Venda, processa cada Baú uma vez, avança Baús e
 encerra a sessão. Separar esse ciclo da Venda unitária preserva o mesmo limite usado no
 MVP de Compra: uma operação de interface testável por vez e um laço que apenas a compõe.
 
@@ -161,7 +163,7 @@ A suíte cobre:
 - sequência de clique, `Ctrl+A`, Preço de Venda, Quantidade `3` e Espaço;
 - ausência de digitação e Espaço quando a Janela não abre;
 - ausência de um segundo Espaço quando a Janela não fecha;
-- nova varredura do mesmo Baú depois de cada Venda;
+- uma única varredura por Baú e consumo dos candidatos já processados depois de cada Venda;
 - avanço somente para a direita e parada no quarto Baú;
 - releitura autoritativa de `X/Y` depois de cada Venda;
 - parada quando `X == Y` e aborto para leituras ilegíveis ou incoerentes;
