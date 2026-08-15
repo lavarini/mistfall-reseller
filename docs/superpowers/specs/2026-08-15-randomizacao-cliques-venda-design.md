@@ -19,6 +19,9 @@ Somente dois cliques passam a variar:
 Os cliques nos Baús, no campo Preço de Venda e no campo Quantidade continuam usando as
 coordenadas fixas atuais.
 
+Como correção de dado no mesmo contexto de Venda, o Preço de Venda da Adaga passa de 240
+para 239. O Preço-alvo de Compra da Adaga não muda.
+
 ## Áreas seguras
 
 O projeto permanece acoplado à resolução 2560×1440, conforme ADR-0002. Por isso as áreas
@@ -82,3 +85,4 @@ Os testes devem demonstrar que:
 - randomização de cliques nos Baús ou nos campos de input;
 - configuração das margens pelo operador;
 - persistência das coordenadas sorteadas nos relatórios.
+- qualquer alteração em `[precos_alvo]`, inclusive o Preço-alvo da Adaga.
