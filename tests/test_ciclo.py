@@ -24,7 +24,11 @@ class _PilotoFalso:
 
     def __call__(self, tela, mao, config, pasta, **kwargs) -> Resultado:
         self.chamadas += 1
-        pathlib.Path(pasta).mkdir(parents=True, exist_ok=True)
+        pasta = pathlib.Path(pasta)
+        pasta.mkdir(parents=True, exist_ok=True)
+        # O que o _Diario de verdade deixa: um PNG por captura e o relatorio.
+        (pasta / "00-pre-voo.png").write_bytes(b"png de mentira")
+        (pasta / "relatorio.json").write_text("{}", encoding="utf-8")
         if self.roteiro:
             return self.roteiro.pop(0)
         return Resultado(Desfecho.NADA_COMPRAVEL)
@@ -118,3 +122,26 @@ def test_a_sessao_conta_compras_e_ouro_gasto(monkeypatch, tmp_path):
 def test_cada_volta_tem_a_propria_pasta(monkeypatch, tmp_path):
     _rodar(monkeypatch, tmp_path, [_comprou(), _comprou()], parar_na_pergunta=3)
     assert sorted(p.name for p in tmp_path.iterdir()) == ["volta-0001", "volta-0002"]
+
+
+def test_volta_de_rotina_descarta_os_prints(monkeypatch, tmp_path):
+    # NADA_COMPRAVEL e o caso comum e o que nao carrega informacao: uma tela
+    # sem Item-alvo no Preco-alvo e o esperado na maioria das Voltas.
+    _rodar(monkeypatch, tmp_path, [Resultado(Desfecho.NADA_COMPRAVEL)],
+           parar_na_pergunta=2)
+    volta = tmp_path / "volta-0001"
+    assert list(volta.glob("*.png")) == []
+
+
+def test_volta_de_rotina_mantem_o_relatorio(monkeypatch, tmp_path):
+    # O JSON e pequeno e e o que permite reconstruir a sessao depois.
+    _rodar(monkeypatch, tmp_path, [Resultado(Desfecho.NADA_COMPRAVEL)],
+           parar_na_pergunta=2)
+    assert (tmp_path / "volta-0001" / "relatorio.json").exists()
+
+
+@pytest.mark.parametrize("desfecho", [
+    Desfecho.COMPROU, Desfecho.OURO_NAO_CAIU, Desfecho.ABORTOU])
+def test_volta_interessante_guarda_os_prints(monkeypatch, tmp_path, desfecho):
+    _rodar(monkeypatch, tmp_path, [Resultado(desfecho)], parar_na_pergunta=2)
+    assert (tmp_path / "volta-0001" / "00-pre-voo.png").exists()
