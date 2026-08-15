@@ -1,4 +1,5 @@
 import dataclasses
+import random
 
 import pytest
 
@@ -46,23 +47,28 @@ def test_processa_o_bau_uma_vez_e_vende_todos_os_stacks_tres(monkeypatch, tmp_pa
     ])
     varreduras = []
     vendidos = []
+    sorteio = random.Random(42)
+    sorteios_recebidos = []
     monkeypatch.setattr("mistfall.ciclo_venda.ler_capacidade", lambda _: next(capacidades))
     monkeypatch.setattr("mistfall.ciclo_venda.ler_bau_selecionado", lambda _: Bau.QUARTO)
     monkeypatch.setattr(
         "mistfall.ciclo_venda.varrer_armazem",
         lambda frame: varreduras.append(frame) or slots,
     )
-    monkeypatch.setattr(
-        "mistfall.ciclo_venda.executar_venda",
-        lambda tela, mao, slot, preco, pasta, ritmo: vendidos.append(slot) or sucesso(slot),
-    )
+    def vender(tela, mao, slot, preco, pasta, ritmo, recebido):
+        vendidos.append(slot)
+        sorteios_recebidos.append(recebido)
+        return sucesso(slot)
+
+    monkeypatch.setattr("mistfall.ciclo_venda.executar_venda", vender)
 
     sessao = executar_ciclo_venda(
         TelaFalsa([STASH]), MaoFalsa(), config(), tmp_path,
-        InterruptorFalso(), RitmoVenda.instantaneo(),
+        InterruptorFalso(), RitmoVenda.instantaneo(), sorteio=sorteio,
     )
 
     assert vendidos == [slots[0], slots[2]]
+    assert sorteios_recebidos == [sorteio, sorteio]
     assert len(varreduras) == 1
     assert sessao.vendas == 2
     assert sessao.desfecho is DesfechoSessaoVenda.ARMAZEM_ESGOTADO
