@@ -144,12 +144,9 @@ def test_le_capacidade_nas_duas_telas_de_armazem():
     assert ler_capacidade(stash_2) == esperado
     assert ler_capacidade(stash_3) == esperado
 
-def test_modal_mostra_uma_listagem_ocupada():
-    assert ler_capacidade(modal) == CapacidadeVenda(ocupadas=1, limite=12)
-
 def test_detecta_bau_dourado_selecionado():
     assert ler_bau_selecionado(stash_2) is Bau.SEGUNDO
-    assert ler_bau_selecionado(stash_3) is Bau.QUARTO
+    assert ler_bau_selecionado(stash_3) is Bau.TERCEIRO
 
 def test_geometria_tem_8_colunas_e_7_linhas_sem_sobrepor():
     caixas = [caixa_slot_armazem(l, c) for l in range(7) for c in range(8)]

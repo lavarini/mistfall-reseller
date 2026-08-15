@@ -1,0 +1,97 @@
+"""Visao pura da aba Vender com o Armazem aberto."""
+
+import re
+
+import cv2
+import numpy as np
+import pytesseract
+
+from mistfall.geometria import conferir_resolucao
+from mistfall.tipos import Bau, CapacidadeVenda
+
+
+REGIAO_CAPACIDADE = (345, 200, 415, 250)
+CENTROS_BAUS = ((1723, 286), (1787, 286), (1851, 286), (1915, 286))
+MEIA_CAIXA_BAU = 22
+
+SLOT_ESQUERDA = 1688
+SLOT_TOPO = 333
+SLOT_PASSO_X = 92
+SLOT_PASSO_Y = 128
+SLOT_LARGURA = 83
+SLOT_ALTURA = 106
+COLUNAS_ARMAZEM = 8
+LINHAS_ARMAZEM = 7
+
+LIMIAR_DOURADO = 0.50
+MARGEM_DOURADA = 0.20
+_CONFIG_CAPACIDADE = "--psm 7 -c tessedit_char_whitelist=0123456789/"
+
+
+def _recortar(img: np.ndarray, regiao: tuple[int, int, int, int]) -> np.ndarray:
+    conferir_resolucao(img)
+    x0, y0, x1, y1 = regiao
+    return img[y0:y1, x0:x1]
+
+
+def _ocr_capacidade(regiao: np.ndarray) -> str:
+    cinza = cv2.cvtColor(regiao, cv2.COLOR_BGR2GRAY)
+    ampliado = cv2.resize(cinza, None, fx=4, fy=4, interpolation=cv2.INTER_CUBIC)
+    _, binaria = cv2.threshold(
+        ampliado, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
+    )
+    return pytesseract.image_to_string(binaria, config=_CONFIG_CAPACIDADE).strip()
+
+
+def ler_capacidade(img: np.ndarray) -> CapacidadeVenda | None:
+    texto = _ocr_capacidade(_recortar(img, REGIAO_CAPACIDADE))
+    casamento = re.fullmatch(r"(\d+)/(\d+)", texto)
+    if casamento is None:
+        return None
+    ocupadas, limite = map(int, casamento.groups())
+    if limite <= 0 or not 0 <= ocupadas <= limite:
+        return None
+    return CapacidadeVenda(ocupadas=ocupadas, limite=limite)
+
+
+def _proporcoes_douradas(img: np.ndarray) -> list[float]:
+    conferir_resolucao(img)
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    proporcoes = []
+    for x, y in CENTROS_BAUS:
+        recorte = hsv[
+            y - MEIA_CAIXA_BAU:y + MEIA_CAIXA_BAU,
+            x - MEIA_CAIXA_BAU:x + MEIA_CAIXA_BAU,
+        ]
+        dourado = (
+            (recorte[:, :, 0] >= 10)
+            & (recorte[:, :, 0] <= 35)
+            & (recorte[:, :, 1] >= 80)
+            & (recorte[:, :, 2] >= 80)
+        )
+        proporcoes.append(float(dourado.mean()))
+    return proporcoes
+
+
+def ler_bau_selecionado(img: np.ndarray) -> Bau | None:
+    proporcoes = _proporcoes_douradas(img)
+    ordem = sorted(range(len(proporcoes)), key=proporcoes.__getitem__, reverse=True)
+    melhor, segundo = ordem[:2]
+    if (
+        proporcoes[melhor] < LIMIAR_DOURADO
+        or proporcoes[melhor] - proporcoes[segundo] < MARGEM_DOURADA
+    ):
+        return None
+    return Bau(melhor)
+
+
+def centro_bau(bau: Bau) -> tuple[int, int]:
+    return CENTROS_BAUS[int(bau)]
+
+
+def caixa_slot_armazem(linha: int, coluna: int) -> tuple[int, int, int, int]:
+    if not 0 <= linha < LINHAS_ARMAZEM or not 0 <= coluna < COLUNAS_ARMAZEM:
+        raise ValueError(f"slot do Armazem fora da grade: ({linha}, {coluna})")
+    x0 = SLOT_ESQUERDA + SLOT_PASSO_X * coluna
+    y0 = SLOT_TOPO + SLOT_PASSO_Y * linha
+    return x0, y0, x0 + SLOT_LARGURA, y0 + SLOT_ALTURA
