@@ -66,10 +66,9 @@ blocos abaixo estao em **PowerShell**; no `cmd.exe` o equivalente e `echo %ERROR
 
 | Codigo | Significado |
 |--------|-------------|
-| 0 | correu como esperado (comprou, simulou, ou nada havia comprável) |
-| 1 | abortou por seguranca — nao apertou Espaco, ou apertou e o Ouro ficou ilegivel |
+| 0 | correu como esperado (enviou a Compra, simulou, ou nada havia compravel) |
+| 1 | abortou por seguranca antes de enviar a Compra |
 | 2 | problema de ambiente (resolucao, tesseract, config, `SendInput` recusado) |
-| 3 | apertou Espaco e o **Ouro nao se moveu** |
 
 ## Primeira execucao: simulada
 
@@ -102,16 +101,13 @@ Quando aparecer a contagem de 5 segundos, **traga o jogo para a frente com Alt+T
 `SendInput` vai para a janela ativa, e nao para uma coordenada da tela. **Nao clique no
 jogo**: um clique pode abrir um modal sozinho e estragar a pre-condicao.
 
-Ha **tres** desfechos possiveis:
+Ha **dois** desfechos principais:
 
 1. **Codigo 2**, com "problema de ambiente: SendInput aceitou 0 de 1 eventos" — o Windows
    recusou o input na cara. Ai sim o UIPI esta bloqueando, e a falha **nao** e silenciosa.
-2. **Codigo 1 ou 3**, sem a Compra acontecer — o clique nao produziu efeito, e o Espaco
-   foi apertado no vazio. Como a Janela nao e mais conferida, o piloto nao sabe dizer
-   que ela nao abriu: quem denuncia e o Ouro nao ter caido.
-3. **Ela compra de verdade** (codigo 0, ou 3) — mas significa que uma Compra foi feita:
-   **refaca a pre-condicao antes da terceira execucao** (confira que ainda ha Item-alvo
-   exatamente no Preco-alvo na tela).
+2. **Codigo 0**, com `compra_enviada` — clique e Espaco foram enviados. Isso **nao confirma**
+   que a Compra aconteceu: observe o jogo. Se ela aconteceu, refaca a pre-condicao antes da
+   terceira execucao e confira que ainda ha Item-alvo exatamente no Preco-alvo na tela.
 
 **O desfecho 2 nao prova UIPI.** Uma versao anterior deste roteiro dizia que sim, e a
 execucao de 2026-08-13 mostrou que nao: com e sem administrador o comportamento foi
@@ -119,9 +115,9 @@ identico, o `SendInput` aceitou os eventos nas duas, o cursor foi ate a Listagem
 clique nao aconteceu. A causa era o clique ter duracao zero — `LEFTDOWN` e `LEFTUP` no mesmo
 lote —, e nao privilegio. Veja o ADR-0001.
 
-Entao, se der o desfecho 2, a pergunta a responder e **onde** o clique se perde, e a
-comparacao com e sem administrador e o que separa privilegio de forma do input. Anote qual
-dos tres aconteceu, com o codigo de saida, **nas duas execucoes**.
+Entao, se o codigo for 0 mas a Compra nao acontecer, a pergunta a responder e **onde** o
+clique se perde. A comparacao com e sem administrador separa privilegio de forma do input.
+Anote o codigo e o que apareceu no jogo **nas duas execucoes**.
 
 ## Terceira execucao: valendo
 
@@ -138,10 +134,10 @@ mouse.
 
 ### A Janela nao e mais conferida
 
-Depois do clique o piloto **espera e aperta Espaco**. A espera e sorteada a cada Compra,
-entre o valor de `--espera-modal` e 1,5x ele. A Janela nao e detectada,
-nao e capturada e nao e lida. Nenhum aborto vem mais do modal, e nenhuma string do tipo "o
-modal cobra X" ou "Preco Unitario ilegivel" existe hoje. Ver o ADR-0003.
+O piloto espera de **50 a 150 ms antes do clique**. Depois do clique, espera de **80 a
+120 ms** e aperta Espaco. As duas faixas sao sorteadas a cada Compra. A Janela nao e
+detectada, nao e capturada e nao e lida. Nenhum aborto vem mais dela, e nenhuma string do
+tipo "o modal cobra X" ou "Preco Unitario ilegivel" existe hoje. Ver o ADR-0003.
 
 Consequencia pratica para quem opera: **o bot aperta Espaco de olhos fechados.** Se o clique
 nao abrir a Janela, o Espaco vai para o jogo. Se a Janela abrir com Quantidade diferente de
@@ -159,20 +155,61 @@ diz quanto se esperou de fato.
 
 ### Se o desfecho for "abortou"
 
-Sobrou pouca coisa que aborta, e nenhuma delas olha o modal: pre-voo em outra Categoria, tela
-que nao e a lista, Ouro inicial ilegivel, ou Ouro final ilegivel depois do Espaco. O `motivo`
-no `relatorio.json` diz qual.
+Sobrou pouca coisa que aborta, e nenhuma delas olha a Janela ou a mudanca de Ouro: por
+exemplo, pre-voo em outra Categoria ou tela que nao e a lista. O `motivo` no
+`relatorio.json` diz qual.
 
-**Atencao ao aborto depois do Espaco**: nesse caso o bot ja apertou, entao pode ter gastado
-ouro. Confira o Ouro no jogo antes de repetir.
+O Ouro e observado uma vez, no frame inicial, e e apenas telemetria. Uma leitura nula nunca
+bloqueia a Volta e nao muda a decisao. Depois do Espaco nao ha outra captura: o desfecho
+`compra_enviada` significa exatamente clique e Espaco enviados, nunca Compra confirmada.
+
+## Rodar o laco
+
+Terminal como administrador, com o jogo em primeiro plano:
+
+```powershell
+mistfall-bot --pasta sessao
+```
+
+Aperte **F2 dentro do jogo** para iniciar e **F3** para parar. Ha uma espera de **150 ms
+entre Voltas**, inclusive depois de um aborto rapido. A producao usa a analise sequencial
+(`concorrente=False`).
+
+Cada Volta guarda `volta-NNNN/relatorio.json`. O bloco `tempos`, em milissegundos, traz
+`captura_pre_voo`, `gravacao_pre_voo`, `estado`, `ouro`, `varredura_total`, `itens`,
+`preparo_folha`, `tesseract_precos`, `analise_inicial_parede`, `conferencia_e_decisao`,
+`pausa_antes_do_clique`, `clique`, `espera_modal` e `espaco`.
+
+Na raiz da sessao, `telemetria-ouro.jsonl` registra a observacao do frame inicial de cada
+Volta, inclusive `null`. `tempos-do-laco.jsonl` registra o instante do proximo inicio,
+`espera_efetiva_ms` e `intervalo_entre_inicios_ms`. Os dois sao observacionais e nunca
+interrompem o laco.
+
+`trabalhadores` continua dormente: mudar a chave nao altera o bot. O modo experimental usa
+duas threads, uma para Ouro e outra para Listagens, mas elas nao consultam essa configuracao
+nem dividem a folha em 12 OCRs. Os 12 recortes continuam empilhados em uma unica chamada ao
+tesseract.
+
+## Benchmark que decide a concorrencia
+
+Com o jogo aberto e uma sessao trazida de volta, rode no Windows:
+
+```powershell
+python -m ferramentas.benchmark_analise --pasta sessao --repeticoes 3
+```
+
+Confirme `resultados_iguais: true` e compare mediana, p95 e maximo de `sequencial` e
+`concorrente`. E esse resultado no Windows, com o jogo aberto, que decide se a concorrencia
+fica ativa. Resultado local no Mac nao decide o padrao operacional; ate essa validacao,
+producao continua sequencial.
 
 ## O que trazer de volta
 
-1. As tres pastas de execucao, inteiras.
-2. O codigo de saida de cada uma das tres.
+1. As tres pastas de execucao e a pasta da sessao, inteiras.
+2. O codigo de saida de cada execucao e o que foi observado no jogo.
 3. O `espera_do_modal_ms` de cada pasta, e se aquele valor bastou. E o numero em calibracao:
    pequeno demais e o Espaco chega antes de a Janela abrir.
-4. Qual dos tres desfechos aconteceu na execucao sem administrador.
-5. Se comprou: o Ouro antes e depois, e se a queda bateu com o Preco-unitario da
-   Listagem escolhida. Com o modal fora do caminho, essa e a unica conferencia que
-   sobrou — e ela acontece depois do Espaco.
+4. Na execucao sem administrador, o codigo e se o clique e o Espaco produziram efeito.
+5. Os dois JSONL, os relatorios das Voltas e a saida do benchmark. A partir deles, calcule
+   tentativas por minuto, mediana/p95 de `analise_inicial_parede`, tempos dos ramos e
+   intervalo entre inicios.

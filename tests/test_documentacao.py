@@ -2,6 +2,7 @@ import pathlib
 
 CONTEXT = pathlib.Path("CONTEXT.md").read_text(encoding="utf-8")
 README = pathlib.Path("README.md").read_text(encoding="utf-8")
+EXECUCAO_WINDOWS = pathlib.Path("docs/execucao-windows.md").read_text(encoding="utf-8")
 LEILAO = pathlib.Path("src/mistfall/leilao.py").read_text(encoding="utf-8")
 PRECOS = pathlib.Path("src/mistfall/precos.py").read_text(encoding="utf-8")
 
@@ -106,6 +107,21 @@ def test_o_readme_documenta_as_teclas():
     assert "mistfall-bot" in README
     assert "Aperte **F2** dentro do jogo" in README
     assert "**F3** para parar" in README
+
+
+def test_readme_diz_que_ouro_nao_bloqueia_e_documenta_telemetria():
+    minusculo = README.lower()
+    assert "telemetria-ouro.jsonl" in README
+    assert "tempos-do-laco.jsonl" in README
+    assert "não confirma" in minusculo or "nao confirma" in minusculo
+    assert "benchmark_analise" in README
+
+
+def test_documentacao_viva_nao_promete_codigo_3_ou_confirmacao_do_ouro():
+    textos = README + EXECUCAO_WINDOWS
+    assert "OURO NAO CAIU" not in textos
+    assert "confirmacao_do_ouro" not in textos
+    assert "| `3` |" not in textos
 
 
 def test_o_readme_avisa_que_f3_e_o_unico_freio_do_ouro():

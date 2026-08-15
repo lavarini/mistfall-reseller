@@ -5,10 +5,12 @@ valor desejado, para revendê-los com lucro.
 
 ## Como funciona
 
-Entrada: um print da tela em 2560×1440. Saída: a decisão de qual Listagem comprar, e a Compra.
+Entrada: um print da tela em 2560×1440. Saída: a decisão de qual Listagem comprar e, quando
+ela existe, o envio dos comandos da Compra.
 
 1. Confere que a tela é a lista do Leilão, em Material de Construção
-2. Lê o Ouro
+2. No mesmo frame inicial, observa o Ouro e começa a varrer as Listagens. Em produção esses
+   dois ramos rodam sequencialmente
 3. Recorta os 12 slots por coordenada fixa e identifica o item de cada um por **template
    matching do ícone** — não por OCR do nome, que é fonte estilizada
 4. Lê o **Preço-unitário** dos 12 slots por OCR, numa **chamada só**: os recortes vão
@@ -16,9 +18,10 @@ Entrada: um print da tela em 2560×1440. Saída: a decisão de qual Listagem com
    posição vertical
 5. Entre as Listagens que estão **exatamente** no Preço-alvo, sorteia uma. Preço abaixo do
    Preço-alvo é leitura suspeita, não pechincha: vai para o `relatorio.json`, não gera Compra
-6. Clica, espera um tempo sorteado numa faixa curta para a **Janela de Confirmação**
-   abrir, e aperta **Espaço**
-7. Confirma que o Ouro caiu **exatamente** o Preço-unitário da Listagem escolhida
+6. Espera entre 50 e 150 ms, clica, espera entre 80 e 120 ms para a **Janela de
+   Confirmação** abrir, e aperta **Espaço**
+7. Registra `compra_enviada`: clique e Espaço foram enviados. Esse desfecho **não confirma**
+   que a Compra aconteceu
 
 **A Janela de Confirmação não é conferida.** Ela não é detectada, não é capturada e não é
 lida — o passo 6 é uma espera e uma tecla. A conferência existia e foi desativada: ela nunca
@@ -28,14 +31,13 @@ O porquê, o que isso deixa descoberto e o que continua cobrindo estão no
 
 O que protege agora vive **antes** do clique: só é comprável o preço **exatamente** igual ao
 Preço-alvo, e a conferência de ordenação invalida preço fora da ordem crescente. Depois do
-clique sobra uma conferência só, a do passo 7 — ela não impede a Compra errada, mas não deixa
-ela passar calada.
+Espaço não há nova captura nem conferência. O Ouro do frame inicial é telemetria
+**observacional**: mesmo ilegível, ele nunca bloqueia a Volta nem muda a decisão de Compra.
 
-Velocidade não era requisito enquanto era uma Compra e para. Com a conferência do modal fora
-do caminho, a espera do passo 6 é o único tempo morto que restou. Ela é **sorteada** a cada
-Compra, entre o valor calibrado e 1,5× ele, para o ritmo não sair sempre idêntico — o piso é
-`--espera-modal`, e o sorteio vai só para cima dele: variar para baixo do calibrado perde
-Compra.
+As duas esperas do passo 6 são **sorteadas** a cada Compra para o ritmo não sair sempre
+idêntico. `--espera-modal` ajusta o piso da espera entre o clique e o Espaço e conserva a
+proporção de 1,5× até o teto. O laço ainda espera 150 ms entre o fim de uma Volta e o início
+da próxima, inclusive depois de um aborto rápido.
 
 ## Onde roda
 
@@ -146,7 +148,8 @@ mistfall-bot --pasta sessao
 
 Aperte **F2** dentro do jogo para começar e **F3** para parar. Cada Volta imprime uma linha
 no console e guarda a própria pasta; as Voltas sem nada comprável descartam os prints e
-mantêm só o relatório.
+mantêm só o relatório. O fecho informa `Compras enviadas`: cada uma significa apenas que o
+clique e o Espaço foram enviados, não que o jogo confirmou a Compra.
 
 Não há piso de Ouro: o bot compra enquanto houver Listagem no Preço-alvo e Ouro na conta, e
 o único freio é o F3.
@@ -155,19 +158,27 @@ o único freio é o F3.
 
 | Código | Significado |
 |--------|-------------|
-| `0` | Correu como esperado: comprou, simulou, ou não havia nada comprável |
-| `1` | Abortou por segurança — tela que ele não entendeu, ou Ouro ilegível |
+| `0` | Correu como esperado: enviou a Compra, simulou, ou não havia nada comprável |
+| `1` | Abortou por segurança — por exemplo, tela que ele não entendeu |
 | `2` | Problema de ambiente: resolução errada, tesseract ausente, config inválida |
-| `3` | Apertou Espaço e o **Ouro não se moveu** |
-
-O `3` existe para não confundir "o Espaço não registrou" com uma Compra confirmada.
 
 ### O que fica na pasta de execução
 
 Cada captura do caminho vira PNG numerado, mais um `relatorio.json` com tudo que o bot leu —
-inclusive quando ele aborta, e inclusive se algo explodir no meio. Traz também o tempo de cada
-etapa (`pre_voo`, `varredura`, `modal`, `confirmacao_do_ouro`), em milissegundos. Se der
-errado, é essa pasta que diagnostica.
+inclusive quando ele aborta, e inclusive se algo explodir no meio. O bloco `tempos`, em
+milissegundos, separa `captura_pre_voo`, `gravacao_pre_voo`, `estado`, `ouro`,
+`varredura_total`, `itens`, `preparo_folha`, `tesseract_precos`,
+`analise_inicial_parede`, `conferencia_e_decisao`, `pausa_antes_do_clique`, `clique`,
+`espera_modal` e `espaco`.
+
+Na raiz da sessão há ainda dois JSONL incrementais:
+
+- `telemetria-ouro.jsonl` registra, em cada Volta, o Ouro observado no frame inicial, inclusive
+  `null`, com número da Volta, horário e instante monotônico;
+- `tempos-do-laco.jsonl` registra a Volta encerrada, o instante do próximo início, a
+  `espera_efetiva_ms` e o `intervalo_entre_inicios_ms`.
+
+Esses arquivos servem para medir a sessão depois; nenhuma linha deles bloqueia o laço.
 
 ## Configuração
 
@@ -195,8 +206,9 @@ paralelizar. E as três leituras da Janela de Confirmação saíram do caminho j
 conferência do modal, pelo [ADR-0003](docs/adr/0003-nao-conferir-a-janela-de-confirmacao.md).
 
 A chave e o helper (`src/mistfall/paralelo.py`) continuam no código de propósito, não por
-esquecimento: a leitura em folha única e a espera cega no modal são as duas experimentais, e
-manter o paralelismo permite voltar atrás sem reconstruir nada. A
+esquecimento. Há um modo experimental com duas threads, uma para observar Ouro e outra para
+varrer Listagens, mas elas **não usam** `trabalhadores` e não dividem a folha em 12 OCRs. A
+folha continua inteira numa única chamada ao tesseract. A
 [#20](https://github.com/lavarini/mistfall-reseller/issues/20) decide se ele fica ou sai, e o
 que o traria de volta.
 
@@ -214,6 +226,19 @@ entre as linhas, onde antes julgava cada recorte sozinho.
 ```
 
 Todos os testes rodam no Mac sem o jogo aberto.
+
+### Benchmark da análise inicial
+
+Com uma sessão que contenha `volta-*/00-pre-voo.png`:
+
+```powershell
+python -m ferramentas.benchmark_analise --pasta sessao --repeticoes 3
+```
+
+O comando compara o modo sequencial com o modo experimental de duas threads e exige
+`resultados_iguais: true`; também imprime mediana, p95 e máximo. O padrão de produção continua
+`concorrente=False`. Somente o benchmark no Windows, com o jogo aberto, decide se a
+concorrência ficará ativa; o resultado local no Mac não decide essa ativação.
 
 ### Ferramentas de bancada
 
