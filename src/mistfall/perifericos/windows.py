@@ -102,8 +102,10 @@ class InterruptorWindows:
 
     def __init__(self, intervalo: float = 0.05) -> None:
         self._intervalo = intervalo
+        self._parada_pedida = False
 
     def esperar_inicio(self) -> None:
+        self._parada_pedida = False
         # A primeira leitura descarta o trinco acumulado: sem ela, um F2
         # apertado antes de o bot subir faria o laco comecar sozinho.
         _tecla_foi_pressionada(VK_F2)
@@ -111,7 +113,10 @@ class InterruptorWindows:
             time.sleep(self._intervalo)
 
     def pediram_parada(self) -> bool:
-        return _tecla_foi_pressionada(VK_F3)
+        self._parada_pedida = (
+            self._parada_pedida or _tecla_foi_pressionada(VK_F3)
+        )
+        return self._parada_pedida
 
 
 def _mouse(dwFlags: int, dx: int = 0, dy: int = 0) -> _INPUT:

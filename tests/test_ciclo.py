@@ -35,12 +35,13 @@ class _PilotoFalso:
 
 
 class _ResetFalso:
-    def __init__(self) -> None:
+    def __init__(self, funcionou: bool = True) -> None:
         self.categorias: list[CategoriaAlternativa] = []
+        self.funcionou = funcionou
 
     def __call__(self, tela, mao, ritmo=None, categoria_alternativa=None) -> bool:
         self.categorias.append(categoria_alternativa)
-        return True
+        return self.funcionou
 
 
 def _comprou(preco: int = 200) -> Resultado:
@@ -48,8 +49,10 @@ def _comprou(preco: int = 200) -> Resultado:
                      preco_total_esperado=preco)
 
 
-def _rodar(monkeypatch, tmp_path, roteiro, parar_na_pergunta):
-    piloto, reset = _PilotoFalso(roteiro), _ResetFalso()
+def _rodar(monkeypatch, tmp_path, roteiro, parar_na_pergunta,
+           reset_funcionou=True):
+    piloto = _PilotoFalso(roteiro)
+    reset = _ResetFalso(funcionou=reset_funcionou)
     monkeypatch.setattr("mistfall.ciclo.executar", piloto)
     monkeypatch.setattr("mistfall.ciclo.resetar_categoria", reset)
     sessao = executar_ciclo(
@@ -82,10 +85,32 @@ def test_o_laco_roda_ate_a_parada(monkeypatch, tmp_path):
     assert sessao.voltas == 3
 
 
+def test_o_laco_encerra_quando_o_piloto_devolve_parou(monkeypatch, tmp_path):
+    sessao, piloto, _ = _rodar(
+        monkeypatch, tmp_path, [Resultado(Desfecho.PAROU)],
+        parar_na_pergunta=3)
+    assert piloto.chamadas == 1
+    assert sessao.voltas == 1
+
+
 def test_nada_compravel_dispara_reset(monkeypatch, tmp_path):
     _, _, reset = _rodar(monkeypatch, tmp_path,
                          [Resultado(Desfecho.NADA_COMPRAVEL)], parar_na_pergunta=2)
     assert reset.categorias == [CategoriaAlternativa.FORJA]
+
+
+def test_reset_que_falha_avisa_preserva_print_e_nao_avanca(
+        monkeypatch, tmp_path, capsys):
+    _, _, reset = _rodar(
+        monkeypatch, tmp_path,
+        [Resultado(Desfecho.NADA_COMPRAVEL)] * 2,
+        parar_na_pergunta=3, reset_funcionou=False)
+
+    saida = capsys.readouterr().out
+    assert saida.count("-> Reset falhou (forja)") == 2
+    assert reset.categorias == [CategoriaAlternativa.FORJA] * 2
+    assert (tmp_path / "volta-0001" / "00-pre-voo.png").exists()
+    assert (tmp_path / "volta-0002" / "00-pre-voo.png").exists()
 
 
 @pytest.mark.parametrize("desfecho", [
@@ -145,6 +170,26 @@ def test_volta_de_rotina_mantem_o_relatorio(monkeypatch, tmp_path):
 def test_volta_interessante_guarda_os_prints(monkeypatch, tmp_path, desfecho):
     _rodar(monkeypatch, tmp_path, [Resultado(desfecho)], parar_na_pergunta=2)
     assert (tmp_path / "volta-0001" / "00-pre-voo.png").exists()
+
+
+def test_so_o_primeiro_aborto_consecutivo_com_o_mesmo_motivo_guarda_print(
+        monkeypatch, tmp_path):
+    roteiro = [
+        Resultado(Desfecho.OURO_NAO_CAIU),
+        Resultado(Desfecho.ABORTOU, motivo="janela aberta"),
+        Resultado(Desfecho.ABORTOU, motivo="janela aberta"),
+        Resultado(Desfecho.ABORTOU, motivo="tela errada"),
+    ]
+    _rodar(monkeypatch, tmp_path, roteiro, parar_na_pergunta=5)
+
+    assert [
+        (tmp_path / f"volta-{numero:04d}" / "00-pre-voo.png").exists()
+        for numero in range(1, 5)
+    ] == [True, True, False, True]
+    assert all(
+        (tmp_path / f"volta-{numero:04d}" / "relatorio.json").exists()
+        for numero in range(1, 5)
+    )
 
 
 import unicodedata

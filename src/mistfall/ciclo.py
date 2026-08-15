@@ -67,7 +67,8 @@ def texto_do_console(texto: str) -> str:
 
 def linha_da_volta(numero: int, resultado: Resultado,
                    resetou: CategoriaAlternativa | None,
-                   relogio: str) -> str:
+                   relogio: str,
+                   reset_falhou: CategoriaAlternativa | None = None) -> str:
     # Sem default no lookup: desfecho novo tem de estourar aqui, e nao virar
     # uma linha muda no meio de uma sessao longa.
     # Quatro digitos, como a pasta da Volta: a ~7 s por Volta, mil Voltas sao
@@ -82,6 +83,8 @@ def linha_da_volta(numero: int, resultado: Resultado,
         partes.append(f"Ouro {resultado.ouro_antes} -> {resultado.ouro_depois}")
     if resetou is not None:
         partes.append(f"-> Reset ({resetou.value})")
+    if reset_falhou is not None:
+        partes.append(f"-> Reset falhou ({reset_falhou.value})")
     if resultado.motivo:
         partes.append(texto_do_console(resultado.motivo))
 
@@ -103,6 +106,9 @@ def executar_ciclo(tela: Tela, mao: Mao, config: Config, pasta: Path,
 
     sessao = Sessao()
     categorias = itertools.cycle(ALTERNANCIA)
+    proxima_categoria = next(categorias)
+    sem_aborto_anterior = object()
+    ultimo_motivo_de_aborto: str | object = sem_aborto_anterior
     pasta = Path(pasta)
 
     while not interruptor.pediram_parada():
@@ -113,15 +119,38 @@ def executar_ciclo(tela: Tela, mao: Mao, config: Config, pasta: Path,
         _contabilizar(sessao, resultado)
 
         resetou = None
+        reset_falhou = None
         if resultado.desfecho is Desfecho.NADA_COMPRAVEL:
-            resetou = next(categorias)
-            resetar_categoria(tela, mao, ritmo, categoria_alternativa=resetou)
+            if resetar_categoria(
+                tela, mao, ritmo, categoria_alternativa=proxima_categoria
+            ):
+                resetou = proxima_categoria
+                proxima_categoria = next(categorias)
+            else:
+                reset_falhou = proxima_categoria
 
-        if resultado.desfecho not in DESFECHOS_QUE_VALEM_PRINT:
+        aborto_repetido = (
+            resultado.desfecho is Desfecho.ABORTOU
+            and ultimo_motivo_de_aborto == resultado.motivo
+        )
+        volta_de_rotina = (
+            resultado.desfecho not in DESFECHOS_QUE_VALEM_PRINT
+            and reset_falhou is None
+        )
+        if aborto_repetido or volta_de_rotina:
             _descartar_os_prints(pasta_da_volta)
 
+        if resultado.desfecho is Desfecho.ABORTOU:
+            ultimo_motivo_de_aborto = resultado.motivo
+        else:
+            ultimo_motivo_de_aborto = sem_aborto_anterior
+
         print(linha_da_volta(sessao.voltas, resultado, resetou,
-                             time.strftime("%H:%M:%S")), flush=True)
+                             time.strftime("%H:%M:%S"), reset_falhou),
+              flush=True)
+
+        if resultado.desfecho is Desfecho.PAROU:
+            break
 
         time.sleep(ritmo.espera_entre_voltas)
 

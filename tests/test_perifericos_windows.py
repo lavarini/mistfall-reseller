@@ -222,3 +222,14 @@ def test_pediram_parada_le_o_f3(monkeypatch):
 def test_pediram_parada_e_falso_sem_f3(monkeypatch):
     monkeypatch.setattr(windows, "_tecla_foi_pressionada", lambda vk: False)
     assert windows.InterruptorWindows().pediram_parada() is False
+
+
+def test_a_parada_fica_pedida_depois_que_o_trinco_e_consumido(monkeypatch):
+    respostas = iter([False, True, False])
+    monkeypatch.setattr(windows, "_tecla_foi_pressionada",
+                        lambda vk: next(respostas))
+    interruptor = windows.InterruptorWindows()
+
+    assert [interruptor.pediram_parada() for _ in range(3)] == [
+        False, True, True,
+    ]

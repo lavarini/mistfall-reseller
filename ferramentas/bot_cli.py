@@ -48,12 +48,12 @@ def _rodar(args: argparse.Namespace) -> int:
         RITMO_PADRAO, espera_para_o_modal_abrir=(piso, piso * 1.5))
 
     print("aperte F2 no jogo para comecar, F3 para parar", flush=True)
-    sessao = executar_ciclo(
+    executar_ciclo(
         TelaWindows(), MaoWindows(), config, Path(args.pasta),
         InterruptorWindows(), ritmo=ritmo,
     )
     print(f"pastas das Voltas em {args.pasta}")
-    return 0 if sessao.voltas else 1
+    return 0
 
 
 if __name__ == "__main__":
