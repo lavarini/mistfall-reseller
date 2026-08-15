@@ -119,8 +119,12 @@ def test_readme_diz_que_ouro_nao_bloqueia_e_documenta_telemetria():
 
 def test_documentacao_limita_telemetria_de_ouro_a_tela_lista():
     assert "cada Volta cuja tela inicial é LISTA" in " ".join(README.split())
-    assert "cada Volta cuja tela inicial e LISTA" in " ".join(
-        EXECUCAO_WINDOWS.split()
+    execucao_windows = " ".join(EXECUCAO_WINDOWS.split())
+    assert "cada Volta cuja tela inicial e LISTA" in execucao_windows
+    assert "O Ouro e observado uma vez, no frame inicial" not in execucao_windows
+    assert (
+        "Nas Voltas cuja tela inicial e reconhecida como LISTA, o Ouro e observado uma vez"
+        in execucao_windows
     )
 
 

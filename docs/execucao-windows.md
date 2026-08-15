@@ -159,9 +159,10 @@ Sobrou pouca coisa que aborta, e nenhuma delas olha a Janela ou a mudanca de Our
 exemplo, pre-voo em outra Categoria ou tela que nao e a lista. O `motivo` no
 `relatorio.json` diz qual.
 
-O Ouro e observado uma vez, no frame inicial, e e apenas telemetria. Uma leitura nula nunca
-bloqueia a Volta e nao muda a decisao. Depois do Espaco nao ha outra captura: o desfecho
-`compra_enviada` significa exatamente clique e Espaco enviados, nunca Compra confirmada.
+Nas Voltas cuja tela inicial e reconhecida como LISTA, o Ouro e observado uma vez, nesse
+frame inicial, e e apenas telemetria. Uma leitura nula nunca bloqueia a Volta e nao muda a
+decisao. Depois do Espaco nao ha outra captura: o desfecho `compra_enviada` significa
+exatamente clique e Espaco enviados, nunca Compra confirmada.
 
 ## Rodar o laco
 
