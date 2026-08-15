@@ -117,6 +117,24 @@ def test_readme_diz_que_ouro_nao_bloqueia_e_documenta_telemetria():
     assert "benchmark_analise" in README
 
 
+def test_documentacao_limita_telemetria_de_ouro_a_tela_lista():
+    assert "cada Volta cuja tela inicial é LISTA" in " ".join(README.split())
+    assert "cada Volta cuja tela inicial e LISTA" in " ".join(
+        EXECUCAO_WINDOWS.split()
+    )
+
+
+def test_documentacao_nao_promete_jsonl_imune_a_erro_de_io():
+    assert "nenhuma linha deles bloqueia o laço" not in README
+    assert "nunca interrompem o laco" not in EXECUCAO_WINDOWS
+    readme = " ".join(README.split())
+    execucao_windows = " ".join(EXECUCAO_WINDOWS.split())
+    assert "não participam da decisão de Compra" in readme
+    assert "não criam uma espera exclusiva" in readme
+    assert "nao participam da decisao de Compra" in execucao_windows
+    assert "nao criam uma espera exclusiva" in execucao_windows
+
+
 def test_documentacao_viva_nao_promete_codigo_3_ou_confirmacao_do_ouro():
     textos = README + EXECUCAO_WINDOWS
     assert "OURO NAO CAIU" not in textos
@@ -128,6 +146,7 @@ def test_o_readme_avisa_que_f3_e_o_unico_freio_do_ouro():
     # Sem este aviso o operador pode supor um piso e deixar o bot gastar Ouro.
     assert "Não há piso de Ouro" in README
     assert "o único freio é o F3" in README
+    assert "limitação do jogo, não uma guarda do bot" in README
 
 
 def test_o_adr_nao_diz_mais_que_o_clique_nao_foi_confirmado():

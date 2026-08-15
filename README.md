@@ -151,8 +151,8 @@ no console e guarda a própria pasta; as Voltas sem nada comprável descartam os
 mantêm só o relatório. O fecho informa `Compras enviadas`: cada uma significa apenas que o
 clique e o Espaço foram enviados, não que o jogo confirmou a Compra.
 
-Não há piso de Ouro: o bot compra enquanto houver Listagem no Preço-alvo e Ouro na conta, e
-o único freio é o F3.
+Não há piso de Ouro: enquanto houver Listagem no Preço-alvo, o bot tenta; o único freio é o F3.
+Ter saldo suficiente é uma limitação do jogo, não uma guarda do bot.
 
 ### Códigos de saída
 
@@ -173,12 +173,14 @@ milissegundos, separa `captura_pre_voo`, `gravacao_pre_voo`, `estado`, `ouro`,
 
 Na raiz da sessão há ainda dois JSONL incrementais:
 
-- `telemetria-ouro.jsonl` registra, em cada Volta, o Ouro observado no frame inicial, inclusive
-  `null`, com número da Volta, horário e instante monotônico;
+- `telemetria-ouro.jsonl` registra, em cada Volta cuja tela inicial é LISTA, o Ouro observado,
+  inclusive `null`, com número da Volta, horário e instante monotônico;
 - `tempos-do-laco.jsonl` registra a Volta encerrada, o instante do próximo início, a
   `espera_efetiva_ms` e o `intervalo_entre_inicios_ms`.
 
-Esses arquivos servem para medir a sessão depois; nenhuma linha deles bloqueia o laço.
+Esses arquivos servem para medir a sessão depois: não participam da decisão de Compra e não
+criam uma espera exclusiva. As gravações são síncronas, portanto um erro de I/O ainda pode
+encerrar a execução.
 
 ## Configuração
 

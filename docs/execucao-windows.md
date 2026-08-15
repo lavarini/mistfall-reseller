@@ -180,10 +180,11 @@ Cada Volta guarda `volta-NNNN/relatorio.json`. O bloco `tempos`, em milissegundo
 `preparo_folha`, `tesseract_precos`, `analise_inicial_parede`, `conferencia_e_decisao`,
 `pausa_antes_do_clique`, `clique`, `espera_modal` e `espaco`.
 
-Na raiz da sessao, `telemetria-ouro.jsonl` registra a observacao do frame inicial de cada
-Volta, inclusive `null`. `tempos-do-laco.jsonl` registra o instante do proximo inicio,
-`espera_efetiva_ms` e `intervalo_entre_inicios_ms`. Os dois sao observacionais e nunca
-interrompem o laco.
+Na raiz da sessao, `telemetria-ouro.jsonl` registra a observacao de cada Volta cuja tela
+inicial e LISTA, inclusive `null`. `tempos-do-laco.jsonl` registra o instante do proximo
+inicio, `espera_efetiva_ms` e `intervalo_entre_inicios_ms`. Os arquivos nao participam da
+decisao de Compra e nao criam uma espera exclusiva. As gravacoes sao sincronas, portanto um
+erro de I/O ainda pode encerrar a execucao.
 
 `trabalhadores` continua dormente: mudar a chave nao altera o bot. O modo experimental usa
 duas threads, uma para Ouro e outra para Listagens, mas elas nao consultam essa configuracao
