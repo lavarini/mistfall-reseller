@@ -41,3 +41,9 @@ def test_o_entry_point_do_bot_existe():
     import tomllib, pathlib
     dados = tomllib.loads(pathlib.Path("pyproject.toml").read_text(encoding="utf-8"))
     assert dados["project"]["scripts"]["mistfall-bot"] == "ferramentas.bot_cli:main"
+
+
+def test_o_entry_point_da_venda_existe():
+    import tomllib, pathlib
+    dados = tomllib.loads(pathlib.Path("pyproject.toml").read_text(encoding="utf-8"))
+    assert dados["project"]["scripts"]["mistfall-venda"] == "ferramentas.venda_cli:main"

@@ -84,3 +84,25 @@ O par de teclas com que o operador liga e desliga o bot: F2 começa, F3 para. É
 fronteira de IO, ao lado da Tela e da Mão, e o F3 é consultado antes de cada clique e
 durante a espera pelo Ouro — nunca entre o clique e o Espaço, onde já não há o que abortar.
 _Avoid_: Hotkey, Atalho, Tecla de pânico.
+
+**Venda**:
+A ação de criar uma Listagem a partir de um stack de 3 unidades de um Item-alvo no
+Armazém. Uma Venda consome uma posição da Capacidade de Venda. O bot preenche o Preço
+de Venda e a Quantidade 3 na Janela de Confirmação e aperta Espaço.
+_Avoid_: Transação, Publicação.
+
+**Preço de Venda**:
+O Preço-unitário fixo pelo qual um Item-alvo é listado. Vem de `[precos_venda]` e não
+é inferido da Tendência de Mercado nem relido da Janela de Confirmação.
+_Avoid_: Preço sugerido, Menor preço.
+
+**Capacidade de Venda**:
+O par `X/Y` mostrado em "Listar para Venda X/Y": `X` são as posições ocupadas e `Y`
+é o limite atual do NPC. Ambos são lidos da tela porque o limite muda com o nível do
+NPC e pode resetar entre seasons.
+_Avoid_: Limite configurado, Vagas fixas.
+
+**Baú**:
+Uma das quatro abas do Armazém abaixo do título "Armazém". O ciclo de Venda começa no
+Baú selecionado, processa sua imagem uma vez e avança somente para a direita.
+_Avoid_: Stash, Página, Guia.

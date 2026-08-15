@@ -123,3 +123,19 @@ def test_o_adr_nao_diz_mais_que_o_clique_nao_foi_confirmado():
     assert ("continua sem observação é o **Espaço**" in adr
             and "nenhuma Compra jamais completou" in adr)
     assert "Se administrador é necessário para alguma coisa também segue em aberto." in adr
+
+
+def test_o_glossario_define_o_fluxo_de_venda():
+    for termo in ("**Venda**", "**Preço de Venda**", "**Capacidade de Venda**", "**Baú**"):
+        assert termo in CONTEXT
+
+
+def test_o_readme_documenta_a_capacidade_lida_da_tela():
+    assert "mistfall-venda" in README
+    assert "Capacidade de Venda vem sempre de `X/Y` na tela" in README
+    assert "não existe limite fixo" in README
+
+
+def test_o_readme_diz_que_cada_bau_e_processado_uma_vez():
+    assert "Cada Baú é processado uma vez" in README
+    assert "avança somente para a direita" in README

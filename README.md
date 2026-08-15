@@ -151,6 +151,30 @@ mantêm só o relatório.
 Não há piso de Ouro: o bot compra enquanto houver Listagem no Preço-alvo e Ouro na conta, e
 o único freio é o F3.
 
+### Vender stacks de três
+
+Abra o Leilão na aba **Vender**, selecione **Armazém** e deixe aberto o Baú de onde o
+bot deve começar. Então rode:
+
+```bash
+mistfall-venda --pasta sessao-venda
+# equivalente quando Scripts não está no PATH:
+python -m ferramentas.venda_cli --pasta sessao-venda
+```
+
+Aperte **F2** dentro do jogo para começar e **F3** para parar. O comando identifica os
+Itens-alvo no Baú atual e cria uma Listagem para cada stack cuja quantidade seja
+exatamente `3`. Cada Baú é processado uma vez; depois ele avança somente para a direita
+e encerra no quarto Baú.
+
+A Capacidade de Venda vem sempre de `X/Y` na tela. O bot relê os dois números depois de
+cada Venda e para quando `X == Y`; não existe limite fixo nem opção de linha de comando
+para substituí-lo.
+
+Na Janela de Confirmação, o bot usa `Ctrl+A` para preencher o Preço de Venda configurado
+e a Quantidade `3`, e confirma com Espaço. Ele reconhece a abertura e o fechamento da
+Janela, mas não relê os campos digitados nem usa a Tendência de Mercado.
+
 ### Códigos de saída
 
 | Código | Significado |
@@ -184,7 +208,19 @@ dragao = 246
 orbe = 253
 rede = 260
 codice = 281
+
+[precos_venda]
+broche = 226
+adaga = 240
+lanterna = 281
+dragao = 295
+orbe = 304
+rede = 312
+codice = 338
 ```
+
+`[precos_venda]` traz o Preço de Venda fixo dos sete Itens-alvo. A Compra continua
+usando `[precos_alvo]`; o comando de Venda exige os sete valores de `[precos_venda]`.
 
 `trabalhadores` controlava quantos OCRs rodavam em paralelo. Hoje **não controla nada**: a chave
 está dormente, e mexer nela não muda o comportamento do bot.
