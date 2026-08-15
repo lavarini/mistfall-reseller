@@ -170,18 +170,6 @@ def test_cli_imprime_o_tempo_de_cada_etapa(monkeypatch, capsys, tmp_path):
     assert "varredura: 456.7" in saida
 
 
-test_todo_desfecho_tem_codigo_de_saida_pelo_resultado = (
-    test_todo_desfecho_tem_codigo_de_saida
-)
-
-
-def test_todo_desfecho_tem_codigo_de_saida():
-    # O mapa foi escrito sem default de proposito: desfecho novo sem codigo
-    # tem de estourar, nao sair 0 e virar indistinguivel de sucesso.
-    for desfecho in Desfecho:
-        assert desfecho in CODIGO_POR_DESFECHO
-
-
 def test_parada_pedida_sai_com_zero():
     # F3 e decisao do operador, nao falha do bot.
     assert CODIGO_POR_DESFECHO[Desfecho.PAROU] == 0
