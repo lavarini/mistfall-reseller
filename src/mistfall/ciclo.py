@@ -21,6 +21,18 @@ from mistfall.perifericos.protocolos import Interruptor, Mao, Tela
 from mistfall.piloto import RITMO_PADRAO, Desfecho, Resultado, Ritmo, executar
 from mistfall.reset import CategoriaAlternativa, resetar_categoria
 
+# Sem acento e sem cor. O projeto inteiro escreve saida de console assim, por
+# causa da pagina de codigo do console do Windows: um mojibake na unica
+# superficie que o operador ve enquanto o bot roda custa caro e nao avisa.
+ROTULO_POR_DESFECHO = {
+    Desfecho.COMPROU: "comprou",
+    Desfecho.NADA_COMPRAVEL: "nada",
+    Desfecho.OURO_NAO_CAIU: "OURO NAO CAIU",
+    Desfecho.ABORTOU: "abortou",
+    Desfecho.SIMULOU: "simulou",
+    Desfecho.PAROU: "parou",
+}
+
 # A ordem e a alternancia: um Reset usa uma Categoria alternativa, e o
 # proximo usa a outra. Nunca as duas no mesmo Reset.
 ALTERNANCIA = (CategoriaAlternativa.FORJA, CategoriaAlternativa.CHAVE)
@@ -45,6 +57,37 @@ class Sessao:
     ouro_gasto: int = 0
 
 
+def linha_da_volta(numero: int, resultado: Resultado,
+                   resetou: CategoriaAlternativa | None,
+                   relogio: str) -> str:
+    # Sem default no lookup: desfecho novo tem de estourar aqui, e nao virar
+    # uma linha muda no meio de uma sessao longa.
+    # Quatro digitos, como a pasta da Volta: a ~7 s por Volta, mil Voltas sao
+    # duas horas de sessao, e tres digitos estourariam antes do fim do dia.
+    partes = [f"[{numero:04d}]", relogio, ROTULO_POR_DESFECHO[resultado.desfecho]]
+
+    if resultado.desfecho is Desfecho.COMPROU and resultado.listagem is not None:
+        item = resultado.listagem.item
+        partes.append(item.value if item is not None else "?")
+        partes.append(f"{resultado.listagem.preco_unitario}g")
+    if resultado.ouro_antes is not None and resultado.ouro_depois is not None:
+        partes.append(f"Ouro {resultado.ouro_antes} -> {resultado.ouro_depois}")
+    if resetou is not None:
+        partes.append(f"-> Reset ({resetou.value})")
+    if resultado.motivo:
+        partes.append(resultado.motivo)
+
+    return "  ".join(partes)
+
+
+def linhas_do_fecho(sessao: Sessao) -> list[str]:
+    return [
+        "",
+        f"parado. {sessao.voltas} Voltas, {sessao.compras} Compras, "
+        f"{sessao.ouro_gasto} de Ouro gasto",
+    ]
+
+
 def executar_ciclo(tela: Tela, mao: Mao, config: Config, pasta: Path,
                    interruptor: Interruptor, ritmo: Ritmo = RITMO_PADRAO,
                    sorteio: random.Random | None = None) -> Sessao:
@@ -60,14 +103,22 @@ def executar_ciclo(tela: Tela, mao: Mao, config: Config, pasta: Path,
         resultado = executar(tela, mao, config, pasta_da_volta, ritmo=ritmo,
                              sorteio=sorteio, interruptor=interruptor)
         _contabilizar(sessao, resultado)
+
+        resetou = None
+        if resultado.desfecho is Desfecho.NADA_COMPRAVEL:
+            resetou = next(categorias)
+            resetar_categoria(tela, mao, ritmo, categoria_alternativa=resetou)
+
         if resultado.desfecho not in DESFECHOS_QUE_VALEM_PRINT:
             _descartar_os_prints(pasta_da_volta)
 
-        if resultado.desfecho is Desfecho.NADA_COMPRAVEL:
-            resetar_categoria(tela, mao, ritmo,
-                              categoria_alternativa=next(categorias))
+        print(linha_da_volta(sessao.voltas, resultado, resetou,
+                             time.strftime("%H:%M:%S")), flush=True)
 
         time.sleep(ritmo.espera_entre_voltas)
+
+    for linha in linhas_do_fecho(sessao):
+        print(linha, flush=True)
 
     return sessao
 

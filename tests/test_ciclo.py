@@ -145,3 +145,73 @@ def test_volta_de_rotina_mantem_o_relatorio(monkeypatch, tmp_path):
 def test_volta_interessante_guarda_os_prints(monkeypatch, tmp_path, desfecho):
     _rodar(monkeypatch, tmp_path, [Resultado(desfecho)], parar_na_pergunta=2)
     assert (tmp_path / "volta-0001" / "00-pre-voo.png").exists()
+
+
+import unicodedata
+
+from mistfall.ciclo import linha_da_volta, linhas_do_fecho
+from mistfall.tipos import ItemAlvo, Listagem
+
+
+def _sem_acento(texto: str) -> bool:
+    return texto == unicodedata.normalize("NFKD", texto).encode(
+        "ascii", "ignore").decode("ascii")
+
+
+def test_a_linha_da_compra_mostra_item_preco_e_ouro():
+    listagem = Listagem(linha=0, coluna=0, item=ItemAlvo.BROCHE,
+                        preco_unitario=200)
+    linha = linha_da_volta(
+        1, Resultado(Desfecho.COMPROU, listagem=listagem, ouro_antes=59227,
+                     ouro_depois=59027), None, "23:47:12")
+    assert "[0001]" in linha
+    assert "23:47:12" in linha
+    assert "comprou" in linha
+    assert "200" in linha
+    assert "59227" in linha and "59027" in linha
+
+
+def test_a_linha_do_nada_compravel_diz_para_onde_resetou():
+    linha = linha_da_volta(2, Resultado(Desfecho.NADA_COMPRAVEL),
+                           CategoriaAlternativa.FORJA, "23:47:19")
+    assert "Reset" in linha and "forja" in linha
+
+
+def test_a_linha_do_ouro_nao_caiu_grita():
+    # E o desfecho mais provavel da primeira execucao real (#9): tem de
+    # saltar aos olhos numa tela que rola sozinha.
+    linha = linha_da_volta(4, Resultado(Desfecho.OURO_NAO_CAIU,
+                                        motivo="o Ouro nao se moveu"),
+                           None, "23:47:33")
+    assert "OURO NAO CAIU" in linha
+
+
+def test_a_linha_do_aborto_carrega_o_motivo():
+    linha = linha_da_volta(
+        5, Resultado(Desfecho.ABORTOU, motivo="pre-voo viu janela, esperava lista"),
+        None, "23:47:40")
+    assert "esperava lista" in linha
+
+
+@pytest.mark.parametrize("desfecho", list(Desfecho))
+def test_nenhuma_linha_tem_acento(desfecho):
+    # A pagina de codigo do console do Windows: o projeto inteiro escreve
+    # saida sem acento, e esta e a unica superficie que o operador ve
+    # enquanto o bot roda.
+    linha = linha_da_volta(1, Resultado(desfecho, motivo="qualquer"),
+                           CategoriaAlternativa.CHAVE, "00:00:00")
+    assert _sem_acento(linha), linha
+
+
+def test_o_fecho_resume_a_sessao():
+    linhas = linhas_do_fecho(Sessao(voltas=12, compras=3, ouro_gasto=550))
+    texto = "\n".join(linhas)
+    assert "12" in texto and "3" in texto and "550" in texto
+    assert _sem_acento(texto)
+
+
+def test_o_laco_imprime_uma_linha_por_volta(monkeypatch, tmp_path, capsys):
+    _rodar(monkeypatch, tmp_path, [_comprou(), _comprou()], parar_na_pergunta=3)
+    saida = capsys.readouterr().out
+    assert "[0001]" in saida and "[0002]" in saida
+    assert saida.count("comprou") == 2
