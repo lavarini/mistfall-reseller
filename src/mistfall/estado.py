@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 from mistfall.geometria import conferir_resolucao
 from mistfall.tipos import EstadoTela
+from mistfall.venda_visao import eh_janela_venda, eh_tela_venda
 
 REGIAO_CENTRO = (900, 500, 1700, 950)
 
@@ -74,6 +75,12 @@ def identificar_estado(img: np.ndarray) -> EstadoTela:
     # Outra Categoria: centro normal E menu moderado.
     if _dentro_faixa(centro, CENTRO_LISTA) and _dentro_faixa(menu, MENU_OUTRA_CATEGORIA):
         return EstadoTela.OUTRA_CATEGORIA
+
+    if eh_janela_venda(img):
+        return EstadoTela.JANELA_VENDA
+
+    if eh_tela_venda(img):
+        return EstadoTela.VENDA
 
     # Qualquer outra combinacao: desconhecido.
     return EstadoTela.DESCONHECIDO

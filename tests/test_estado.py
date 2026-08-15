@@ -26,6 +26,9 @@ ESTADO_ESPERADO = {
     "janela-em-animacao-rede-260": EstadoTela.JANELA_CONFIRMACAO,
     "reset-forja": EstadoTela.OUTRA_CATEGORIA,
     "reset-chave": EstadoTela.OUTRA_CATEGORIA,
+    "venda-stash-2": EstadoTela.VENDA,
+    "venda-stash-3": EstadoTela.VENDA,
+    "modal-venda-broche": EstadoTela.JANELA_VENDA,
 }
 
 @pytest.mark.parametrize("nome,esperado", sorted(ESTADO_ESPERADO.items()))
@@ -38,13 +41,15 @@ def test_todo_print_do_corpus_tem_estado_declarado():
     do_disco = {pathlib.Path(c).stem for c in glob.glob("images/*.png")}
     assert do_disco == set(ESTADO_ESPERADO)
 
-def test_os_tres_estados_aparecem_no_corpus():
+def test_todos_os_estados_reconheciveis_aparecem_no_corpus():
     # O teste antigo se chamava "mutuamente exclusivos" e nao verificava nada
     # disso. O que da para afirmar de verdade e que o corpus exercita os tres.
     assert set(ESTADO_ESPERADO.values()) == {
         EstadoTela.LISTA,
         EstadoTela.JANELA_CONFIRMACAO,
         EstadoTela.OUTRA_CATEGORIA,
+        EstadoTela.VENDA,
+        EstadoTela.JANELA_VENDA,
     }
 
 # --- destaque na linha errada do menu -----------------------------------------

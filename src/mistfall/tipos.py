@@ -15,6 +15,8 @@ class EstadoTela(Enum):
     JANELA_CONFIRMACAO = "janela_confirmacao"
     OUTRA_CATEGORIA = "outra_categoria"
     DESCONHECIDO = "desconhecido"
+    VENDA = "venda"
+    JANELA_VENDA = "janela_venda"
 
 
 class Bau(IntEnum):

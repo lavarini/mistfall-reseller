@@ -26,6 +26,8 @@ LINHAS_ARMAZEM = 7
 
 LIMIAR_DOURADO = 0.50
 MARGEM_DOURADA = 0.20
+REGIAO_TITULO_JANELA_VENDA = (1000, 190, 1550, 300)
+REGIAO_CENTRO_JANELA_VENDA = (400, 280, 2150, 1150)
 _CONFIG_CAPACIDADE = "--psm 7 -c tessedit_char_whitelist=0123456789/"
 _CONFIG_QUANTIDADE = "--psm 13 -c tessedit_char_whitelist=0123456789"
 ESCALAS_SLOT = tuple(indice / 20 for indice in range(28, 41))
@@ -151,3 +153,15 @@ def escolher_slot_de_venda(slots: list[SlotArmazem]) -> SlotArmazem | None:
 def centro_slot_armazem(slot: SlotArmazem) -> tuple[int, int]:
     x0, y0, x1, y1 = caixa_slot_armazem(slot.linha, slot.coluna)
     return (x0 + x1) // 2, (y0 + y1) // 2
+
+
+def eh_tela_venda(img: np.ndarray) -> bool:
+    return ler_capacidade(img) is not None and ler_bau_selecionado(img) is not None
+
+
+def eh_janela_venda(img: np.ndarray) -> bool:
+    titulo = _recortar(img, REGIAO_TITULO_JANELA_VENDA)
+    centro = _recortar(img, REGIAO_CENTRO_JANELA_VENDA)
+    brilho_titulo = float(cv2.cvtColor(titulo, cv2.COLOR_BGR2GRAY).mean())
+    brilho_centro = float(cv2.cvtColor(centro, cv2.COLOR_BGR2GRAY).mean())
+    return brilho_titulo >= 25.0 and brilho_centro <= 12.0
