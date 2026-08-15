@@ -49,6 +49,18 @@ def _fechar(pasta: Path, sessao: SessaoVenda) -> None:
     )
 
 
+def _esperar_bau(tela: Tela, esperado: Bau, ritmo: RitmoVenda):
+    inicio = time.monotonic()
+    primeira = True
+    while primeira or time.monotonic() - inicio < ritmo.teto_espera_fechamento:
+        primeira = False
+        frame = tela.capturar()
+        if eh_tela_venda(frame) and ler_bau_selecionado(frame) is esperado:
+            return frame
+        time.sleep(ritmo.intervalo_entre_perguntas)
+    return None
+
+
 def executar_ciclo_venda(
     tela: Tela,
     mao: Mao,
@@ -68,6 +80,7 @@ def executar_ciclo_venda(
 
     try:
         frame = tela.capturar()
+        bau_confirmado = None
         while True:
             if not eh_tela_venda(frame):
                 return encerrar(DesfechoSessaoVenda.ABORTOU, "tela de Venda ilegivel")
@@ -79,7 +92,8 @@ def executar_ciclo_venda(
             if capacidade.ocupadas >= capacidade.limite:
                 return encerrar(DesfechoSessaoVenda.CAPACIDADE_CHEIA)
 
-            bau = ler_bau_selecionado(frame)
+            bau = bau_confirmado or ler_bau_selecionado(frame)
+            bau_confirmado = None
             if bau is None:
                 return encerrar(DesfechoSessaoVenda.ABORTOU, "Bau selecionado ilegivel")
             sessao.baus_processados.append(int(bau) + 1)
@@ -124,8 +138,14 @@ def executar_ciclo_venda(
                 return encerrar(DesfechoSessaoVenda.ARMAZEM_ESGOTADO)
             if interruptor.pediram_parada():
                 return encerrar(DesfechoSessaoVenda.PAROU)
-            mao.clicar(*centro_bau(Bau(int(bau) + 1)))
-            time.sleep(ritmo.intervalo_entre_perguntas)
-            frame = tela.capturar()
+            proximo_bau = Bau(int(bau) + 1)
+            mao.clicar(*centro_bau(proximo_bau))
+            frame = _esperar_bau(tela, proximo_bau, ritmo)
+            if frame is None:
+                return encerrar(
+                    DesfechoSessaoVenda.ABORTOU,
+                    f"Bau {int(proximo_bau) + 1} nao abriu",
+                )
+            bau_confirmado = proximo_bau
     finally:
         _fechar(pasta, sessao)

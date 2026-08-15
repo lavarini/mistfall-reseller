@@ -104,6 +104,22 @@ def test_avanca_somente_um_bau_a_direita(monkeypatch, tmp_path):
     assert sessao.baus_processados == [2, 3, 4]
 
 
+def test_espera_o_destaque_mudar_antes_de_processar_o_proximo_bau(monkeypatch, tmp_path):
+    # A primeira captura depois do clique ainda mostra o segundo Bau. Processa-la
+    # de novo venderia candidatos antigos; o ciclo precisa esperar o terceiro.
+    baus = iter([Bau.SEGUNDO, Bau.SEGUNDO, Bau.TERCEIRO, Bau.QUARTO])
+    monkeypatch.setattr("mistfall.ciclo_venda.ler_capacidade", lambda _: CapacidadeVenda(0, 12))
+    monkeypatch.setattr("mistfall.ciclo_venda.ler_bau_selecionado", lambda _: next(baus))
+    monkeypatch.setattr("mistfall.ciclo_venda.varrer_armazem", lambda _: [])
+    sessao = executar_ciclo_venda(
+        TelaFalsa([STASH]), MaoFalsa(), config(), tmp_path,
+        InterruptorFalso(), dataclasses.replace(
+            RitmoVenda.instantaneo(), teto_espera_fechamento=1.0
+        ),
+    )
+    assert sessao.baus_processados == [2, 3, 4]
+
+
 def test_limite_novo_substitui_o_anterior(monkeypatch, tmp_path):
     slot = SlotArmazem(0, 0, ItemAlvo.BROCHE, 3)
     capacidades = iter([CapacidadeVenda(1, 12), CapacidadeVenda(2, 20)])
