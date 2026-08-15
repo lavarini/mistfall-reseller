@@ -90,20 +90,36 @@ def test_o_readme_diz_que_trabalhadores_esta_dormente():
 
 
 def test_o_glossario_define_volta():
+    # O titulo sozinho nao define o termo nem guarda os sinonimos rejeitados.
     assert "**Volta**" in CONTEXT
+    assert "_Avoid_: Iteração, Ciclo, Rodada." in CONTEXT
 
 
 def test_o_glossario_define_interruptor():
+    # O titulo sozinho nao define o termo nem guarda os sinonimos rejeitados.
     assert "**Interruptor**" in CONTEXT
+    assert "_Avoid_: Hotkey, Atalho, Tecla de pânico." in CONTEXT
 
 
 def test_o_readme_documenta_as_teclas():
-    assert "F2" in README and "F3" in README
+    # As teclas precisam estar ligadas ao comando e ao contexto do jogo.
+    assert "mistfall-bot" in README
+    assert "Aperte **F2** dentro do jogo" in README
+    assert "**F3** para parar" in README
+
+
+def test_o_readme_avisa_que_f3_e_o_unico_freio_do_ouro():
+    # Sem este aviso o operador pode supor um piso e deixar o bot gastar Ouro.
+    assert "Não há piso de Ouro" in README
+    assert "o único freio é o F3" in README
 
 
 def test_o_adr_nao_diz_mais_que_o_clique_nao_foi_confirmado():
-    # A execucao real confirmou: execucao-real/01-janela.png existe, ou seja
-    # o bot clicou e a Janela abriu.
+    # Guarda o que foi confirmado e as duas perguntas que continuam abertas.
     adr = pathlib.Path("docs/adr/0001-dev-mac-run-windows.md").read_text(
         encoding="utf-8")
     assert "Que o clique com duração resolve" not in adr
+    assert "O clique com duração resolve" in adr
+    assert ("continua sem observação é o **Espaço**" in adr
+            and "nenhuma Compra jamais completou" in adr)
+    assert "Se administrador é necessário para alguma coisa também segue em aberto." in adr
