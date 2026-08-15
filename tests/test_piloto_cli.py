@@ -16,7 +16,11 @@ def test_simular_e_falso_por_padrao():
     assert montar_parser().parse_args([]).simular is False
 
 def test_resetar_e_falso_por_padrao():
-    assert montar_parser().parse_args([]).resetar is False
+    assert montar_parser().parse_args([]).resetar is None
+
+def test_resetar_sem_destino_usa_forja_e_aceita_chave():
+    assert montar_parser().parse_args(["--resetar"]).resetar == "forja"
+    assert montar_parser().parse_args(["--resetar", "chave"]).resetar == "chave"
 
 def test_resetar_nao_pode_ser_combinado_com_simulacao():
     with pytest.raises(SystemExit):
@@ -33,11 +37,34 @@ def test_resetar_executa_so_o_reset(monkeypatch, capsys):
                         lambda *_: pytest.fail("nao deveria carregar config"))
     monkeypatch.setattr(cli, "executar",
                         lambda *_a, **_k: pytest.fail("nao deveria comprar"))
-    monkeypatch.setattr(cli, "resetar_categoria", lambda *_a, **_k: True)
+    visto = {}
+
+    def reset_espiao(*_a, **kwargs):
+        visto.update(kwargs)
+        return True
+
+    monkeypatch.setattr(cli, "resetar_categoria", reset_espiao)
 
     args = montar_parser().parse_args(["--resetar"])
     assert cli._rodar(args) == 0
     assert "Reset: concluido" in capsys.readouterr().out
+    assert visto["categoria_alternativa"] is cli.CategoriaAlternativa.FORJA
+
+def test_cli_repassa_chave_ao_reset(monkeypatch):
+    import ferramentas.piloto_cli as cli
+    import mistfall.perifericos.windows as windows
+
+    monkeypatch.setattr(windows, "TelaWindows", type("T", (), {}))
+    monkeypatch.setattr(windows, "MaoWindows", type("M", (), {}))
+    monkeypatch.setattr(cli, "SEGUNDOS_DE_CONTAGEM", 0)
+    visto = {}
+    monkeypatch.setattr(
+        cli, "resetar_categoria",
+        lambda *_a, **kwargs: visto.update(kwargs) is None,
+    )
+
+    assert cli._rodar(montar_parser().parse_args(["--resetar", "chave"])) == 0
+    assert visto["categoria_alternativa"] is cli.CategoriaAlternativa.CHAVE
 
 def test_espera_do_modal_e_ajustavel_em_milissegundos():
     # A Janela abre com animacao, e quanto ela dura so se descobre na maquina

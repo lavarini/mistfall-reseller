@@ -8,7 +8,7 @@ from pathlib import Path
 
 from mistfall.config import carregar_config
 from mistfall.piloto import RITMO_PADRAO, Desfecho, Resultado, executar
-from mistfall.reset import resetar_categoria
+from mistfall.reset import CategoriaAlternativa, resetar_categoria
 
 SEGUNDOS_DE_CONTAGEM = 5
 
@@ -18,8 +18,11 @@ def montar_parser() -> argparse.ArgumentParser:
     modo = p.add_mutually_exclusive_group()
     modo.add_argument("--simular", action="store_true",
                       help="varre e decide, mas nao clica nem aperta nada")
-    modo.add_argument("--resetar", action="store_true",
-                      help="executa somente o Reset de Categoria e para")
+    modo.add_argument(
+        "--resetar", nargs="?", const=CategoriaAlternativa.FORJA.value,
+        choices=[categoria.value for categoria in CategoriaAlternativa],
+        help="executa somente o Reset e para; destino padrao: forja",
+    )
     p.add_argument("--pasta", default="execucao",
                    help="onde salvar prints e relatorio")
     p.add_argument("--config", default="config.toml")
@@ -64,7 +67,7 @@ def main() -> int:
 def _rodar(args: argparse.Namespace) -> int:
     # O Reset nao consulta Precos-alvo; alem de desnecessario, carregar a
     # configuracao aqui impediria o teste isolado por um arquivo irrelevante.
-    config = None if args.resetar else carregar_config(args.config)
+    config = None if args.resetar is not None else carregar_config(args.config)
 
     from mistfall.perifericos.windows import MaoWindows, TelaWindows
 
@@ -79,8 +82,11 @@ def _rodar(args: argparse.Namespace) -> int:
 
     tela, mao = TelaWindows(), MaoWindows()
 
-    if args.resetar:
-        sucesso = resetar_categoria(tela, mao, RITMO_PADRAO)
+    if args.resetar is not None:
+        categoria = CategoriaAlternativa(args.resetar)
+        sucesso = resetar_categoria(
+            tela, mao, RITMO_PADRAO, categoria_alternativa=categoria,
+        )
         print(f"Reset: {'concluido' if sucesso else 'falhou'}")
         return 0 if sucesso else 1
 

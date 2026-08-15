@@ -3,7 +3,7 @@ import pytest
 from mistfall.geometria import (
     caixa_slot, conferir_resolucao, regiao_icone, recorte_preco,
     TODOS_OS_SLOTS, RESOLUCAO,
-    CATEGORIA_MATERIAL_CONSTRUCAO, CATEGORIA_MATERIAL_FORJA,
+    CATEGORIA_CHAVE, CATEGORIA_MATERIAL_CONSTRUCAO, CATEGORIA_MATERIAL_FORJA,
 )
 
 def test_existem_doze_slots():
@@ -50,6 +50,7 @@ def test_categorias_vizinhas_mantem_x_e_avancam_72_px():
     assert x_construcao == x_forja == 220
     assert y_construcao == 705
     assert y_forja - y_construcao == 72
+    assert CATEGORIA_CHAVE == (220, 849)
 
 @pytest.mark.parametrize("largura,altura", [(3840, 2160), (1920, 1080), (1440, 2560)])
 def test_conferir_resolucao_recusa_qualquer_outra(largura, altura):

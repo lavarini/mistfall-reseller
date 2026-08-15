@@ -20,6 +20,7 @@ PRECO_REL = (931, 98, 1011, 143)
 # as linhas vizinhas mantem o mesmo x e avancam 72 px em y.
 CATEGORIA_MATERIAL_CONSTRUCAO = (220, 705)
 CATEGORIA_MATERIAL_FORJA = (220, 777)
+CATEGORIA_CHAVE = (220, 849)
 
 TODOS_OS_SLOTS = [(linha, coluna) for linha in range(LINHAS) for coluna in range(2)]
 
