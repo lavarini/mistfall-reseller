@@ -291,6 +291,27 @@ def test_ouro_ilegivel_e_telemetria_e_nao_aborto(tmp_path, monkeypatch):
     assert r.ouro_observado is None
 
 
+def test_ouro_ilegivel_e_publicado_uma_vez_sem_impedir_compra(tmp_path, monkeypatch):
+    import mistfall.piloto as piloto
+    real = piloto.analisar_inicial
+
+    def sem_ouro(img, **kwargs):
+        resultado = real(img, **kwargs)
+        return dataclasses.replace(resultado, ouro_observado=None)
+
+    monkeypatch.setattr(piloto, "analisar_inicial", sem_ouro)
+    observacoes = []
+    mao = MaoFalsa()
+    r = executar(
+        TelaFalsa([LISTA]), mao, cfg(), tmp_path, ritmo=JA,
+        observador_ouro=lambda ouro, _monotonic, _horario: observacoes.append(ouro),
+    )
+
+    assert observacoes == [None]
+    assert r.desfecho is Desfecho.COMPRA_ENVIADA
+    assert [acao[0] for acao in mao.acoes] == ["clicar", "apertar_espaco"]
+
+
 def test_publica_observacao_com_instante_da_captura(tmp_path):
     vistos = []
     executar(TelaFalsa([LISTA]), MaoFalsa(), cfg(), tmp_path, ritmo=JA,

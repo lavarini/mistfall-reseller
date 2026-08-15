@@ -41,20 +41,31 @@ Vale registrar, porque a decisão é reversível e o custo dela precisa estar vi
 - **Clique no slot errado.** É falha de geometria, não de OCR, então nenhuma regra da
   varredura alcança.
 
-## O que continua cobrindo
+## O que continuava cobrindo naquela fase
 
-A decisão não deixa o bot cego. O que protege agora vive todo antes do clique, mais uma
-conferência depois:
+Ao retirar a conferência da Janela, a implementação ainda manteve temporariamente uma
+confirmação posterior pelo Ouro. Naquele estágio, as proteções eram:
 
 - `decisao._comprável` só aceita preço **exatamente** igual ao Preço-alvo. Leitura baixa não
   vira pechincha, e a janela de erro perigoso encolhe de "todo o intervalo abaixo" para um
   único valor.
 - `leilao.conferir_ordenacao` invalida qualquer preço fora da ordem crescente do Leilão.
-- **A queda do Ouro tem de bater com o Preço-unitário da Listagem escolhida.** Com o modal
-  fora do caminho, esse valor passa a vir da Listagem, assumindo Quantidade 1. É a única
-  conferência que sobrou no caminho, e ela acontece **depois** do Espaço: não impede a Compra
-  errada, mas não deixa ela passar calada — o desfecho sai `comprou` com a divergência no
-  motivo, ou `ouro_nao_caiu`.
+- **A queda do Ouro tinha de bater com o Preço-unitário da Listagem escolhida.** Com o modal
+  fora do caminho, esse valor vinha da Listagem, assumindo Quantidade 1. Era a única
+  conferência restante e acontecia **depois** do Espaço: o desfecho saía `comprou` com a
+  divergência no motivo, ou `ouro_nao_caiu`.
+
+Esse último item é histórico e não descreve mais o caminho vivo.
+
+## Comportamento atual
+
+As duas proteções anteriores ao clique continuam. Depois do Espaço, porém, não há captura,
+leitura, enquete nem espera posterior ao Espaço. O Ouro é apenas telemetria observacional do
+frame inicial: `None` também é registrado e não aborta nem muda a decisão de Compra.
+
+O desfecho atual é `COMPRA_ENVIADA`: afirma somente que o clique e o Espaço foram enviados.
+Ele não confirma a Compra, não calcula Ouro gasto e não ressuscita `comprou` ou
+`ouro_nao_caiu` como desfechos vivos.
 
 ## O código continua lá
 

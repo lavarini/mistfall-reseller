@@ -81,6 +81,7 @@ _Avoid_: Iteração, Ciclo, Rodada.
 
 **Interruptor**:
 O par de teclas com que o operador liga e desliga o bot: F2 começa, F3 para. É a terceira
-fronteira de IO, ao lado da Tela e da Mão, e o F3 é consultado antes de cada clique e
-durante a espera pelo Ouro — nunca entre o clique e o Espaço, onde já não há o que abortar.
+fronteira de IO, ao lado da Tela e da Mão, e o F3 é consultado antes de cada clique. Não é
+consultado entre o clique e o Espaço, onde já não há o que abortar, nem existe espera
+pós-Espaço: o Ouro é apenas telemetria observacional do frame inicial.
 _Avoid_: Hotkey, Atalho, Tecla de pânico.

@@ -3,6 +3,11 @@ import pathlib
 CONTEXT = pathlib.Path("CONTEXT.md").read_text(encoding="utf-8")
 README = pathlib.Path("README.md").read_text(encoding="utf-8")
 EXECUCAO_WINDOWS = pathlib.Path("docs/execucao-windows.md").read_text(encoding="utf-8")
+ADR_DEV_WINDOWS = pathlib.Path("docs/adr/0001-dev-mac-run-windows.md").read_text(
+    encoding="utf-8")
+ADR_SEM_CONFIRMACAO = pathlib.Path(
+    "docs/adr/0003-nao-conferir-a-janela-de-confirmacao.md").read_text(
+        encoding="utf-8")
 LEILAO = pathlib.Path("src/mistfall/leilao.py").read_text(encoding="utf-8")
 PRECOS = pathlib.Path("src/mistfall/precos.py").read_text(encoding="utf-8")
 
@@ -146,6 +151,37 @@ def test_documentacao_viva_nao_promete_codigo_3_ou_confirmacao_do_ouro():
     assert "| `3` |" not in textos
 
 
+def test_documentacao_arquitetural_descreve_ouro_observacional():
+    contexto = " ".join(CONTEXT.split())
+    adr_sem_confirmacao = " ".join(ADR_SEM_CONFIRMACAO.split())
+    adr_dev_windows = " ".join(ADR_DEV_WINDOWS.split())
+
+    assert "durante a espera pelo Ouro" not in contexto
+    assert "Ouro é apenas telemetria observacional" in adr_sem_confirmacao
+    assert "COMPRA_ENVIADA" in adr_sem_confirmacao
+    assert "nem espera posterior ao Espaço" in adr_sem_confirmacao
+    assert "`OURO_NAO_CAIU` era" in adr_dev_windows
+    assert "Hoje, `COMPRA_ENVIADA`" in adr_dev_windows
+
+
+def test_documentacao_qualifica_as_etapas_presentes_em_tempos():
+    readme = " ".join(README.split())
+    execucao_windows = " ".join(EXECUCAO_WINDOWS.split())
+    assert "`tempos` contém somente as etapas alcançadas pela Volta" in readme
+    assert "`tempos` contem somente as etapas alcancadas pela Volta" in execucao_windows
+    assert "abortos, simulações e caminhos curtos têm um conjunto parcial" in readme
+    assert "abortos, simulacoes e caminhos curtos tem um conjunto parcial" in execucao_windows
+
+
+def test_documentacao_exige_pasta_nova_por_processo_de_sessao():
+    readme = " ".join(README.split())
+    execucao_windows = " ".join(EXECUCAO_WINDOWS.split())
+    assert "Cada processo deve usar uma pasta nova de sessão" in readme
+    assert "reutilizar uma pasta existente mistura os JSONL" in readme
+    assert "Cada processo deve usar uma pasta nova de sessao" in execucao_windows
+    assert "reutilizar uma pasta existente mistura os JSONL" in execucao_windows
+
+
 def test_o_readme_avisa_que_f3_e_o_unico_freio_do_ouro():
     # Sem este aviso o operador pode supor um piso e deixar o bot gastar Ouro.
     assert "Não há piso de Ouro" in README
@@ -154,11 +190,12 @@ def test_o_readme_avisa_que_f3_e_o_unico_freio_do_ouro():
 
 
 def test_o_adr_nao_diz_mais_que_o_clique_nao_foi_confirmado():
-    # Guarda o que foi confirmado e as duas perguntas que continuam abertas.
-    adr = pathlib.Path("docs/adr/0001-dev-mac-run-windows.md").read_text(
-        encoding="utf-8")
+    # Guarda o marco historico sem deixa-lo se passar por comportamento vivo.
+    adr = ADR_DEV_WINDOWS
     assert "Que o clique com duração resolve" not in adr
     assert "O clique com duração resolve" in adr
-    assert ("continua sem observação é o **Espaço**" in adr
-            and "nenhuma Compra jamais completou" in adr)
+    assert ("Naquela execução, o Espaço ainda não tinha sido observado" in adr
+            and "nenhuma Compra havia completado" in adr)
+    assert "Hoje, `COMPRA_ENVIADA`" in adr
+    assert "não há leitura nem espera pós-Espaço" in adr
     assert "Se administrador é necessário para alguma coisa também segue em aberto." in adr

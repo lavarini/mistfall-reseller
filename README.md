@@ -146,6 +146,10 @@ está em [`docs/execucao-windows.md`](docs/execucao-windows.md).
 mistfall-bot --pasta sessao
 ```
 
+Cada processo deve usar uma pasta nova de sessão; reutilizar uma pasta existente mistura os
+JSONL, porque a numeração das Voltas e os relógios monotônicos relativos reiniciam em cada
+processo.
+
 Aperte **F2** dentro do jogo para começar e **F3** para parar. Cada Volta imprime uma linha
 no console e guarda a própria pasta; as Voltas sem nada comprável descartam os prints e
 mantêm só o relatório. O fecho informa `Compras enviadas`: cada uma significa apenas que o
@@ -169,7 +173,8 @@ inclusive quando ele aborta, e inclusive se algo explodir no meio. O bloco `temp
 milissegundos, separa `captura_pre_voo`, `gravacao_pre_voo`, `estado`, `ouro`,
 `varredura_total`, `itens`, `preparo_folha`, `tesseract_precos`,
 `analise_inicial_parede`, `conferencia_e_decisao`, `pausa_antes_do_clique`, `clique`,
-`espera_modal` e `espaco`.
+`espera_modal` e `espaco`. `tempos` contém somente as etapas alcançadas pela Volta: abortos,
+simulações e caminhos curtos têm um conjunto parcial.
 
 Na raiz da sessão há ainda dois JSONL incrementais:
 

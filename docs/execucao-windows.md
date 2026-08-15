@@ -172,6 +172,10 @@ Terminal como administrador, com o jogo em primeiro plano:
 mistfall-bot --pasta sessao
 ```
 
+Cada processo deve usar uma pasta nova de sessao; reutilizar uma pasta existente mistura os
+JSONL, porque a numeracao das Voltas e os relogios monotonicos relativos reiniciam em cada
+processo.
+
 Aperte **F2 dentro do jogo** para iniciar e **F3** para parar. Ha uma espera de **150 ms
 entre Voltas**, inclusive depois de um aborto rapido. A producao usa a analise sequencial
 (`concorrente=False`).
@@ -179,7 +183,8 @@ entre Voltas**, inclusive depois de um aborto rapido. A producao usa a analise s
 Cada Volta guarda `volta-NNNN/relatorio.json`. O bloco `tempos`, em milissegundos, traz
 `captura_pre_voo`, `gravacao_pre_voo`, `estado`, `ouro`, `varredura_total`, `itens`,
 `preparo_folha`, `tesseract_precos`, `analise_inicial_parede`, `conferencia_e_decisao`,
-`pausa_antes_do_clique`, `clique`, `espera_modal` e `espaco`.
+`pausa_antes_do_clique`, `clique`, `espera_modal` e `espaco`. `tempos` contem somente as
+etapas alcancadas pela Volta: abortos, simulacoes e caminhos curtos tem um conjunto parcial.
 
 Na raiz da sessao, `telemetria-ouro.jsonl` registra a observacao de cada Volta cuja tela
 inicial e LISTA, inclusive `null`. `tempos-do-laco.jsonl` registra o instante do proximo

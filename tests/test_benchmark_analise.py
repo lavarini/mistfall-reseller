@@ -1,3 +1,4 @@
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -29,8 +30,35 @@ def test_medir_separa_aquecimento_compara_modos_e_exige_igualdade(monkeypatch, t
     assert resumo["sequencial"]["n"] == 4
     assert resumo["concorrente"]["n"] == 4
     assert resumo["sequencial"]["mediana_ms"] == 20.0
+    assert resumo["sequencial"]["p95_ms"] == 20.0
+    assert resumo["sequencial"]["max_ms"] == 20.0
     assert resumo["concorrente"]["mediana_ms"] == 10.0
+    assert resumo["concorrente"]["p95_ms"] == 10.0
+    assert resumo["concorrente"]["max_ms"] == 10.0
     assert chamadas[0] is False
+
+
+def test_cli_emite_o_resumo_completo_como_json(monkeypatch, tmp_path, capsys):
+    pasta = tmp_path / "sessao"
+    frame = pasta / "volta-0001" / "00-pre-voo.png"
+    frame.parent.mkdir(parents=True)
+    frame.write_bytes(b"imagem")
+    esperado = {
+        "aquecimento_ms": 21.0,
+        "sequencial": {"n": 1, "mediana_ms": 20.0, "p95_ms": 22.0, "max_ms": 23.0},
+        "concorrente": {"n": 1, "mediana_ms": 10.0, "p95_ms": 12.0, "max_ms": 13.0},
+        "resultados_iguais": True,
+    }
+    monkeypatch.setattr(benchmark_analise, "medir", lambda caminhos, repeticoes: esperado)
+    monkeypatch.setattr(
+        "sys.argv", ["benchmark_analise", "--pasta", str(pasta), "--repeticoes", "1"])
+
+    assert benchmark_analise.main() == 0
+    emitido = json.loads(capsys.readouterr().out)
+
+    assert emitido == esperado
+    assert "p95_ms" in emitido["sequencial"]
+    assert "max_ms" in emitido["concorrente"]
 
 
 def test_medir_rejeita_imagem_ilegivel_com_caminho(monkeypatch, tmp_path):
