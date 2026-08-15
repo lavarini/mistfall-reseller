@@ -86,7 +86,7 @@ def test_espera_do_modal_vira_faixa_com_piso_no_valor_pedido(monkeypatch, tmp_pa
 
     def espiao(*a, **k):
         visto["ritmo"] = k["ritmo"]
-        return Resultado(Desfecho.COMPROU)
+        return Resultado(Desfecho.COMPRA_ENVIADA)
 
     monkeypatch.setattr(cli, "executar", espiao)
     monkeypatch.setattr(sys, "argv", ["mistfall-piloto", "--simular",
@@ -97,8 +97,8 @@ def test_espera_do_modal_vira_faixa_com_piso_no_valor_pedido(monkeypatch, tmp_pa
     assert piso == 0.25
     assert teto > piso
 
-def test_comprou_sai_zero():
-    assert codigo_de_saida(Resultado(Desfecho.COMPROU)) == 0
+def test_compra_enviada_sai_zero():
+    assert codigo_de_saida(Resultado(Desfecho.COMPRA_ENVIADA)) == 0
 
 def test_nada_compravel_sai_zero():
     assert codigo_de_saida(Resultado(Desfecho.NADA_COMPRAVEL)) == 0
@@ -109,15 +109,10 @@ def test_simulou_sai_zero():
 def test_abortou_sai_um():
     assert codigo_de_saida(Resultado(Desfecho.ABORTOU, "qualquer motivo")) == 1
 
-def test_ouro_que_nao_caiu_nao_sai_zero():
-    # Sair 0 aqui deixa "o Espaco nao registrou" indistinguivel de uma Compra
-    # confirmada, que e justamente a pergunta que a execucao vai responder.
-    assert codigo_de_saida(Resultado(Desfecho.OURO_NAO_CAIU, "parado")) == 3
-
 def test_todo_desfecho_tem_codigo_de_saida():
     # Desfecho novo sem codigo tem de estourar, nunca cair num default 0.
     for desfecho in Desfecho:
-        assert codigo_de_saida(Resultado(desfecho)) in (0, 1, 3)
+        assert codigo_de_saida(Resultado(desfecho)) in (0, 1)
 
 def test_problema_de_ambiente_sai_dois(monkeypatch, capsys):
     # Resolucao errada, tesseract ausente e config invalida sobem excecao.
@@ -157,7 +152,8 @@ def test_cli_imprime_o_tempo_de_cada_etapa(monkeypatch, capsys, tmp_path):
     monkeypatch.setattr(
         cli, "executar",
         lambda *a, **k: Resultado(
-            Desfecho.COMPROU,
+            Desfecho.COMPRA_ENVIADA,
+            ouro_observado=66160,
             tempos={"pre_voo": 12.3, "varredura": 456.7, "modal": 78.9},
         ),
     )
@@ -168,6 +164,7 @@ def test_cli_imprime_o_tempo_de_cada_etapa(monkeypatch, capsys, tmp_path):
     saida = capsys.readouterr().out
     assert "Tempo por etapa" in saida
     assert "varredura: 456.7" in saida
+    assert "Ouro observado: 66160" in saida
 
 
 def test_parada_pedida_sai_com_zero():

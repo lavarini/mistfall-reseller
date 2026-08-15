@@ -36,15 +36,12 @@ def montar_parser() -> argparse.ArgumentParser:
 
 
 # 0 correu como esperado ou o operador pediu parada, 1 abortou por seguranca,
-# 2 problema de ambiente (em main), 3 apertou Espaco e o Ouro nao se moveu —
-# que nao pode sair como 0, sob pena de ficar indistinguivel de uma Compra
-# confirmada.
+# 2 problema de ambiente (em main).
 CODIGO_POR_DESFECHO = {
-    Desfecho.COMPROU: 0,
+    Desfecho.COMPRA_ENVIADA: 0,
     Desfecho.NADA_COMPRAVEL: 0,
     Desfecho.SIMULOU: 0,
     Desfecho.ABORTOU: 1,
-    Desfecho.OURO_NAO_CAIU: 3,
     Desfecho.PAROU: 0,
 }
 
@@ -112,12 +109,11 @@ def _rodar(args: argparse.Namespace) -> int:
     if resultado.escala_do_icone is not None:
         print(f"a Janela mostrava: item={resultado.item_no_modal} "
               f"preco={resultado.preco_no_modal} "
-              f"quantidade={resultado.quantidade_no_modal} "
-              f"total={resultado.preco_total_esperado}")
+              f"quantidade={resultado.quantidade_no_modal}")
         print(f"scores do icone (escala {resultado.escala_do_icone}): "
               f"{resultado.scores_do_icone}")
-    if resultado.ouro_antes is not None:
-        print(f"Ouro: {resultado.ouro_antes} -> {resultado.ouro_depois}")
+    if resultado.ouro_observado is not None:
+        print(f"Ouro observado: {resultado.ouro_observado}")
     if resultado.tempos:
         print("Tempo por etapa (ms):")
         for etapa, ms in resultado.tempos.items():
