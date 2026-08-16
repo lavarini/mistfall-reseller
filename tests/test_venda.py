@@ -9,11 +9,16 @@ from mistfall.venda import (
     AREA_SEGURA_BOTAO_LISTAR,
     CENTRO_PRECO_VENDA,
     CENTRO_QUANTIDADE_VENDA,
+    PONTO_NEUTRO_POS_VENDA,
     DesfechoVenda,
     RitmoVenda,
     executar_venda,
 )
-from mistfall.venda_visao import centro_slot_armazem
+from mistfall.venda_visao import (
+    CENTRO_ABA_ARMAZEM,
+    PainelItens,
+    centro_slot_armazem,
+)
 
 
 STASH = "images/venda-stash-2.png"
@@ -47,8 +52,49 @@ def test_executa_um_stack_com_cliques_dentro_das_areas_seguras(tmp_path):
         ("selecionar_tudo",),
         ("digitar_numero", 3),
     ]
+    indice_listar = max(
+        indice for indice, acao in enumerate(mao.acoes)
+        if acao[0] == "clicar" and dentro(acao[1:], AREA_SEGURA_BOTAO_LISTAR)
+    )
+    assert mao.acoes[indice_listar + 1] == ("mover", *PONTO_NEUTRO_POS_VENDA)
+    assert ("apertar_esc",) not in mao.acoes
     assert resultado.desfecho is DesfechoVenda.VENDEU
     assert resultado.quantidade == 3
+
+
+def test_recupera_inventario_e_volta_ao_armazem(monkeypatch, tmp_path):
+    estados = iter([PainelItens.INVENTARIO, PainelItens.ARMAZEM])
+    monkeypatch.setattr("mistfall.venda.ler_painel_itens", lambda _: next(estados))
+    monkeypatch.setattr("mistfall.venda.eh_tela_venda", lambda _: True)
+    mao = MaoFalsa()
+
+    resultado = executar_venda(
+        TelaFalsa([STASH, MODAL, STASH, STASH]),
+        mao,
+        SLOT,
+        226,
+        tmp_path,
+        ritmo=RitmoVenda.instantaneo(),
+    )
+
+    assert resultado.desfecho is DesfechoVenda.VENDEU
+    assert mao.acoes.count(("clicar", *CENTRO_ABA_ARMAZEM)) == 1
+    assert mao.acoes.count(("mover", *PONTO_NEUTRO_POS_VENDA)) == 2
+    assert ("apertar_esc",) not in mao.acoes
+
+
+def test_aborta_sem_esc_quando_painel_permanece_ilegivel(monkeypatch, tmp_path):
+    monkeypatch.setattr("mistfall.venda.ler_painel_itens", lambda _: None)
+    mao = MaoFalsa()
+    resultado = executar_venda(
+        TelaFalsa([STASH, MODAL, MODAL]), mao, SLOT, 226, tmp_path,
+        ritmo=RitmoVenda.instantaneo(),
+    )
+    assert resultado.desfecho is DesfechoVenda.ABORTOU
+    assert ("apertar_esc",) not in mao.acoes
+    assert not any(
+        acao == ("clicar", *CENTRO_ABA_ARMAZEM) for acao in mao.acoes
+    )
 
 
 def test_nao_digita_nem_confirma_quando_janela_nao_abre(tmp_path):
