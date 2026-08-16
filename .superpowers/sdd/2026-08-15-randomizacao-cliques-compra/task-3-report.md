@@ -32,4 +32,5 @@
 
 ## Commit
 
-`3accc88 Randomiza cliques de Categoria no Reset`
+Implementação: `d7eca29 Randomiza cliques de Categoria no Reset`.
+Este relatório foi finalizado no commit seguinte.
