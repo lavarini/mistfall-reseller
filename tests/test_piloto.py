@@ -7,6 +7,7 @@ import cv2
 import pytest
 
 from mistfall.config import Config
+from mistfall.geometria import area_clique_slot
 from mistfall.perifericos.falso import MaoFalsa, TelaFalsa
 from mistfall.piloto import (Desfecho, Resultado, Ritmo, _conferir_a_janela,
                              executar)
@@ -46,10 +47,63 @@ def test_caminho_feliz_compra(tmp_path):
     r = executar(roteiro_feliz(), mao, cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
     assert r.desfecho is Desfecho.COMPRA_ENVIADA
 
-def test_caminho_feliz_clica_no_slot_certo(tmp_path):
+def _dentro(ponto, area):
+    x, y = ponto
+    x0, y0, x1, y1 = area
+    return x0 <= x <= x1 and y0 <= y <= y1
+
+
+def test_caminho_feliz_clica_na_area_segura_do_slot_certo(tmp_path):
     mao = MaoFalsa()
-    executar(roteiro_feliz(), mao, cfg(), tmp_path, ritmo=JA, sorteio=random.Random(1))
-    assert mao.acoes[0] == ("clicar", 1975, 721)
+    resultado = executar(
+        roteiro_feliz(), mao, cfg(), tmp_path,
+        ritmo=JA, sorteio=random.Random(1),
+    )
+    ponto = mao.acoes[0][1:]
+    assert _dentro(
+        ponto,
+        area_clique_slot(resultado.listagem.linha, resultado.listagem.coluna),
+    )
+
+
+def _clique_com_semente(tmp_path, semente):
+    mao = MaoFalsa()
+    executar(
+        roteiro_feliz(), mao, cfg(), tmp_path / str(semente),
+        ritmo=JA, sorteio=random.Random(semente),
+    )
+    return mao.acoes[0][1:]
+
+
+def test_sementes_variadas_produzem_mais_de_um_ponto_de_listagem(tmp_path):
+    pontos = {_clique_com_semente(tmp_path, s) for s in range(10)}
+    assert len(pontos) > 1
+
+
+def test_mesma_semente_reproduz_o_clique_da_listagem(tmp_path):
+    assert _clique_com_semente(tmp_path / "a", 91) == _clique_com_semente(
+        tmp_path / "b", 91,
+    )
+
+
+def test_clique_injetado_independe_do_random_global(tmp_path):
+    random.seed(1)
+    primeiro = _clique_com_semente(tmp_path / "a", 73)
+    random.seed(999)
+    segundo = _clique_com_semente(tmp_path / "b", 73)
+    assert primeiro == segundo
+
+
+def test_modo_simulado_nao_sorteia_coordenada(tmp_path, monkeypatch):
+    def falhar(*_args):
+        raise AssertionError("nao deveria sortear clique simulado")
+
+    monkeypatch.setattr("mistfall.piloto.sortear_ponto", falhar)
+    resultado = executar(
+        roteiro_feliz(), MaoFalsa(), cfg(), tmp_path,
+        simular=True, ritmo=JA, sorteio=random.Random(1),
+    )
+    assert resultado.desfecho is Desfecho.SIMULOU
 
 def test_caminho_feliz_aperta_espaco_e_nunca_esc(tmp_path):
     mao = MaoFalsa()
