@@ -45,4 +45,5 @@ def test_parar_antes_da_primeira_volta_sai_com_sucesso(monkeypatch, tmp_path):
     ritmo = visto["ritmo"]
     assert ritmo.pausa_antes_do_clique == (0.05, 0.15)
     assert ritmo.espera_entre_voltas == 0.15
+    assert ritmo.espera_apos_compra == (0.30, 0.40)
     assert ritmo.espera_para_o_modal_abrir == (0.1, 0.15)

@@ -187,8 +187,9 @@ def executar_ciclo(tela: Tela, mao: Mao, config: Config, pasta: Path,
 
         inicio_anterior = inicio_da_volta
         volta_anterior = sessao.voltas
+        espera = _espera_para_proxima_volta(resultado.desfecho, ritmo, sorteio)
         inicio_espera = time.monotonic()
-        time.sleep(ritmo.espera_entre_voltas)
+        time.sleep(espera)
         espera_anterior = time.monotonic() - inicio_espera
 
     for linha in linhas_do_fecho(sessao):
