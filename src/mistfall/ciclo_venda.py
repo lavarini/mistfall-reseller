@@ -95,6 +95,32 @@ def _candidatos(frame):
     ]
 
 
+def _esperar_vaga(
+    tela: Tela,
+    interruptor: Interruptor,
+    capacidade: CapacidadeVenda,
+    ritmo: RitmoVenda,
+):
+    tentativa = 0
+    while capacidade.ocupadas >= capacidade.limite:
+        espera = ritmo.esperas_capacidade_cheia[
+            min(tentativa, len(ritmo.esperas_capacidade_cheia) - 1)
+        ]
+        inicio = time.monotonic()
+        while time.monotonic() - inicio < espera:
+            if interruptor.pediram_parada():
+                return None, "parou"
+            intervalo = ritmo.intervalo_entre_perguntas
+            restante = espera - (time.monotonic() - inicio)
+            time.sleep(min(intervalo, restante) if intervalo > 0 else restante)
+        frame = tela.capturar()
+        capacidade = ler_capacidade(frame)
+        if capacidade is None:
+            return None, "capacidade ilegivel"
+        tentativa += 1
+    return (frame, capacidade), ""
+
+
 def executar_ciclo_venda(
     tela: Tela,
     mao: Mao,
@@ -126,8 +152,6 @@ def executar_ciclo_venda(
             if capacidade is None:
                 return encerrar(DesfechoSessaoVenda.ABORTOU, "Capacidade de Venda ilegivel")
             sessao.capacidade_final = capacidade
-            if capacidade.ocupadas >= capacidade.limite:
-                return encerrar(DesfechoSessaoVenda.CAPACIDADE_CHEIA)
 
             bau = bau_confirmado or ler_bau_selecionado(frame)
             bau_confirmado = None
@@ -143,6 +167,20 @@ def executar_ciclo_venda(
                 while candidatos:
                     if interruptor.pediram_parada():
                         return encerrar(DesfechoSessaoVenda.PAROU)
+
+                    if capacidade.ocupadas >= capacidade.limite:
+                        espera, motivo = _esperar_vaga(
+                            tela, interruptor, capacidade, ritmo,
+                        )
+                        if motivo == "parou":
+                            return encerrar(DesfechoSessaoVenda.PAROU)
+                        if espera is None:
+                            return encerrar(
+                                DesfechoSessaoVenda.ABORTOU,
+                                motivo,
+                            )
+                        frame, capacidade = espera
+                        sessao.capacidade_final = capacidade
 
                     slot = candidatos.pop(0)
                     resultado = executar_venda(
@@ -171,8 +209,6 @@ def executar_ciclo_venda(
                             "Capacidade de Venda ilegivel depois da Venda",
                         )
                     sessao.capacidade_final = capacidade
-                    if capacidade.ocupadas >= capacidade.limite:
-                        return encerrar(DesfechoSessaoVenda.CAPACIDADE_CHEIA)
 
                     if resultado.armazem_reaberto:
                         candidatos = _candidatos(frame)
@@ -187,6 +223,13 @@ def executar_ciclo_venda(
                         "nao conseguiu resetar o Armazem",
                     )
                 frame = frame_resetado
+                capacidade = ler_capacidade(frame)
+                if capacidade is None:
+                    return encerrar(
+                        DesfechoSessaoVenda.ABORTOU,
+                        "Capacidade de Venda ilegivel depois do reset",
+                    )
+                sessao.capacidade_final = capacidade
                 candidatos = _candidatos(frame)
                 resetou_armazem = True
 

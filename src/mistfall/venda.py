@@ -35,6 +35,7 @@ class RitmoVenda:
     intervalo_entre_perguntas: float = 0.1
     teto_espera_janela: float = 10.0
     teto_espera_fechamento: float = 10.0
+    esperas_capacidade_cheia: tuple[float, ...] = (20.0, 40.0, 60.0)
 
     @classmethod
     def instantaneo(cls) -> "RitmoVenda":
@@ -43,6 +44,7 @@ class RitmoVenda:
             intervalo_entre_perguntas=0.0,
             teto_espera_janela=0.02,
             teto_espera_fechamento=0.02,
+            esperas_capacidade_cheia=(0.0, 0.0, 0.0),
         )
 
 

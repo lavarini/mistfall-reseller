@@ -136,11 +136,17 @@ def test_forca_reset_quando_primeira_varredura_nao_encontra_alvo(monkeypatch, tm
     assert sessao.vendas == 1
 
 
-def test_para_quando_a_capacidade_lida_fica_cheia(monkeypatch, tmp_path):
+def test_aguarda_vaga_e_retorna_a_vender_quando_capacidade_libera(monkeypatch, tmp_path):
     slot = SlotArmazem(0, 0, ItemAlvo.BROCHE, 3)
-    capacidades = iter([CapacidadeVenda(11, 12), CapacidadeVenda(12, 12)])
+    capacidades = iter([
+        CapacidadeVenda(14, 15),
+        CapacidadeVenda(15, 15),
+        CapacidadeVenda(15, 15),
+        CapacidadeVenda(14, 15),
+        CapacidadeVenda(15, 15),
+    ])
     monkeypatch.setattr("mistfall.ciclo_venda.ler_capacidade", lambda _: next(capacidades))
-    monkeypatch.setattr("mistfall.ciclo_venda.ler_bau_selecionado", lambda _: Bau.SEGUNDO)
+    monkeypatch.setattr("mistfall.ciclo_venda.ler_bau_selecionado", lambda _: Bau.QUARTO)
     monkeypatch.setattr("mistfall.ciclo_venda.varrer_armazem", lambda _: [slot, slot])
     monkeypatch.setattr(
         "mistfall.ciclo_venda.executar_venda",
@@ -150,9 +156,9 @@ def test_para_quando_a_capacidade_lida_fica_cheia(monkeypatch, tmp_path):
         TelaFalsa([STASH]), MaoFalsa(), config(), tmp_path,
         InterruptorFalso(), RitmoVenda.instantaneo(),
     )
-    assert sessao.vendas == 1
-    assert sessao.capacidade_final == CapacidadeVenda(12, 12)
-    assert sessao.desfecho is DesfechoSessaoVenda.CAPACIDADE_CHEIA
+    assert sessao.vendas == 2
+    assert sessao.capacidade_final == CapacidadeVenda(15, 15)
+    assert sessao.desfecho is DesfechoSessaoVenda.ARMAZEM_ESGOTADO
 
 
 def test_avanca_somente_um_bau_a_direita(monkeypatch, tmp_path):
