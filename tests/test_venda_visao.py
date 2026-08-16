@@ -4,12 +4,14 @@ import pytest
 
 from mistfall.tipos import Bau, CapacidadeVenda, ItemAlvo, SlotArmazem
 from mistfall.venda_visao import (
+    PainelItens,
     caixa_slot_armazem,
     centro_bau,
     centro_slot_armazem,
     escolher_slot_de_venda,
     ler_bau_selecionado,
     ler_capacidade,
+    ler_painel_itens,
     varrer_armazem,
 )
 
@@ -32,6 +34,26 @@ def test_le_capacidade_nas_duas_telas_de_armazem(stash_2, stash_3):
 def test_detecta_bau_dourado_selecionado(stash_2, stash_3):
     assert ler_bau_selecionado(stash_2) is Bau.SEGUNDO
     assert ler_bau_selecionado(stash_3) is Bau.TERCEIRO
+
+
+def test_detecta_painel_armazem_selecionado(stash_2):
+    assert ler_painel_itens(stash_2) is PainelItens.ARMAZEM
+
+
+def test_painel_de_itens_ambiguo_e_recusado(monkeypatch, stash_2):
+    monkeypatch.setattr(
+        "mistfall.venda_visao._proporcoes_douradas_abas",
+        lambda _: [0.16, 0.16],
+    )
+    assert ler_painel_itens(stash_2) is None
+
+
+def test_detecta_inventario_quando_primeiro_titulo_esta_dourado(monkeypatch, stash_2):
+    monkeypatch.setattr(
+        "mistfall.venda_visao._proporcoes_douradas_abas",
+        lambda _: [0.163, 0.110],
+    )
+    assert ler_painel_itens(stash_2) is PainelItens.INVENTARIO
 
 
 def test_geometria_tem_8_colunas_e_7_linhas_sem_sobrepor():
