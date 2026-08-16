@@ -1,5 +1,6 @@
 """O laco: quantas Voltas, quando reseta e com qual Categoria."""
 
+import dataclasses
 import json
 import pathlib
 import random
@@ -8,7 +9,7 @@ from datetime import datetime
 
 import pytest
 
-from mistfall.ciclo import Sessao, executar_ciclo
+from mistfall.ciclo import Sessao, _espera_para_proxima_volta, executar_ciclo
 from mistfall.perifericos.falso import InterruptorFalso
 from mistfall.piloto import Desfecho, Resultado, Ritmo
 from mistfall.reset import CategoriaAlternativa
@@ -65,6 +66,53 @@ class _ResetFalso:
 
 def _compra_enviada() -> Resultado:
     return Resultado(Desfecho.COMPRA_ENVIADA, ouro_observado=1000)
+
+
+def test_compra_enviada_sorteia_espera_na_faixa_pos_compra():
+    ritmo = Ritmo()
+    vistos = {
+        _espera_para_proxima_volta(
+            Desfecho.COMPRA_ENVIADA, ritmo, random.Random(semente),
+        )
+        for semente in range(12)
+    }
+    assert len(vistos) > 1
+    assert all(0.30 <= espera <= 0.40 for espera in vistos)
+
+
+def test_mesma_semente_reproduz_espera_pos_compra():
+    ritmo = Ritmo()
+    primeira = _espera_para_proxima_volta(
+        Desfecho.COMPRA_ENVIADA, ritmo, random.Random(91),
+    )
+    segunda = _espera_para_proxima_volta(
+        Desfecho.COMPRA_ENVIADA, ritmo, random.Random(91),
+    )
+    assert primeira == segunda
+
+
+def test_sorteio_injetado_da_espera_independe_do_random_global():
+    ritmo = Ritmo()
+    random.seed(1)
+    primeira = _espera_para_proxima_volta(
+        Desfecho.COMPRA_ENVIADA, ritmo, random.Random(73),
+    )
+    random.seed(999)
+    segunda = _espera_para_proxima_volta(
+        Desfecho.COMPRA_ENVIADA, ritmo, random.Random(73),
+    )
+    assert primeira == segunda
+
+
+@pytest.mark.parametrize(
+    "desfecho",
+    [Desfecho.NADA_COMPRAVEL, Desfecho.ABORTOU, Desfecho.SIMULOU],
+)
+def test_desfecho_sem_compra_mantem_espera_comum(desfecho):
+    ritmo = dataclasses.replace(Ritmo.instantaneo(), espera_entre_voltas=0.15)
+    assert _espera_para_proxima_volta(
+        desfecho, ritmo, random.Random(42),
+    ) == 0.15
 
 
 def _rodar(monkeypatch, tmp_path, roteiro, parar_na_pergunta,

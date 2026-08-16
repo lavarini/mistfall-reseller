@@ -284,9 +284,11 @@ def test_parada_antes_do_clique_nao_clica(tmp_path):
     assert mao.acoes == []
 
 
-def test_o_ritmo_tem_espera_entre_voltas():
+def test_o_ritmo_separa_espera_comum_e_espera_apos_compra():
     assert Ritmo().espera_entre_voltas == 0.15
+    assert Ritmo().espera_apos_compra == (0.30, 0.40)
     assert Ritmo.instantaneo().espera_entre_voltas == 0.0
+    assert Ritmo.instantaneo().espera_apos_compra == (0.0, 0.0)
 
 def test_espera_do_modal_e_sorteada_dentro_da_faixa(tmp_path):
     # Ritmo identico em tudo, sementes diferentes: se a espera fosse fixa os

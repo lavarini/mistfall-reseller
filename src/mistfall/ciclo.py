@@ -97,6 +97,16 @@ def linhas_do_fecho(sessao: Sessao) -> list[str]:
     ]
 
 
+def _espera_para_proxima_volta(
+    desfecho: Desfecho,
+    ritmo: Ritmo,
+    sorteio: random.Random,
+) -> float:
+    if desfecho is Desfecho.COMPRA_ENVIADA:
+        return sorteio.uniform(*ritmo.espera_apos_compra)
+    return ritmo.espera_entre_voltas
+
+
 def executar_ciclo(tela: Tela, mao: Mao, config: Config, pasta: Path,
                    interruptor: Interruptor, ritmo: Ritmo = RITMO_PADRAO,
                    sorteio: random.Random | None = None) -> Sessao:
