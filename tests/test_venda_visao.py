@@ -9,6 +9,7 @@ from mistfall.venda_visao import (
     centro_bau,
     centro_slot_armazem,
     escolher_slot_de_venda,
+    REGIAO_CAPACIDADE,
     ler_bau_selecionado,
     ler_capacidade,
     ler_painel_itens,
@@ -30,6 +31,11 @@ def test_le_capacidade_nas_duas_telas_de_armazem(stash_2, stash_3):
     esperado = CapacidadeVenda(ocupadas=0, limite=12)
     assert ler_capacidade(stash_2) == esperado
     assert ler_capacidade(stash_3) == esperado
+
+
+def test_regiao_de_capacidade_tem_largura_para_contador_de_dois_digitos():
+    x0, _, x1, _ = REGIAO_CAPACIDADE
+    assert x1 - x0 >= 105
 
 def test_detecta_bau_dourado_selecionado(stash_2, stash_3):
     assert ler_bau_selecionado(stash_2) is Bau.SEGUNDO

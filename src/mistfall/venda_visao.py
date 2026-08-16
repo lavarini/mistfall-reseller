@@ -12,7 +12,7 @@ from mistfall.itens import identificar_item, pontuar
 from mistfall.tipos import Bau, CapacidadeVenda, SlotArmazem
 
 
-REGIAO_CAPACIDADE = (345, 200, 415, 250)
+REGIAO_CAPACIDADE = (345, 200, 450, 250)
 CENTROS_BAUS = ((1723, 286), (1787, 286), (1851, 286), (1915, 286))
 MEIA_CAIXA_BAU = 22
 REGIOES_ABAS_ITENS = (
