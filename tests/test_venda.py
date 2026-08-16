@@ -81,6 +81,7 @@ def test_recupera_inventario_e_volta_ao_armazem(monkeypatch, tmp_path):
     assert mao.acoes.count(("clicar", *CENTRO_ABA_ARMAZEM)) == 1
     assert mao.acoes.count(("mover", *PONTO_NEUTRO_POS_VENDA)) == 2
     assert ("apertar_esc",) not in mao.acoes
+    assert resultado.armazem_reaberto is True
 
 
 def test_aborta_sem_esc_quando_painel_permanece_ilegivel(monkeypatch, tmp_path):

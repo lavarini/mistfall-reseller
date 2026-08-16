@@ -74,6 +74,68 @@ def test_processa_o_bau_uma_vez_e_vende_todos_os_stacks_tres(monkeypatch, tmp_pa
     assert sessao.desfecho is DesfechoSessaoVenda.ARMAZEM_ESGOTADO
 
 
+def test_rele_candidatos_depois_de_reabrir_armazem(monkeypatch, tmp_path):
+    grades = iter([
+        [SlotArmazem(0, 0, ItemAlvo.BROCHE, 3)],
+        [SlotArmazem(0, 0, ItemAlvo.ADAGA, 3)],
+    ])
+    capacidades = iter([
+        CapacidadeVenda(0, 15),
+        CapacidadeVenda(1, 15),
+        CapacidadeVenda(2, 15),
+    ])
+    vendidos = []
+    monkeypatch.setattr("mistfall.ciclo_venda.ler_capacidade", lambda _: next(capacidades))
+    monkeypatch.setattr("mistfall.ciclo_venda.ler_bau_selecionado", lambda _: Bau.QUARTO)
+    monkeypatch.setattr("mistfall.ciclo_venda.varrer_armazem", lambda _: next(grades))
+
+    def vender(tela, mao, slot, preco, pasta, ritmo, recebido):
+        vendidos.append((slot.item, preco))
+        resultado = sucesso(slot)
+        if len(vendidos) == 1:
+            resultado.armazem_reaberto = True
+        return resultado
+
+    monkeypatch.setattr("mistfall.ciclo_venda.executar_venda", vender)
+    sessao = executar_ciclo_venda(
+        TelaFalsa([STASH]), MaoFalsa(), config(), tmp_path,
+        InterruptorFalso(), RitmoVenda.instantaneo(),
+    )
+
+    assert vendidos == [
+        (ItemAlvo.BROCHE, config().precos_venda[ItemAlvo.BROCHE]),
+        (ItemAlvo.ADAGA, config().precos_venda[ItemAlvo.ADAGA]),
+    ]
+    assert sessao.vendas == 2
+
+
+def test_forca_reset_quando_primeira_varredura_nao_encontra_alvo(monkeypatch, tmp_path):
+    slot = SlotArmazem(0, 0, ItemAlvo.ADAGA, 3)
+    grades = iter([[], [slot]])
+    capacidades = iter([
+        CapacidadeVenda(0, 15),
+        CapacidadeVenda(0, 15),
+        CapacidadeVenda(1, 15),
+    ])
+    resets = []
+    monkeypatch.setattr("mistfall.ciclo_venda.ler_capacidade", lambda _: next(capacidades))
+    monkeypatch.setattr("mistfall.ciclo_venda.ler_bau_selecionado", lambda _: Bau.QUARTO)
+    monkeypatch.setattr("mistfall.ciclo_venda.varrer_armazem", lambda _: next(grades))
+    monkeypatch.setattr(
+        "mistfall.ciclo_venda._forcar_reset_armazem",
+        lambda tela, *args: resets.append(True) or tela.capturar(),
+    )
+    monkeypatch.setattr("mistfall.ciclo_venda.executar_venda", lambda *args, **kwargs: sucesso(slot))
+
+    sessao = executar_ciclo_venda(
+        TelaFalsa([STASH]), MaoFalsa(), config(), tmp_path,
+        InterruptorFalso(), RitmoVenda.instantaneo(),
+    )
+
+    assert resets == [True]
+    assert sessao.vendas == 1
+
+
 def test_para_quando_a_capacidade_lida_fica_cheia(monkeypatch, tmp_path):
     slot = SlotArmazem(0, 0, ItemAlvo.BROCHE, 3)
     capacidades = iter([CapacidadeVenda(11, 12), CapacidadeVenda(12, 12)])
@@ -98,6 +160,7 @@ def test_avanca_somente_um_bau_a_direita(monkeypatch, tmp_path):
     monkeypatch.setattr("mistfall.ciclo_venda.ler_capacidade", lambda _: CapacidadeVenda(0, 12))
     monkeypatch.setattr("mistfall.ciclo_venda.ler_bau_selecionado", lambda _: next(baus))
     monkeypatch.setattr("mistfall.ciclo_venda.varrer_armazem", lambda _: [])
+    monkeypatch.setattr("mistfall.ciclo_venda._forcar_reset_armazem", lambda tela, *args: tela.capturar())
     mao = MaoFalsa()
     sessao = executar_ciclo_venda(
         TelaFalsa([STASH]), mao, config(), tmp_path,
@@ -117,6 +180,7 @@ def test_espera_o_destaque_mudar_antes_de_processar_o_proximo_bau(monkeypatch, t
     monkeypatch.setattr("mistfall.ciclo_venda.ler_capacidade", lambda _: CapacidadeVenda(0, 12))
     monkeypatch.setattr("mistfall.ciclo_venda.ler_bau_selecionado", lambda _: next(baus))
     monkeypatch.setattr("mistfall.ciclo_venda.varrer_armazem", lambda _: [])
+    monkeypatch.setattr("mistfall.ciclo_venda._forcar_reset_armazem", lambda tela, *args: tela.capturar())
     sessao = executar_ciclo_venda(
         TelaFalsa([STASH]), MaoFalsa(), config(), tmp_path,
         InterruptorFalso(), dataclasses.replace(

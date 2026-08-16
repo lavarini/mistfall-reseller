@@ -17,10 +17,14 @@ from mistfall.venda import (
     executar_venda,
 )
 from mistfall.venda_visao import (
+    CENTRO_ABA_ARMAZEM,
+    CENTRO_ABA_INVENTARIO,
+    PainelItens,
     centro_bau,
     eh_tela_venda,
     ler_bau_selecionado,
     ler_capacidade,
+    ler_painel_itens,
     varrer_armazem,
 )
 
@@ -60,6 +64,35 @@ def _esperar_bau(tela: Tela, esperado: Bau, ritmo: RitmoVenda):
             return frame
         time.sleep(ritmo.intervalo_entre_perguntas)
     return None
+
+
+def _esperar_painel(tela: Tela, esperado: PainelItens, ritmo: RitmoVenda):
+    inicio = time.monotonic()
+    primeira = True
+    while primeira or time.monotonic() - inicio < ritmo.teto_espera_fechamento:
+        primeira = False
+        frame = tela.capturar()
+        if ler_painel_itens(frame) is esperado:
+            return frame
+        time.sleep(ritmo.intervalo_entre_perguntas)
+    return None
+
+
+def _forcar_reset_armazem(
+    tela: Tela, mao: Mao, bau: Bau, ritmo: RitmoVenda,
+):
+    mao.clicar(*CENTRO_ABA_INVENTARIO)
+    if _esperar_painel(tela, PainelItens.INVENTARIO, ritmo) is None:
+        return None
+    mao.clicar(*CENTRO_ABA_ARMAZEM)
+    return _esperar_bau(tela, bau, ritmo)
+
+
+def _candidatos(frame):
+    return [
+        slot for slot in varrer_armazem(frame)
+        if slot.item is not None and slot.quantidade == 3
+    ]
 
 
 def executar_ciclo_venda(
@@ -102,42 +135,60 @@ def executar_ciclo_venda(
                 return encerrar(DesfechoSessaoVenda.ABORTOU, "Bau selecionado ilegivel")
             sessao.baus_processados.append(int(bau) + 1)
 
-            candidatos = [
-                slot for slot in varrer_armazem(frame)
-                if slot.item is not None and slot.quantidade == 3
-            ]
-            for indice, slot in enumerate(candidatos, start=1):
-                if interruptor.pediram_parada():
-                    return encerrar(DesfechoSessaoVenda.PAROU)
+            candidatos = _candidatos(frame)
+            # Uma lista inicialmente não vazia já representa trabalho válido;
+            # só forçamos a troca de abas quando a leitura não encontrou alvo.
+            resetou_armazem = bool(candidatos)
+            while True:
+                while candidatos:
+                    if interruptor.pediram_parada():
+                        return encerrar(DesfechoSessaoVenda.PAROU)
 
-                resultado = executar_venda(
-                    tela,
-                    mao,
-                    slot,
-                    config.precos_venda[slot.item],
-                    pasta / f"venda-{sessao.vendas + 1:04d}",
-                    ritmo,
-                    sorteio,
-                )
-                if resultado.desfecho is not DesfechoVenda.VENDEU:
-                    return encerrar(DesfechoSessaoVenda.ABORTOU, resultado.motivo)
-                sessao.vendas += 1
+                    slot = candidatos.pop(0)
+                    resultado = executar_venda(
+                        tela,
+                        mao,
+                        slot,
+                        config.precos_venda[slot.item],
+                        pasta / f"venda-{sessao.vendas + 1:04d}",
+                        ritmo,
+                        sorteio,
+                    )
+                    if resultado.desfecho is not DesfechoVenda.VENDEU:
+                        return encerrar(DesfechoSessaoVenda.ABORTOU, resultado.motivo)
+                    sessao.vendas += 1
 
-                frame = tela.capturar()
-                if not eh_tela_venda(frame):
+                    frame = tela.capturar()
+                    if not eh_tela_venda(frame):
+                        return encerrar(
+                            DesfechoSessaoVenda.ABORTOU,
+                            "tela de Venda ilegivel depois da Venda",
+                        )
+                    capacidade = ler_capacidade(frame)
+                    if capacidade is None:
+                        return encerrar(
+                            DesfechoSessaoVenda.ABORTOU,
+                            "Capacidade de Venda ilegivel depois da Venda",
+                        )
+                    sessao.capacidade_final = capacidade
+                    if capacidade.ocupadas >= capacidade.limite:
+                        return encerrar(DesfechoSessaoVenda.CAPACIDADE_CHEIA)
+
+                    if resultado.armazem_reaberto:
+                        candidatos = _candidatos(frame)
+                        resetou_armazem = True
+
+                if resetou_armazem:
+                    break
+                frame_resetado = _forcar_reset_armazem(tela, mao, bau, ritmo)
+                if frame_resetado is None:
                     return encerrar(
                         DesfechoSessaoVenda.ABORTOU,
-                        "tela de Venda ilegivel depois da Venda",
+                        "nao conseguiu resetar o Armazem",
                     )
-                capacidade = ler_capacidade(frame)
-                if capacidade is None:
-                    return encerrar(
-                        DesfechoSessaoVenda.ABORTOU,
-                        "Capacidade de Venda ilegivel depois da Venda",
-                    )
-                sessao.capacidade_final = capacidade
-                if capacidade.ocupadas >= capacidade.limite:
-                    return encerrar(DesfechoSessaoVenda.CAPACIDADE_CHEIA)
+                frame = frame_resetado
+                candidatos = _candidatos(frame)
+                resetou_armazem = True
 
             if bau is Bau.QUARTO:
                 return encerrar(DesfechoSessaoVenda.ARMAZEM_ESGOTADO)

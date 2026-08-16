@@ -63,6 +63,7 @@ class ResultadoVenda:
     coluna: int | None = None
     preco_venda: int | None = None
     quantidade: int = 3
+    armazem_reaberto: bool = False
 
 
 def _esperar_frame(tela: Tela, predicado, teto: float, intervalo: float):
@@ -88,13 +89,13 @@ def _esperar_retorno_armazem(tela: Tela, mao: Mao, ritmo: RitmoVenda):
         ultimo = tela.capturar()
         painel = ler_painel_itens(ultimo)
         if painel is PainelItens.ARMAZEM and eh_tela_venda(ultimo):
-            return ultimo, ultimo
+            return ultimo, ultimo, clicou_armazem
         if painel is PainelItens.INVENTARIO and not clicou_armazem:
             mao.clicar(*CENTRO_ABA_ARMAZEM)
             mao.mover(*PONTO_NEUTRO_POS_VENDA)
             clicou_armazem = True
         time.sleep(ritmo.intervalo_entre_perguntas)
-    return None, ultimo
+    return None, ultimo, clicou_armazem
 
 
 def _gravar(pasta: Path, nome: str, frame) -> None:
@@ -173,7 +174,8 @@ def executar_venda(
         mao.clicar(*_sortear_ponto(AREA_SEGURA_BOTAO_LISTAR, sorteio))
         mao.mover(*PONTO_NEUTRO_POS_VENDA)
 
-        depois, ultimo = _esperar_retorno_armazem(tela, mao, ritmo)
+        depois, ultimo, armazem_reaberto = _esperar_retorno_armazem(tela, mao, ritmo)
+        resultado.armazem_reaberto = armazem_reaberto
         if depois is None:
             if ultimo is not None:
                 _gravar(pasta, "02-nao-fechou.png", ultimo)
