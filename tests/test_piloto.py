@@ -286,7 +286,7 @@ def test_parada_antes_do_clique_nao_clica(tmp_path):
 
 def test_o_ritmo_separa_espera_comum_e_espera_apos_compra():
     assert Ritmo().espera_entre_voltas == 0.15
-    assert Ritmo().espera_apos_compra == (0.35, 0.45)
+    assert Ritmo().espera_apos_compra == (0.65, 0.75)
     assert Ritmo.instantaneo().espera_entre_voltas == 0.0
     assert Ritmo.instantaneo().espera_apos_compra == (0.0, 0.0)
 

@@ -107,7 +107,7 @@ def test_compra_enviada_sorteia_espera_na_faixa_pos_compra():
         for semente in range(12)
     }
     assert len(vistos) > 1
-    assert all(0.35 <= espera <= 0.45 for espera in vistos)
+    assert all(0.65 <= espera <= 0.75 for espera in vistos)
 
 
 def test_mesma_semente_reproduz_espera_pos_compra():
@@ -194,7 +194,7 @@ def test_o_laco_encerra_quando_o_piloto_devolve_parou(monkeypatch, tmp_path):
 def test_ciclo_aplica_espera_pos_compra(monkeypatch, tmp_path):
     relogio = _instalar_relogio(monkeypatch)
     ritmo = dataclasses.replace(
-        Ritmo.instantaneo(), espera_apos_compra=(0.35, 0.45),
+        Ritmo.instantaneo(), espera_apos_compra=(0.65, 0.75),
     )
     piloto = _PilotoFalso([_compra_enviada(), Resultado(Desfecho.PAROU)])
     monkeypatch.setattr("mistfall.ciclo.executar", piloto)
@@ -208,7 +208,7 @@ def test_ciclo_aplica_espera_pos_compra(monkeypatch, tmp_path):
     )
 
     assert len(relogio.esperas) == 1
-    assert 0.35 <= relogio.esperas[0] <= 0.45
+    assert 0.65 <= relogio.esperas[0] <= 0.75
 
 
 @pytest.mark.parametrize("desfecho", [Desfecho.NADA_COMPRAVEL, Desfecho.ABORTOU])
@@ -219,7 +219,7 @@ def test_ciclo_mantem_150_ms_quando_nao_compra(
     ritmo = dataclasses.replace(
         Ritmo.instantaneo(),
         espera_entre_voltas=0.15,
-        espera_apos_compra=(0.35, 0.45),
+        espera_apos_compra=(0.65, 0.75),
     )
     piloto = _PilotoFalso([Resultado(desfecho), Resultado(Desfecho.PAROU)])
     monkeypatch.setattr("mistfall.ciclo.executar", piloto)

@@ -95,7 +95,7 @@ class Ritmo:
     espera_entre_voltas: float = 0.15
     # Tempo extra para a lista se reorganizar depois de uma Compra enviada.
     # So o ciclo conhece o desfecho e decide quando usar esta faixa.
-    espera_apos_compra: tuple[float, float] = (0.35, 0.45)
+    espera_apos_compra: tuple[float, float] = (0.65, 0.75)
 
     @classmethod
     def instantaneo(cls) -> "Ritmo":

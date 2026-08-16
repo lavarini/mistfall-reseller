@@ -37,7 +37,7 @@ Espaço não há nova captura nem conferência. O Ouro do frame inicial é telem
 As duas esperas do passo 6 são **sorteadas** a cada Compra para o ritmo não sair sempre
 idêntico. `--espera-modal` ajusta o piso da espera entre o clique e o Espaço e conserva a
 proporção de 1,5× até o teto. Depois de uma Compra enviada, o loop espera um valor sorteado
-entre 350 e 450 ms para a lista se atualizar antes da próxima captura. Voltas sem Compra
+entre 650 e 750 ms para a lista se atualizar antes da próxima captura. Voltas sem Compra
 mantêm a espera fixa de 150 ms, evitando desacelerar a varredura comum.
 
 Os cliques da Compra não repetem uma coordenada fixa. A Listagem escolhida e as duas
