@@ -4,6 +4,7 @@ from mistfall.geometria import (
     caixa_slot, conferir_resolucao, regiao_icone, recorte_preco,
     TODOS_OS_SLOTS, RESOLUCAO,
     CATEGORIA_CHAVE, CATEGORIA_MATERIAL_CONSTRUCAO, CATEGORIA_MATERIAL_FORJA,
+    area_clique_categoria, area_clique_slot,
 )
 
 def test_existem_doze_slots():
@@ -59,3 +60,20 @@ def test_conferir_resolucao_recusa_qualquer_outra(largura, altura):
     img = np.zeros((altura, largura, 3), dtype=np.uint8)
     with pytest.raises(ValueError, match=f"recebi {largura}x{altura}"):
         conferir_resolucao(img)
+
+
+def test_area_de_clique_do_slot_fica_ao_redor_do_centro():
+    x0, y0, x1, y1 = caixa_slot(2, 1)
+    cx, cy = (x0 + x1) // 2, (y0 + y1) // 2
+    assert area_clique_slot(2, 1) == (cx - 20, cy - 26, cx + 20, cy + 26)
+
+
+@pytest.mark.parametrize(
+    "centro",
+    [CATEGORIA_MATERIAL_CONSTRUCAO, CATEGORIA_MATERIAL_FORJA, CATEGORIA_CHAVE],
+)
+def test_area_de_clique_da_categoria_fica_ao_redor_do_centro(centro):
+    cx, cy = centro
+    assert area_clique_categoria(centro) == (
+        cx - 60, cy - 18, cx + 60, cy + 18,
+    )

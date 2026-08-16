@@ -46,10 +46,11 @@ import cv2
 import numpy as np
 
 from mistfall.analise import analisar_inicial
+from mistfall.cliques import sortear_ponto
 from mistfall.config import Config
 from mistfall.decisao import escolher
 from mistfall.estado import identificar_estado
-from mistfall.geometria import caixa_slot
+from mistfall.geometria import area_clique_slot
 from mistfall.janela import (
     ler_item_da_janela, ler_preco_da_janela,
     ler_preco_total_da_janela, ler_quantidade_da_janela,
@@ -358,13 +359,14 @@ def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
         if interruptor is not None and interruptor.pediram_parada():
             return encerrar(Desfecho.PAROU, "parada pedida antes do clique")
 
-        x0, y0, x1, y1 = caixa_slot(escolhida.linha, escolhida.coluna)
         inicio = time.monotonic()
         time.sleep(sorteio.uniform(*ritmo.pausa_antes_do_clique))
         r.tempos["pausa_antes_do_clique"] = (time.monotonic() - inicio) * 1000
 
         inicio = time.monotonic()
-        mao.clicar((x0 + x1) // 2, (y0 + y1) // 2)
+        mao.clicar(*sortear_ponto(
+            area_clique_slot(escolhida.linha, escolhida.coluna), sorteio,
+        ))
         r.tempos["clique"] = (time.monotonic() - inicio) * 1000
 
         # A Janela nao e olhada para nada: nem capturada, nem lida, nem

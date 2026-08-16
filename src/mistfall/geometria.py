@@ -1,4 +1,5 @@
 import numpy as np
+from mistfall.cliques import AreaClique
 from mistfall.tipos import Listagem, ItemAlvo, EstadoTela  # noqa: F401
 
 RESOLUCAO = (2560, 1440)
@@ -8,6 +9,10 @@ SLOT_COLUNAS = (459, 1470)
 SLOT_LARGURA = 1011
 SLOT_ALTURA = 154
 LINHAS = 6
+MEIA_LARGURA_CLIQUE_SLOT = 20
+MEIA_ALTURA_CLIQUE_SLOT = 26
+MEIA_LARGURA_CLIQUE_CATEGORIA = 60
+MEIA_ALTURA_CLIQUE_CATEGORIA = 18
 
 # Regiao de BUSCA do icone. O template e menor que ela (ver MARGEM_TEMPLATE),
 # para o matchTemplate poder deslizar e absorver o arredondamento de SLOT_PASSO.
@@ -42,6 +47,25 @@ def caixa_slot(linha: int, coluna: int) -> tuple[int, int, int, int]:
     x0 = SLOT_COLUNAS[coluna]
     y0 = int(SLOT_TOPO + SLOT_PASSO * linha)
     return x0, y0, x0 + SLOT_LARGURA, y0 + SLOT_ALTURA
+
+def area_clique_slot(linha: int, coluna: int) -> AreaClique:
+    x0, y0, x1, y1 = caixa_slot(linha, coluna)
+    cx, cy = (x0 + x1) // 2, (y0 + y1) // 2
+    return (
+        cx - MEIA_LARGURA_CLIQUE_SLOT,
+        cy - MEIA_ALTURA_CLIQUE_SLOT,
+        cx + MEIA_LARGURA_CLIQUE_SLOT,
+        cy + MEIA_ALTURA_CLIQUE_SLOT,
+    )
+
+def area_clique_categoria(centro: tuple[int, int]) -> AreaClique:
+    cx, cy = centro
+    return (
+        cx - MEIA_LARGURA_CLIQUE_CATEGORIA,
+        cy - MEIA_ALTURA_CLIQUE_CATEGORIA,
+        cx + MEIA_LARGURA_CLIQUE_CATEGORIA,
+        cy + MEIA_ALTURA_CLIQUE_CATEGORIA,
+    )
 
 def _recorte(img, linha, coluna, rel):
     conferir_resolucao(img)
