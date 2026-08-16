@@ -1,6 +1,7 @@
 """Visao pura da aba Vender com o Armazem aberto."""
 
 import re
+from enum import Enum
 
 import cv2
 import numpy as np
@@ -14,6 +15,13 @@ from mistfall.tipos import Bau, CapacidadeVenda, SlotArmazem
 REGIAO_CAPACIDADE = (345, 200, 415, 250)
 CENTROS_BAUS = ((1723, 286), (1787, 286), (1851, 286), (1915, 286))
 MEIA_CAIXA_BAU = 22
+REGIOES_ABAS_ITENS = (
+    (1570, 190, 1755, 240),  # Inventario
+    (1770, 190, 1940, 240),  # Armazem
+)
+LIMIAR_DOURADO_ABA = 0.14
+MARGEM_DOURADA_ABA = 0.03
+CENTRO_ABA_ARMAZEM = (1845, 215)
 
 SLOT_ESQUERDA = 1688
 SLOT_TOPO = 333
@@ -32,6 +40,11 @@ _CONFIG_CAPACIDADE = "--psm 7 -c tessedit_char_whitelist=0123456789/"
 _CONFIG_QUANTIDADE = "--psm 13 -c tessedit_char_whitelist=0123456789"
 ESCALAS_SLOT = tuple(indice / 20 for indice in range(28, 41))
 QUANTIDADE_REL = (50, 70, 83, 106)
+
+
+class PainelItens(Enum):
+    INVENTARIO = "inventario"
+    ARMAZEM = "armazem"
 
 
 def _recortar(img: np.ndarray, regiao: tuple[int, int, int, int]) -> np.ndarray:
@@ -89,6 +102,34 @@ def ler_bau_selecionado(img: np.ndarray) -> Bau | None:
     ):
         return None
     return Bau(melhor)
+
+
+def _proporcoes_douradas_abas(img: np.ndarray) -> list[float]:
+    conferir_resolucao(img)
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    resultado = []
+    for x0, y0, x1, y1 in REGIOES_ABAS_ITENS:
+        recorte = hsv[y0:y1, x0:x1]
+        dourado = (
+            (recorte[:, :, 0] >= 10)
+            & (recorte[:, :, 0] <= 35)
+            & (recorte[:, :, 1] >= 50)
+            & (recorte[:, :, 2] >= 80)
+        )
+        resultado.append(float(dourado.mean()))
+    return resultado
+
+
+def ler_painel_itens(img: np.ndarray) -> PainelItens | None:
+    proporcoes = _proporcoes_douradas_abas(img)
+    melhor = max(range(2), key=proporcoes.__getitem__)
+    outro = 1 - melhor
+    if (
+        proporcoes[melhor] < LIMIAR_DOURADO_ABA
+        or proporcoes[melhor] - proporcoes[outro] < MARGEM_DOURADA_ABA
+    ):
+        return None
+    return PainelItens.INVENTARIO if melhor == 0 else PainelItens.ARMAZEM
 
 
 def centro_bau(bau: Bau) -> tuple[int, int]:

@@ -11,7 +11,14 @@ import cv2
 
 from mistfall.perifericos.protocolos import Mao, Tela
 from mistfall.tipos import SlotArmazem
-from mistfall.venda_visao import centro_slot_armazem, eh_janela_venda, eh_tela_venda
+from mistfall.venda_visao import (
+    CENTRO_ABA_ARMAZEM,
+    PainelItens,
+    centro_slot_armazem,
+    eh_janela_venda,
+    eh_tela_venda,
+    ler_painel_itens,
+)
 
 
 CENTRO_PRECO_VENDA = (1700, 806)
@@ -19,6 +26,7 @@ CENTRO_QUANTIDADE_VENDA = (1700, 907)
 MEIA_LARGURA_CLIQUE_SLOT = 20
 MEIA_ALTURA_CLIQUE_SLOT = 26
 AREA_SEGURA_BOTAO_LISTAR = (1500, 1010, 1900, 1040)
+PONTO_NEUTRO_POS_VENDA = (1620, 1100)
 
 
 @dataclass(frozen=True)
@@ -67,6 +75,25 @@ def _esperar_frame(tela: Tela, predicado, teto: float, intervalo: float):
         if predicado(ultimo):
             return ultimo, ultimo
         time.sleep(intervalo)
+    return None, ultimo
+
+
+def _esperar_retorno_armazem(tela: Tela, mao: Mao, ritmo: RitmoVenda):
+    inicio = time.monotonic()
+    clicou_armazem = False
+    ultimo = None
+    primeira = True
+    while primeira or time.monotonic() - inicio < ritmo.teto_espera_fechamento:
+        primeira = False
+        ultimo = tela.capturar()
+        painel = ler_painel_itens(ultimo)
+        if painel is PainelItens.ARMAZEM and eh_tela_venda(ultimo):
+            return ultimo, ultimo
+        if painel is PainelItens.INVENTARIO and not clicou_armazem:
+            mao.clicar(*CENTRO_ABA_ARMAZEM)
+            mao.mover(*PONTO_NEUTRO_POS_VENDA)
+            clicou_armazem = True
+        time.sleep(ritmo.intervalo_entre_perguntas)
     return None, ultimo
 
 
@@ -144,13 +171,9 @@ def executar_venda(
         # botao — observado na primeira execucao real de Venda. O clique
         # direto nao depende do foco e confirma a mesma acao.
         mao.clicar(*_sortear_ponto(AREA_SEGURA_BOTAO_LISTAR, sorteio))
+        mao.mover(*PONTO_NEUTRO_POS_VENDA)
 
-        depois, ultimo = _esperar_frame(
-            tela,
-            eh_tela_venda,
-            ritmo.teto_espera_fechamento,
-            ritmo.intervalo_entre_perguntas,
-        )
+        depois, ultimo = _esperar_retorno_armazem(tela, mao, ritmo)
         if depois is None:
             if ultimo is not None:
                 _gravar(pasta, "02-nao-fechou.png", ultimo)

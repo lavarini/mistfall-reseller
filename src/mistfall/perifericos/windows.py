@@ -168,11 +168,14 @@ class MaoWindows:
         self._segundos_de_clique = segundos_de_clique
         self._segundos_de_tecla = segundos_de_tecla
 
-    def clicar(self, x: int, y: int) -> None:
+    def mover(self, x: int, y: int) -> None:
         # SendInput absoluto usa 0..65535 sobre a tela virtual.
         nx = x * 65535 // (LARGURA - 1)
         ny = y * 65535 // (ALTURA - 1)
         _enviar(_mouse(MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE, nx, ny))
+
+    def clicar(self, x: int, y: int) -> None:
+        self.mover(x, y)
         # Pressionar e soltar em lotes separados, com o botao segurado entre os
         # dois. Juntos num lote so o clique dura tempo zero: um jogo que le por
         # amostragem, e nao pela fila de mensagens, nunca ve o botao apertado.

@@ -39,10 +39,16 @@ def test_tela_falsa_exige_pelo_menos_um_frame():
 
 def test_mao_falsa_grava_na_ordem():
     mao = MaoFalsa()
+    mao.mover(30, 40)
     mao.clicar(10, 20)
     mao.apertar_espaco()
     mao.apertar_esc()
-    assert mao.acoes == [("clicar", 10, 20), ("apertar_espaco",), ("apertar_esc",)]
+    assert mao.acoes == [
+        ("mover", 30, 40),
+        ("clicar", 10, 20),
+        ("apertar_espaco",),
+        ("apertar_esc",),
+    ]
 
 def test_mao_falsa_comeca_vazia():
     assert MaoFalsa().acoes == []

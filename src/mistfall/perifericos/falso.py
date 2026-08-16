@@ -34,6 +34,9 @@ class MaoFalsa:
     def __init__(self) -> None:
         self.acoes: list[tuple] = []
 
+    def mover(self, x: int, y: int) -> None:
+        self.acoes.append(("mover", x, y))
+
     def clicar(self, x: int, y: int) -> None:
         self.acoes.append(("clicar", x, y))
 
