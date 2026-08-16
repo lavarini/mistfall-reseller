@@ -65,6 +65,11 @@ def test_geometria_tem_8_colunas_e_7_linhas_sem_sobrepor():
         assert 0 <= y0 < y1 <= 1440
 
 
+def test_ultima_coluna_fica_alinhada_com_a_grade_real():
+    x0, _, x1, _ = caixa_slot_armazem(4, 7)
+    assert (x0, x1) == (2342, 2425)
+
+
 def test_centro_de_cada_bau_e_distinto():
     assert len({centro_bau(bau) for bau in Bau}) == 4
 

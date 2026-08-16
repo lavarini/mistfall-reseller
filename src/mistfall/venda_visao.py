@@ -25,7 +25,7 @@ CENTRO_ABA_ARMAZEM = (1845, 215)
 
 SLOT_ESQUERDA = 1688
 SLOT_TOPO = 333
-SLOT_PASSO_X = 92
+SLOT_PASSO_X = 93.5
 SLOT_PASSO_Y = 128
 SLOT_LARGURA = 83
 SLOT_ALTURA = 106
@@ -139,7 +139,7 @@ def centro_bau(bau: Bau) -> tuple[int, int]:
 def caixa_slot_armazem(linha: int, coluna: int) -> tuple[int, int, int, int]:
     if not 0 <= linha < LINHAS_ARMAZEM or not 0 <= coluna < COLUNAS_ARMAZEM:
         raise ValueError(f"slot do Armazem fora da grade: ({linha}, {coluna})")
-    x0 = SLOT_ESQUERDA + SLOT_PASSO_X * coluna
+    x0 = int(SLOT_ESQUERDA + SLOT_PASSO_X * coluna)
     y0 = SLOT_TOPO + SLOT_PASSO_Y * linha
     return x0, y0, x0 + SLOT_LARGURA, y0 + SLOT_ALTURA
 
