@@ -100,6 +100,9 @@ def linhas_do_fecho(sessao: Sessao) -> list[str]:
 def executar_ciclo(tela: Tela, mao: Mao, config: Config, pasta: Path,
                    interruptor: Interruptor, ritmo: Ritmo = RITMO_PADRAO,
                    sorteio: random.Random | None = None) -> Sessao:
+    if sorteio is None:
+        sorteio = random.Random()
+
     interruptor.esperar_inicio()
 
     sessao = Sessao()
@@ -141,7 +144,8 @@ def executar_ciclo(tela: Tela, mao: Mao, config: Config, pasta: Path,
         reset_falhou = None
         if resultado.desfecho is Desfecho.NADA_COMPRAVEL:
             if resetar_categoria(
-                tela, mao, ritmo, categoria_alternativa=proxima_categoria
+                tela, mao, ritmo, categoria_alternativa=proxima_categoria,
+                sorteio=sorteio,
             ):
                 resetou = proxima_categoria
                 proxima_categoria = next(categorias)

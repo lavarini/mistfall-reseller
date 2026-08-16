@@ -39,6 +39,11 @@ idêntico. `--espera-modal` ajusta o piso da espera entre o clique e o Espaço e
 proporção de 1,5× até o teto. O laço ainda espera 150 ms entre o fim de uma Volta e o início
 da próxima, inclusive depois de um aborto rápido.
 
+Os cliques da Compra não repetem uma coordenada fixa. A Listagem escolhida e as duas
+Categorias usadas pelo Reset recebem pontos sorteados dentro de áreas centrais seguras.
+Esse sorteio só muda o ponto dentro do mesmo alvo: não muda a Listagem escolhida, a
+alternância Forja/Chave, as esperas ou as teclas Espaço/F2/F3.
+
 ## Onde roda
 
 O jogo roda num PC **Windows**; o desenvolvimento acontece num **Mac**. Por isso existem três

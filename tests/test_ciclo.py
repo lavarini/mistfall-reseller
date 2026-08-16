@@ -2,6 +2,7 @@
 
 import json
 import pathlib
+import random
 import time
 from datetime import datetime
 
@@ -24,9 +25,11 @@ class _PilotoFalso:
     def __init__(self, roteiro: list[Resultado]) -> None:
         self.roteiro = list(roteiro)
         self.chamadas = 0
+        self.sorteios: list[random.Random | None] = []
 
     def __call__(self, tela, mao, config, pasta, **kwargs) -> Resultado:
         self.chamadas += 1
+        self.sorteios.append(kwargs.get("sorteio"))
         pasta = pathlib.Path(pasta)
         pasta.mkdir(parents=True, exist_ok=True)
         # O que o _Diario de verdade deixa: um PNG por captura e o relatorio.
@@ -50,10 +53,13 @@ class _PilotoFalso:
 class _ResetFalso:
     def __init__(self, funcionou: bool = True) -> None:
         self.categorias: list[CategoriaAlternativa] = []
+        self.sorteios: list[random.Random | None] = []
         self.funcionou = funcionou
 
-    def __call__(self, tela, mao, ritmo=None, categoria_alternativa=None) -> bool:
+    def __call__(self, tela, mao, ritmo=None, categoria_alternativa=None,
+                 sorteio=None) -> bool:
         self.categorias.append(categoria_alternativa)
+        self.sorteios.append(sorteio)
         return self.funcionou
 
 
@@ -146,6 +152,63 @@ def test_a_categoria_do_reset_alterna(monkeypatch, tmp_path):
     assert reset.categorias == [CategoriaAlternativa.FORJA,
                                 CategoriaAlternativa.CHAVE,
                                 CategoriaAlternativa.FORJA]
+
+
+def test_compartilha_um_sorteio_com_todas_as_voltas_e_resets(
+        monkeypatch, tmp_path):
+    sorteio = random.Random(42)
+    piloto = _PilotoFalso([
+        Resultado(Desfecho.NADA_COMPRAVEL),
+        Resultado(Desfecho.COMPRA_ENVIADA),
+        Resultado(Desfecho.NADA_COMPRAVEL),
+    ])
+    reset = _ResetFalso()
+    monkeypatch.setattr("mistfall.ciclo.executar", piloto)
+    monkeypatch.setattr("mistfall.ciclo.resetar_categoria", reset)
+
+    executar_ciclo(
+        tela=None,
+        mao=None,
+        config=None,
+        pasta=tmp_path,
+        interruptor=InterruptorFalso(parar_na_pergunta=4),
+        ritmo=Ritmo.instantaneo(),
+        sorteio=sorteio,
+    )
+
+    assert piloto.sorteios == [sorteio, sorteio, sorteio]
+    assert reset.sorteios == [sorteio, sorteio]
+    assert reset.categorias == [CategoriaAlternativa.FORJA,
+                                CategoriaAlternativa.CHAVE]
+
+
+def test_cria_um_unico_sorteio_quando_a_sessao_nao_recebe_um(
+        monkeypatch, tmp_path):
+    criados = []
+
+    class RandomFalso(random.Random):
+        def __init__(self):
+            super().__init__(42)
+            criados.append(self)
+
+    piloto = _PilotoFalso([Resultado(Desfecho.NADA_COMPRAVEL)] * 2)
+    reset = _ResetFalso()
+    monkeypatch.setattr("mistfall.ciclo.random.Random", RandomFalso)
+    monkeypatch.setattr("mistfall.ciclo.executar", piloto)
+    monkeypatch.setattr("mistfall.ciclo.resetar_categoria", reset)
+
+    executar_ciclo(
+        tela=None,
+        mao=None,
+        config=None,
+        pasta=tmp_path,
+        interruptor=InterruptorFalso(parar_na_pergunta=3),
+        ritmo=Ritmo.instantaneo(),
+    )
+
+    assert len(criados) == 1
+    assert piloto.sorteios == [criados[0], criados[0]]
+    assert reset.sorteios == [criados[0], criados[0]]
 
 
 def test_a_sessao_conta_compras_enviadas(monkeypatch, tmp_path):
