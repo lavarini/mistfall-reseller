@@ -67,7 +67,7 @@ def test_windows_implementa_os_protocolos():
     metodos = lambda c: {n.name for n in classes[c].body if isinstance(n, ast.FunctionDef)}
     assert "capturar" in metodos("TelaWindows")
     assert {
-        "clicar", "apertar_espaco", "apertar_esc",
+        "mover", "clicar", "apertar_espaco", "apertar_esc",
         "selecionar_tudo", "digitar_numero",
     } <= metodos("MaoWindows")
     # Confere aridade, nao so o nome: um `botao=None` extra passaria pela
@@ -77,6 +77,17 @@ def test_windows_implementa_os_protocolos():
         if isinstance(n, ast.FunctionDef) and n.name == "clicar"
     )
     assert [a.arg for a in clicar.args.args] == ["self", "x", "y"]
+
+def test_mover_emite_somente_movimento_absoluto(monkeypatch):
+    chamadas = []
+    monkeypatch.setattr(windows, "_enviar", lambda *entradas: chamadas.append(entradas))
+
+    windows.MaoWindows().mover(2559, 1439)
+
+    assert len(chamadas) == 1
+    (evento,) = chamadas[0]
+    assert evento.uniao.mi.dwFlags == 0x8001
+    assert (evento.uniao.mi.dx, evento.uniao.mi.dy) == (65535, 65535)
 
 def test_tecla_espaco_pressionada_usa_scancode_e_nao_virtual_key():
     # Jogos costumam ler scancode de hardware e ignorar tecla virtual: se o
