@@ -1,14 +1,16 @@
 """O laco: quantas Voltas, quando reseta e com qual Categoria."""
 
+import dataclasses
 import json
 import pathlib
 import random
 import time
 from datetime import datetime
+from types import SimpleNamespace
 
 import pytest
 
-from mistfall.ciclo import Sessao, executar_ciclo
+from mistfall.ciclo import Sessao, _espera_para_proxima_volta, executar_ciclo
 from mistfall.perifericos.falso import InterruptorFalso
 from mistfall.piloto import Desfecho, Resultado, Ritmo
 from mistfall.reset import CategoriaAlternativa
@@ -67,6 +69,82 @@ def _compra_enviada() -> Resultado:
     return Resultado(Desfecho.COMPRA_ENVIADA, ouro_observado=1000)
 
 
+class _RelogioFalso:
+    def __init__(self):
+        self.agora = 100.0
+        self.esperas = []
+
+    def monotonic(self):
+        return self.agora
+
+    def sleep(self, segundos):
+        self.esperas.append(segundos)
+        self.agora += segundos
+
+    def strftime(self, _formato):
+        return "12:00:00"
+
+
+def _instalar_relogio(monkeypatch):
+    relogio = _RelogioFalso()
+    monkeypatch.setattr(
+        "mistfall.ciclo.time",
+        SimpleNamespace(
+            monotonic=relogio.monotonic,
+            sleep=relogio.sleep,
+            strftime=relogio.strftime,
+        ),
+    )
+    return relogio
+
+
+def test_compra_enviada_sorteia_espera_na_faixa_pos_compra():
+    ritmo = Ritmo()
+    vistos = {
+        _espera_para_proxima_volta(
+            Desfecho.COMPRA_ENVIADA, ritmo, random.Random(semente),
+        )
+        for semente in range(12)
+    }
+    assert len(vistos) > 1
+    assert all(0.30 <= espera <= 0.40 for espera in vistos)
+
+
+def test_mesma_semente_reproduz_espera_pos_compra():
+    ritmo = Ritmo()
+    primeira = _espera_para_proxima_volta(
+        Desfecho.COMPRA_ENVIADA, ritmo, random.Random(91),
+    )
+    segunda = _espera_para_proxima_volta(
+        Desfecho.COMPRA_ENVIADA, ritmo, random.Random(91),
+    )
+    assert primeira == segunda
+
+
+def test_sorteio_injetado_da_espera_independe_do_random_global():
+    ritmo = Ritmo()
+    random.seed(1)
+    primeira = _espera_para_proxima_volta(
+        Desfecho.COMPRA_ENVIADA, ritmo, random.Random(73),
+    )
+    random.seed(999)
+    segunda = _espera_para_proxima_volta(
+        Desfecho.COMPRA_ENVIADA, ritmo, random.Random(73),
+    )
+    assert primeira == segunda
+
+
+@pytest.mark.parametrize(
+    "desfecho",
+    [Desfecho.NADA_COMPRAVEL, Desfecho.ABORTOU, Desfecho.SIMULOU],
+)
+def test_desfecho_sem_compra_mantem_espera_comum(desfecho):
+    ritmo = dataclasses.replace(Ritmo.instantaneo(), espera_entre_voltas=0.15)
+    assert _espera_para_proxima_volta(
+        desfecho, ritmo, random.Random(42),
+    ) == 0.15
+
+
 def _rodar(monkeypatch, tmp_path, roteiro, parar_na_pergunta,
            reset_funcionou=True):
     piloto = _PilotoFalso(roteiro)
@@ -111,6 +189,66 @@ def test_o_laco_encerra_quando_o_piloto_devolve_parou(monkeypatch, tmp_path):
         parar_na_pergunta=3)
     assert piloto.chamadas == 1
     assert sessao.voltas == 1
+
+
+def test_ciclo_aplica_espera_pos_compra(monkeypatch, tmp_path):
+    relogio = _instalar_relogio(monkeypatch)
+    ritmo = dataclasses.replace(
+        Ritmo.instantaneo(), espera_apos_compra=(0.30, 0.40),
+    )
+    piloto = _PilotoFalso([_compra_enviada(), Resultado(Desfecho.PAROU)])
+    monkeypatch.setattr("mistfall.ciclo.executar", piloto)
+    monkeypatch.setattr("mistfall.ciclo.resetar_categoria", _ResetFalso())
+
+    executar_ciclo(
+        None, None, None, tmp_path,
+        InterruptorFalso(parar_na_pergunta=3),
+        ritmo=ritmo,
+        sorteio=random.Random(42),
+    )
+
+    assert len(relogio.esperas) == 1
+    assert 0.30 <= relogio.esperas[0] <= 0.40
+
+
+@pytest.mark.parametrize("desfecho", [Desfecho.NADA_COMPRAVEL, Desfecho.ABORTOU])
+def test_ciclo_mantem_150_ms_quando_nao_compra(
+    monkeypatch, tmp_path, desfecho,
+):
+    relogio = _instalar_relogio(monkeypatch)
+    ritmo = dataclasses.replace(
+        Ritmo.instantaneo(),
+        espera_entre_voltas=0.15,
+        espera_apos_compra=(0.30, 0.40),
+    )
+    piloto = _PilotoFalso([Resultado(desfecho), Resultado(Desfecho.PAROU)])
+    monkeypatch.setattr("mistfall.ciclo.executar", piloto)
+    monkeypatch.setattr("mistfall.ciclo.resetar_categoria", _ResetFalso())
+
+    executar_ciclo(
+        None, None, None, tmp_path,
+        InterruptorFalso(parar_na_pergunta=3),
+        ritmo=ritmo,
+        sorteio=random.Random(42),
+    )
+
+    assert relogio.esperas == [0.15]
+
+
+def test_parou_nao_dorme(monkeypatch, tmp_path):
+    relogio = _instalar_relogio(monkeypatch)
+    piloto = _PilotoFalso([Resultado(Desfecho.PAROU)])
+    monkeypatch.setattr("mistfall.ciclo.executar", piloto)
+    monkeypatch.setattr("mistfall.ciclo.resetar_categoria", _ResetFalso())
+
+    executar_ciclo(
+        None, None, None, tmp_path,
+        InterruptorFalso(parar_na_pergunta=2),
+        ritmo=Ritmo(),
+        sorteio=random.Random(42),
+    )
+
+    assert relogio.esperas == []
 
 
 def test_nada_compravel_dispara_reset(monkeypatch, tmp_path):
@@ -238,14 +376,22 @@ def test_o_laco_escreve_ouro_de_cada_volta_em_jsonl(monkeypatch, tmp_path):
     assert [linha["ouro"] for linha in linhas] == [1000, 1000]
 
 
-def test_o_laco_so_registra_intervalo_quando_a_proxima_volta_comeca(
-    monkeypatch, tmp_path
+def test_telemetria_registra_espera_pos_compra_realmente_aplicada(
+    monkeypatch, tmp_path,
 ):
-    _rodar(
-        monkeypatch,
-        tmp_path,
-        [_compra_enviada(), _compra_enviada()],
-        parar_na_pergunta=3,
+    relogio = _instalar_relogio(monkeypatch)
+    ritmo = dataclasses.replace(
+        Ritmo.instantaneo(), espera_apos_compra=(0.35, 0.35),
+    )
+    piloto = _PilotoFalso([_compra_enviada(), Resultado(Desfecho.PAROU)])
+    monkeypatch.setattr("mistfall.ciclo.executar", piloto)
+    monkeypatch.setattr("mistfall.ciclo.resetar_categoria", _ResetFalso())
+
+    executar_ciclo(
+        None, None, None, tmp_path,
+        InterruptorFalso(parar_na_pergunta=3),
+        ritmo=ritmo,
+        sorteio=random.Random(42),
     )
 
     linhas = [
@@ -253,12 +399,41 @@ def test_o_laco_so_registra_intervalo_quando_a_proxima_volta_comeca(
         for linha in (tmp_path / "tempos-do-laco.jsonl").read_text().splitlines()
     ]
 
-    assert [linha["volta"] for linha in linhas] == [1]
-    assert linhas[0]["espera_efetiva_ms"] >= 0
-    assert (
-        linhas[0]["intervalo_entre_inicios_ms"]
-        >= linhas[0]["espera_efetiva_ms"]
+    assert len(linhas) == 1
+    assert linhas[0]["espera_efetiva_ms"] == 350.0
+    assert linhas[0]["intervalo_entre_inicios_ms"] == 350.0
+    assert relogio.esperas == [0.35]
+
+
+def test_telemetria_mede_so_o_sleep_depois_do_sorteio(
+    monkeypatch, tmp_path,
+):
+    relogio = _instalar_relogio(monkeypatch)
+    piloto = _PilotoFalso([_compra_enviada(), Resultado(Desfecho.PAROU)])
+
+    def sortear_espera(desfecho, ritmo, sorteio):
+        relogio.agora += 0.1
+        return 0.35
+
+    monkeypatch.setattr("mistfall.ciclo.executar", piloto)
+    monkeypatch.setattr("mistfall.ciclo.resetar_categoria", _ResetFalso())
+    monkeypatch.setattr(
+        "mistfall.ciclo._espera_para_proxima_volta", sortear_espera,
     )
+
+    executar_ciclo(
+        None, None, None, tmp_path,
+        InterruptorFalso(parar_na_pergunta=3),
+        ritmo=Ritmo.instantaneo(),
+        sorteio=random.Random(42),
+    )
+
+    linhas = [
+        json.loads(linha)
+        for linha in (tmp_path / "tempos-do-laco.jsonl").read_text().splitlines()
+    ]
+    assert linhas[0]["espera_efetiva_ms"] == 350.0
+    assert linhas[0]["intervalo_entre_inicios_ms"] == 450.0
 
 
 def test_cada_volta_tem_a_propria_pasta(monkeypatch, tmp_path):

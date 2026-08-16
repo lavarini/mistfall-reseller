@@ -93,6 +93,9 @@ class Ritmo:
     # esta espera o ciclo gira em rotacao maxima capturando a tela dezenas de
     # vezes por segundo. E palpite calibravel, nao medida.
     espera_entre_voltas: float = 0.15
+    # Tempo extra para a lista se reorganizar depois de uma Compra enviada.
+    # So o ciclo conhece o desfecho e decide quando usar esta faixa.
+    espera_apos_compra: tuple[float, float] = (0.30, 0.40)
 
     @classmethod
     def instantaneo(cls) -> "Ritmo":
@@ -105,6 +108,7 @@ class Ritmo:
             espera_para_o_modal_abrir=(0.0, 0.0),
             espera_categoria_carregar=0.0,
             espera_entre_voltas=0.0,
+            espera_apos_compra=(0.0, 0.0),
         )
 
 
