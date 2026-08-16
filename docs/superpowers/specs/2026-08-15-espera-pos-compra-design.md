@@ -11,10 +11,10 @@ compraram.
 O `Ritmo` passa a expor duas esperas diferentes entre Voltas:
 
 - `espera_entre_voltas`, já existente, continua fixa em `0.15` segundo;
-- `espera_apos_compra`, nova faixa, usa `(0.30, 0.40)` segundo.
+- `espera_apos_compra`, nova faixa, usa `(0.35, 0.45)` segundo.
 
-Depois de `COMPRA_ENVIADA`, o ciclo sorteia uma espera uniformemente distribuída entre 300 e
-400 ms. A média estatística da faixa é 350 ms. Depois de qualquer outro desfecho, o ciclo mantém
+Depois de `COMPRA_ENVIADA`, o ciclo sorteia uma espera uniformemente distribuída entre 350 e
+450 ms. A média estatística da faixa é 400 ms. Depois de qualquer outro desfecho, o ciclo mantém
 a espera fixa atual de 150 ms.
 
 O ajuste não espera nem reconhece uma mudança visual. É uma primeira proteção temporal,
@@ -47,7 +47,7 @@ capturas, cliques e teclas não muda.
 A telemetria de intervalo já mede a duração real da espera entre Voltas. Ela continua recebendo
 `espera_anterior`, agora com o valor efetivamente escolhido:
 
-- aproximadamente 300–400 ms depois de uma Compra enviada;
+- aproximadamente 350–450 ms depois de uma Compra enviada;
 - aproximadamente 150 ms nos demais casos com ritmo padrão.
 
 Não se adiciona campo, arquivo ou evento. A medição existente basta para validar o efeito em uma
@@ -57,7 +57,7 @@ sessão real.
 
 Os testes do ciclo devem provar:
 
-- Compra enviada chama `sleep` com valor dentro de `0.30..0.40`;
+- Compra enviada chama `sleep` com valor dentro de `0.35..0.45`;
 - sementes variadas produzem mais de um valor pós-Compra;
 - a mesma semente reproduz o valor;
 - mudar o estado global de `random` não altera uma sessão com gerador injetado;
@@ -73,8 +73,8 @@ argumento de linha de comando nesta etapa.
 
 ## Documentação operacional
 
-O README deve explicar que, após uma Compra enviada, o loop aguarda um valor sorteado entre 300
-e 400 ms para a lista atualizar. Deve distinguir essa espera dos 150 ms mantidos após Voltas sem
+O README deve explicar que, após uma Compra enviada, o loop aguarda um valor sorteado entre 350
+e 450 ms para a lista atualizar. Deve distinguir essa espera dos 150 ms mantidos após Voltas sem
 Compra.
 
 ## Fora de escopo
