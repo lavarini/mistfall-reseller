@@ -36,6 +36,7 @@ class RitmoVenda:
     teto_espera_janela: float = 10.0
     teto_espera_fechamento: float = 10.0
     esperas_capacidade_cheia: tuple[float, ...] = (20.0, 40.0, 60.0)
+    pausa_interacao_modal: float = 0.05
 
     @classmethod
     def instantaneo(cls) -> "RitmoVenda":
@@ -45,6 +46,7 @@ class RitmoVenda:
             teto_espera_janela=0.02,
             teto_espera_fechamento=0.02,
             esperas_capacidade_cheia=(0.0, 0.0, 0.0),
+            pausa_interacao_modal=0.0,
         )
 
 
@@ -163,12 +165,17 @@ def executar_venda(
             return resultado
         _gravar(pasta, "01-janela.png", janela)
 
+        time.sleep(ritmo.pausa_interacao_modal)
         mao.clicar(*CENTRO_PRECO_VENDA)
+        time.sleep(ritmo.pausa_interacao_modal)
         mao.selecionar_tudo()
         mao.digitar_numero(preco_venda)
+        time.sleep(ritmo.pausa_interacao_modal)
         mao.clicar(*CENTRO_QUANTIDADE_VENDA)
+        time.sleep(ritmo.pausa_interacao_modal)
         mao.selecionar_tudo()
         mao.digitar_numero(3)
+        time.sleep(ritmo.pausa_interacao_modal)
         # O campo Quantidade continua com foco depois da digitacao. Nesse
         # estado, Espaco e inserido no campo em vez de acionar o atalho do
         # botao — observado na primeira execucao real de Venda. O clique

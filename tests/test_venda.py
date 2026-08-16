@@ -32,6 +32,11 @@ def dentro(ponto, area):
     return x0 <= x <= x1 and y0 <= y <= y1
 
 
+def test_ritmo_do_modal_tem_pausa_curta_e_ritmo_instantaneo_nao_espera():
+    assert RitmoVenda().pausa_interacao_modal == 0.05
+    assert RitmoVenda.instantaneo().pausa_interacao_modal == 0.0
+
+
 def test_executa_um_stack_com_cliques_dentro_das_areas_seguras(tmp_path):
     tela = TelaFalsa([STASH, MODAL, STASH])
     mao = MaoFalsa()
