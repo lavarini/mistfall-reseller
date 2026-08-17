@@ -11,6 +11,7 @@ from mistfall.ciclo_venda import (
     DesfechoSessaoVenda,
     executar_ciclo_venda,
 )
+from mistfall.venda_visao import PainelItens
 
 
 STASH = "images/venda-stash-2.png"
@@ -75,10 +76,10 @@ def test_processa_o_bau_uma_vez_e_vende_todos_os_stacks_tres(monkeypatch, tmp_pa
 
 
 def test_rele_candidatos_depois_de_reabrir_armazem(monkeypatch, tmp_path):
-    grades = iter([
-        [SlotArmazem(0, 0, ItemAlvo.BROCHE, 3)],
-        [SlotArmazem(0, 0, ItemAlvo.ADAGA, 3)],
-    ])
+    slots = [
+        SlotArmazem(0, 0, ItemAlvo.BROCHE, 3),
+        SlotArmazem(0, 1, ItemAlvo.ADAGA, 3),
+    ]
     capacidades = iter([
         CapacidadeVenda(0, 15),
         CapacidadeVenda(1, 15),
@@ -87,7 +88,11 @@ def test_rele_candidatos_depois_de_reabrir_armazem(monkeypatch, tmp_path):
     vendidos = []
     monkeypatch.setattr("mistfall.ciclo_venda.ler_capacidade", lambda _: next(capacidades))
     monkeypatch.setattr("mistfall.ciclo_venda.ler_bau_selecionado", lambda _: Bau.QUARTO)
-    monkeypatch.setattr("mistfall.ciclo_venda.varrer_armazem", lambda _: next(grades))
+    varreduras = []
+    monkeypatch.setattr(
+        "mistfall.ciclo_venda.varrer_armazem",
+        lambda frame: varreduras.append(frame) or slots,
+    )
 
     def vender(tela, mao, slot, preco, pasta, ritmo, recebido):
         vendidos.append((slot.item, preco))
@@ -107,6 +112,36 @@ def test_rele_candidatos_depois_de_reabrir_armazem(monkeypatch, tmp_path):
         (ItemAlvo.ADAGA, config().precos_venda[ItemAlvo.ADAGA]),
     ]
     assert sessao.vendas == 2
+    assert len(varreduras) == 1
+
+
+def test_painel_inventario_no_inicio_aborta_antes_de_varrer(monkeypatch, tmp_path):
+    varreduras = []
+    monkeypatch.setattr("mistfall.ciclo_venda.eh_tela_venda", lambda _: True)
+    monkeypatch.setattr(
+        "mistfall.ciclo_venda.ler_painel_itens",
+        lambda _: PainelItens.INVENTARIO,
+    )
+    monkeypatch.setattr(
+        "mistfall.ciclo_venda.ler_capacidade",
+        lambda _: CapacidadeVenda(0, 12),
+    )
+    monkeypatch.setattr("mistfall.ciclo_venda.ler_bau_selecionado", lambda _: Bau.SEGUNDO)
+    monkeypatch.setattr(
+        "mistfall.ciclo_venda.varrer_armazem",
+        lambda frame: varreduras.append(frame) or [],
+    )
+    mao = MaoFalsa()
+
+    sessao = executar_ciclo_venda(
+        TelaFalsa([STASH]), mao, config(), tmp_path,
+        InterruptorFalso(), RitmoVenda.instantaneo(),
+    )
+
+    assert sessao.desfecho is DesfechoSessaoVenda.ABORTOU
+    assert "Armazem" in sessao.motivo
+    assert varreduras == []
+    assert mao.acoes == []
 
 
 def test_forca_reset_quando_primeira_varredura_nao_encontra_alvo(monkeypatch, tmp_path):

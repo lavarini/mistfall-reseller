@@ -8,6 +8,8 @@ from mistfall.venda_visao import (
     caixa_slot_armazem,
     centro_bau,
     centro_slot_armazem,
+    eh_janela_venda,
+    eh_tela_venda,
     escolher_slot_de_venda,
     REGIAO_CAPACIDADE,
     ler_bau_selecionado,
@@ -44,6 +46,44 @@ def test_detecta_bau_dourado_selecionado(stash_2, stash_3):
 
 def test_detecta_painel_armazem_selecionado(stash_2):
     assert ler_painel_itens(stash_2) is PainelItens.ARMAZEM
+
+
+def test_tela_com_resgate_continua_como_tela_de_venda():
+    imagem = cv2.imread("images/tela-venda-resgatar.png")
+    assert ler_painel_itens(imagem) is PainelItens.ARMAZEM
+    assert eh_tela_venda(imagem)
+    assert ler_capacidade(imagem) == CapacidadeVenda(0, 15)
+
+
+def test_modal_com_resgate_continua_como_janela_de_venda():
+    imagem = cv2.imread("images/modal-venda-resgatar.png")
+    assert eh_janela_venda(imagem)
+
+
+def test_varredura_mapeia_slots_com_quatro_trabalhadores(monkeypatch):
+    chamada = {}
+
+    def mapear(funcao, itens, trabalhadores):
+        chamada["trabalhadores"] = trabalhadores
+        itens = list(itens)
+        chamada["itens"] = itens
+        return [funcao(item) for item in itens]
+
+    monkeypatch.setattr("mistfall.venda_visao.mapear", mapear)
+    monkeypatch.setattr(
+        "mistfall.venda_visao._identificar_item_do_slot",
+        lambda _: None,
+    )
+
+    resultado = varrer_armazem(np.zeros((1440, 2560, 3), dtype=np.uint8))
+
+    assert chamada["trabalhadores"] == 4
+    assert len(chamada["itens"]) == 56
+    assert [(slot.linha, slot.coluna) for slot in resultado] == [
+        (linha, coluna)
+        for linha in range(7)
+        for coluna in range(8)
+    ]
 
 
 def test_painel_de_itens_ambiguo_e_recusado(monkeypatch, stash_2):

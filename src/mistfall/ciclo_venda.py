@@ -147,6 +147,11 @@ def executar_ciclo_venda(
         while True:
             if not eh_tela_venda(frame):
                 return encerrar(DesfechoSessaoVenda.ABORTOU, "tela de Venda ilegivel")
+            if ler_painel_itens(frame) is not PainelItens.ARMAZEM:
+                return encerrar(
+                    DesfechoSessaoVenda.ABORTOU,
+                    "Armazem nao esta selecionado",
+                )
 
             capacidade = ler_capacidade(frame)
             if capacidade is None:
@@ -209,10 +214,6 @@ def executar_ciclo_venda(
                             "Capacidade de Venda ilegivel depois da Venda",
                         )
                     sessao.capacidade_final = capacidade
-
-                    if resultado.armazem_reaberto:
-                        candidatos = _candidatos(frame)
-                        resetou_armazem = True
 
                 if resetou_armazem:
                     break

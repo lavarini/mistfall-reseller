@@ -9,6 +9,7 @@ import pytesseract
 
 from mistfall.geometria import conferir_resolucao
 from mistfall.itens import identificar_item, pontuar
+from mistfall.paralelo import TRABALHADORES_PADRAO, mapear
 from mistfall.tipos import Bau, CapacidadeVenda, SlotArmazem
 
 
@@ -173,16 +174,21 @@ def _ler_quantidade(slot: np.ndarray) -> int | None:
     return int(texto) if texto.isdigit() else None
 
 
+def _ler_slot(tarefa):
+    linha, coluna, regiao = tarefa
+    item = _identificar_item_do_slot(regiao)
+    quantidade = _ler_quantidade(regiao) if item is not None else None
+    return SlotArmazem(linha, coluna, item, quantidade)
+
+
 def varrer_armazem(img: np.ndarray) -> list[SlotArmazem]:
     conferir_resolucao(img)
-    resultado = []
-    for linha in range(LINHAS_ARMAZEM):
-        for coluna in range(COLUNAS_ARMAZEM):
-            regiao = _recortar_slot(img, linha, coluna)
-            item = _identificar_item_do_slot(regiao)
-            quantidade = _ler_quantidade(regiao) if item is not None else None
-            resultado.append(SlotArmazem(linha, coluna, item, quantidade))
-    return resultado
+    tarefas = [
+        (linha, coluna, _recortar_slot(img, linha, coluna))
+        for linha in range(LINHAS_ARMAZEM)
+        for coluna in range(COLUNAS_ARMAZEM)
+    ]
+    return mapear(_ler_slot, tarefas, TRABALHADORES_PADRAO)
 
 
 def escolher_slot_de_venda(slots: list[SlotArmazem]) -> SlotArmazem | None:
