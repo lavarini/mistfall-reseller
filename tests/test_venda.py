@@ -35,6 +35,7 @@ def dentro(ponto, area):
 def test_ritmo_do_modal_tem_pausa_curta_e_ritmo_instantaneo_nao_espera():
     assert RitmoVenda().pausa_interacao_modal == 0.05
     assert RitmoVenda().pausa_antes_do_preco == 0.15
+    assert RitmoVenda().esperas_capacidade_cheia == (1.0, 5.0, 10.0, 20.0, 30.0)
     assert RitmoVenda.instantaneo().pausa_interacao_modal == 0.0
     assert RitmoVenda.instantaneo().pausa_antes_do_preco == 0.0
 
