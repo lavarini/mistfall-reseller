@@ -31,6 +31,7 @@ ESTADO_ESPERADO = {
     "tela-venda-resgatar": EstadoTela.VENDA,
     "modal-venda-broche": EstadoTela.JANELA_VENDA,
     "modal-venda-resgatar": EstadoTela.JANELA_VENDA,
+    "loading-modal-venda": EstadoTela.JANELA_VENDA,
 }
 
 @pytest.mark.parametrize("nome,esperado", sorted(ESTADO_ESPERADO.items()))

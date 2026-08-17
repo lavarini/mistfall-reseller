@@ -37,6 +37,7 @@ class RitmoVenda:
     teto_espera_fechamento: float = 10.0
     esperas_capacidade_cheia: tuple[float, ...] = (20.0, 40.0, 60.0)
     pausa_interacao_modal: float = 0.05
+    pausa_antes_do_preco: float = 0.15
 
     @classmethod
     def instantaneo(cls) -> "RitmoVenda":
@@ -47,6 +48,7 @@ class RitmoVenda:
             teto_espera_fechamento=0.02,
             esperas_capacidade_cheia=(0.0, 0.0, 0.0),
             pausa_interacao_modal=0.0,
+            pausa_antes_do_preco=0.0,
         )
 
 
@@ -165,7 +167,7 @@ def executar_venda(
             return resultado
         _gravar(pasta, "01-janela.png", janela)
 
-        time.sleep(ritmo.pausa_interacao_modal)
+        time.sleep(ritmo.pausa_antes_do_preco)
         mao.clicar(*CENTRO_PRECO_VENDA)
         time.sleep(ritmo.pausa_interacao_modal)
         mao.selecionar_tudo()
