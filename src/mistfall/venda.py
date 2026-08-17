@@ -35,7 +35,7 @@ class RitmoVenda:
     intervalo_entre_perguntas: float = 0.1
     teto_espera_janela: float = 10.0
     teto_espera_fechamento: float = 10.0
-    esperas_capacidade_cheia: tuple[float, ...] = (1.0, 5.0, 10.0, 20.0, 30.0)
+    esperas_capacidade_cheia: tuple[float, ...] = (1.0, 2.0, 5.0, 10.0)
     pausa_interacao_modal: float = 0.05
     pausa_antes_do_preco: float = 0.15
 
@@ -46,7 +46,7 @@ class RitmoVenda:
             intervalo_entre_perguntas=0.0,
             teto_espera_janela=0.02,
             teto_espera_fechamento=0.02,
-            esperas_capacidade_cheia=(0.0, 0.0, 0.0, 0.0, 0.0),
+            esperas_capacidade_cheia=(0.0, 0.0, 0.0, 0.0),
             pausa_interacao_modal=0.0,
             pausa_antes_do_preco=0.0,
         )
