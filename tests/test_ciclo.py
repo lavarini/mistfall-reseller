@@ -10,7 +10,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from mistfall.ciclo import Sessao, _espera_para_proxima_volta, executar_ciclo
+from mistfall.ciclo import (
+    Sessao,
+    _espera_para_proxima_volta,
+    _esperar_lista_atualizada,
+    executar_ciclo,
+)
 from mistfall.perifericos.falso import InterruptorFalso
 from mistfall.piloto import Desfecho, Resultado, Ritmo
 from mistfall.reset import CategoriaAlternativa
@@ -85,6 +90,16 @@ class _RelogioFalso:
         return "12:00:00"
 
 
+class _TelaSequencia:
+    def __init__(self, frames):
+        self.frames = iter(frames)
+        self.capturas = 0
+
+    def capturar(self):
+        self.capturas += 1
+        return next(self.frames)
+
+
 def _instalar_relogio(monkeypatch):
     relogio = _RelogioFalso()
     monkeypatch.setattr(
@@ -96,6 +111,21 @@ def _instalar_relogio(monkeypatch):
         ),
     )
     return relogio
+
+
+def test_espera_lista_mudar_e_assentar_depois_de_compra(monkeypatch):
+    relogio = _instalar_relogio(monkeypatch)
+    monkeypatch.setattr("mistfall.ciclo.assinatura_das_listagens", lambda frame: frame)
+    tela = _TelaSequencia(["antiga", "antiga", "nova", "nova"])
+    ritmo = dataclasses.replace(
+        Ritmo.instantaneo(),
+        teto_espera_atualizacao=0.5,
+        intervalo_sondagem_atualizacao=0.1,
+    )
+
+    assert _esperar_lista_atualizada(tela, "antiga", ritmo) is True
+    assert tela.capturas == 4
+    assert relogio.esperas == [0.1, 0.1, 0.1]
 
 
 def test_compra_enviada_sorteia_espera_na_faixa_pos_compra():

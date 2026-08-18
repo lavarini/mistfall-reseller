@@ -56,7 +56,7 @@ from mistfall.janela import (
     ler_preco_total_da_janela, ler_quantidade_da_janela,
     pontuar_icone_da_janela,
 )
-from mistfall.leilao import conferir_ordenacao
+from mistfall.leilao import assinatura_das_listagens, conferir_ordenacao
 from mistfall.paralelo import mapear
 from mistfall.perifericos.protocolos import Interruptor, Mao, Tela
 from mistfall.tipos import EstadoTela, Listagem
@@ -96,6 +96,10 @@ class Ritmo:
     # Tempo extra para a lista se reorganizar depois de uma Compra enviada.
     # So o ciclo conhece o desfecho e decide quando usar esta faixa.
     espera_apos_compra: tuple[float, float] = (0.65, 0.75)
+    # Depois do piso acima, sondamos a lista ate ela trocar e repetir o mesmo
+    # frame. O teto cobre uma atualizacao lenta sem travar o laco para sempre.
+    teto_espera_atualizacao: float = 1.0
+    intervalo_sondagem_atualizacao: float = 0.1
 
     @classmethod
     def instantaneo(cls) -> "Ritmo":
@@ -109,6 +113,8 @@ class Ritmo:
             espera_categoria_carregar=0.0,
             espera_entre_voltas=0.0,
             espera_apos_compra=(0.0, 0.0),
+            teto_espera_atualizacao=0.0,
+            intervalo_sondagem_atualizacao=0.0,
         )
 
 
@@ -133,6 +139,7 @@ class Resultado:
     motivo: str = ""
     listagem: Listagem | None = None
     ouro_observado: int | None = None
+    assinatura_pre_voo: str | None = None
     segundos_ate_a_janela: float | None = None
     # Tudo que foi lido dentro da Janela, gravado mesmo quando aborta: e o
     # diagnostico que volta da maquina Windows, onde ninguem pode depurar.
@@ -310,6 +317,7 @@ def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
     try:
         inicio = time.monotonic()
         inicial = tela.capturar()
+        r.assinatura_pre_voo = assinatura_das_listagens(inicial)
         instante_captura = time.monotonic()
         horario_captura = datetime.now().astimezone()
         r.tempos["captura_pre_voo"] = (instante_captura - inicio) * 1000

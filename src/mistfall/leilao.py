@@ -1,4 +1,5 @@
 import dataclasses
+import hashlib
 import time
 
 import numpy as np
@@ -6,6 +7,22 @@ from mistfall.geometria import TODOS_OS_SLOTS, regiao_icone, recorte_preco
 from mistfall.itens import identificar_item
 from mistfall.precos import ler_precos
 from mistfall.tipos import Listagem
+
+
+def assinatura_das_listagens(img: np.ndarray) -> str:
+    """Resume apenas os sinais que mudam quando a lista e redesenhada.
+
+    O aviso de Compra pode ficar sobre a tela por mais tempo que a lista e
+    possui animacao propria. Ele nao entra na assinatura: o ciclo precisa
+    esperar a troca das Listagens, nao o desaparecimento de um aviso.
+    """
+    partes = []
+    for linha, coluna in TODOS_OS_SLOTS:
+        partes.extend((
+            regiao_icone(img, linha, coluna).tobytes(),
+            recorte_preco(img, linha, coluna).tobytes(),
+        ))
+    return hashlib.sha256(b"".join(partes)).hexdigest()
 
 def varrer_bruto(
     img: np.ndarray, tempos: dict[str, float] | None = None

@@ -20,6 +20,7 @@ from pathlib import Path
 from mistfall.config import Config
 from mistfall.perifericos.protocolos import Interruptor, Mao, Tela
 from mistfall.piloto import RITMO_PADRAO, Desfecho, Resultado, Ritmo, executar
+from mistfall.leilao import assinatura_das_listagens
 from mistfall.reset import CategoriaAlternativa, resetar_categoria
 from mistfall.telemetria import TelemetriaSessao
 
@@ -107,6 +108,35 @@ def _espera_para_proxima_volta(
     return ritmo.espera_entre_voltas
 
 
+def _esperar_lista_atualizada(
+    tela: Tela, assinatura_anterior: str, ritmo: Ritmo,
+) -> bool:
+    """Espera a lista trocar e depois ficar igual em duas capturas.
+
+    A primeira captura apos a Compra ainda pode conter a lista antiga com o
+    aviso de sucesso por cima. A assinatura ignora o aviso e olha icones e
+    precos dos slots. O timeout e deliberado: se o jogo nao redesenhar, o
+    ciclo segue e o Reset continua sendo a recuperacao do caso.
+    """
+    inicio = time.monotonic()
+    ultima = None
+    mudou = False
+    estaveis = 0
+    while time.monotonic() - inicio <= ritmo.teto_espera_atualizacao:
+        assinatura = assinatura_das_listagens(tela.capturar())
+        if assinatura != assinatura_anterior:
+            mudou = True
+        if mudou and assinatura == ultima:
+            estaveis += 1
+        else:
+            estaveis = 1 if mudou else 0
+        if mudou and estaveis >= 2:
+            return True
+        ultima = assinatura
+        time.sleep(ritmo.intervalo_sondagem_atualizacao)
+    return False
+
+
 def executar_ciclo(tela: Tela, mao: Mao, config: Config, pasta: Path,
                    interruptor: Interruptor, ritmo: Ritmo = RITMO_PADRAO,
                    sorteio: random.Random | None = None) -> Sessao:
@@ -190,6 +220,11 @@ def executar_ciclo(tela: Tela, mao: Mao, config: Config, pasta: Path,
         espera = _espera_para_proxima_volta(resultado.desfecho, ritmo, sorteio)
         inicio_espera = time.monotonic()
         time.sleep(espera)
+        if (resultado.desfecho is Desfecho.COMPRA_ENVIADA
+                and resultado.assinatura_pre_voo is not None):
+            _esperar_lista_atualizada(
+                tela, resultado.assinatura_pre_voo, ritmo,
+            )
         espera_anterior = time.monotonic() - inicio_espera
 
     for linha in linhas_do_fecho(sessao):
