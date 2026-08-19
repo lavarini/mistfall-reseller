@@ -88,7 +88,8 @@ class Ritmo:
     # Tempo dado ao Leilao para redesenhar a lista depois da troca de
     # Categoria. Tambem serve ao Reset standalone, antes de o loop existir.
     espera_categoria_carregar: float = 1.0
-    # Respiro entre uma Volta e a proxima. Nao e cosmetico: como so o F3 para
+    # Respiro entre uma Volta e a proxima. Nao e cosmetico: como o F3 inicia e
+    # o F4 para
     # o laco, uma tela que nao seja LISTA faz o pre-voo abortar na hora, e sem
     # esta espera o ciclo gira em rotacao maxima capturando a tela dezenas de
     # vezes por segundo. E palpite calibravel, nao medida.

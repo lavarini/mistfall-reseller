@@ -256,6 +256,7 @@ def test_capturar_converte_bgra_para_bgr():
 def test_interruptor_padrao_usa_f3_para_inicio_e_f4_para_parada():
     interruptor = windows.InterruptorWindows()
 
+    assert not hasattr(windows, "VK_F2")
     assert interruptor._vk_inicio == windows.VK_F3
     assert interruptor._vk_parada == windows.VK_F4
 

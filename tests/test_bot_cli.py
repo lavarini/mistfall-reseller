@@ -28,8 +28,10 @@ def test_parar_antes_da_primeira_volta_sai_com_sucesso(monkeypatch, tmp_path):
     perifericos = types.ModuleType("mistfall.perifericos.windows")
     class InterruptorWindows:
         def __init__(self):
-            self.teclas = (0x72, 0x73)
+            self.teclas = (perifericos.VK_F3, perifericos.VK_F4)
 
+    perifericos.VK_F3 = 0x72
+    perifericos.VK_F4 = 0x73
     perifericos.InterruptorWindows = InterruptorWindows
     perifericos.MaoWindows = type("MaoWindows", (), {})
     perifericos.TelaWindows = type("TelaWindows", (), {})
@@ -54,7 +56,7 @@ def test_parar_antes_da_primeira_volta_sai_com_sucesso(monkeypatch, tmp_path):
     assert ritmo.espera_para_o_modal_abrir == (0.1, 0.15)
     interruptor = visto["args"][4]
     assert isinstance(interruptor, InterruptorWindows)
-    assert interruptor.teclas == (0x72, 0x73)
+    assert interruptor.teclas == (perifericos.VK_F3, perifericos.VK_F4)
 
 
 def test_bot_anuncia_f3_para_comecar_e_f4_para_parar(capsys, monkeypatch, tmp_path):

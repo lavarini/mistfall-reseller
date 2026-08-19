@@ -86,7 +86,7 @@ def test_o_interruptor_falso_conta_as_perguntas():
 
 def test_o_interruptor_falso_registra_o_inicio():
     # esperar_inicio nao bloqueia no duble: so anota que foi chamado, para o
-    # teste do ciclo poder afirmar que o laco espera pelo F2 antes de agir.
+    # teste do ciclo poder afirmar que o laco espera pelo F3 antes de agir.
     interruptor = InterruptorFalso()
     interruptor.esperar_inicio()
     assert interruptor.inicios == 1

@@ -4,7 +4,7 @@ Nao duplica nada do piloto nem do reset — compoe os dois. O piloto continua
 sendo "uma Compra e para"; quem sabe que existe uma proxima Volta e este
 modulo.
 
-So o F3 encerra o laco. Nenhuma falha o encerra, por mais que se repita:
+So o F4 encerra o laco; o F3 inicia. Nenhuma falha o encerra, por mais que se repita:
 decisao do dono do projeto, registrada na spec junto com o que ela deixa em
 aberto. A `espera_entre_voltas` e o que impede uma tela errada de virar um
 laco em rotacao maxima.

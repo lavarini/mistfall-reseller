@@ -279,7 +279,7 @@ def test_parada_antes_do_clique_nao_clica(tmp_path):
                  sorteio=random.Random(1),
                  interruptor=InterruptorFalso(parar_na_pergunta=1))
     assert r.desfecho is Desfecho.PAROU
-    # O ponto da abordagem cooperativa: F3 durante a varredura nao pode
+    # O ponto da abordagem cooperativa: F4 durante a varredura nao pode
     # deixar o bot completar mais uma Compra.
     assert mao.acoes == []
 

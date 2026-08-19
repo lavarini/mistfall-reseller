@@ -47,7 +47,6 @@ SCANCODE_DIGITO = {"0": 0x0B, **{str(numero): numero + 1 for numero in range(1, 
 # Virtual-key das teclas de controle do operador. Aqui e virtual-key mesmo, e
 # nao scancode: GetAsyncKeyState le o teclado do lado de ca, e nao injeta
 # evento no jogo — e o oposto do que o SendInput faz.
-VK_F2 = 0x71
 VK_F3 = 0x72
 VK_F4 = 0x73
 
