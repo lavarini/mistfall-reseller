@@ -246,6 +246,31 @@ def test_espaco_encerra_a_compra_sem_captura_posterior(tmp_path):
     assert tela.capturas_feitas == 1
     assert [acao[0] for acao in mao.acoes] == ["clicar", "apertar_espaco"]
 
+
+def test_observador_recebe_o_frame_inicial_antes_de_qualquer_clique(tmp_path):
+    vistos = []
+    mao = MaoFalsa()
+
+    executar(
+        roteiro_feliz(), mao, cfg(), tmp_path, ritmo=JA,
+        observador_frame_inicial=lambda frame: vistos.append(
+            (frame, list(mao.acoes))),
+    )
+
+    assert len(vistos) == 1
+    frame, acoes_no_callback = vistos[0]
+    assert frame.shape == cv2.imread(LISTA).shape
+    assert (frame == cv2.imread(LISTA)).all()
+    assert acoes_no_callback == []
+
+
+def test_sem_observador_frame_inicial_mantem_uma_captura(tmp_path):
+    tela = TelaFalsa([LISTA])
+
+    executar(tela, MaoFalsa(), cfg(), tmp_path, ritmo=JA)
+
+    assert tela.capturas_feitas == 1
+
 def test_a_conferencia_reprovaria_o_frame_em_animacao(tmp_path):
     # Captura real da maquina do jogo: a Janela e reconhecivel como
     # JANELA_CONFIRMACAO enquanto ainda se expande, e nessa fase esta 69 px

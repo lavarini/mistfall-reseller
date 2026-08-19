@@ -295,7 +295,9 @@ def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
              observador_ouro: Callable[
                  [int | None, float, datetime], None
              ] | None = None,
-             concorrente: bool = False) -> Resultado:
+             concorrente: bool = False,
+             observador_frame_inicial: Callable[[np.ndarray], None] | None = None,
+             ) -> Resultado:
     diario = _Diario(Path(pasta))
     r = Resultado(Desfecho.ABORTOU, "explodiu antes da primeira captura")
     if sorteio is None:
@@ -311,6 +313,8 @@ def executar(tela: Tela, mao: Mao, config: Config, pasta: Path,
     try:
         inicio = time.monotonic()
         inicial = tela.capturar()
+        if observador_frame_inicial is not None:
+            observador_frame_inicial(inicial)
         instante_captura = time.monotonic()
         horario_captura = datetime.now().astimezone()
         r.tempos["captura_pre_voo"] = (instante_captura - inicio) * 1000

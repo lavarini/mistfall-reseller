@@ -16,6 +16,9 @@ import time
 import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
+
+import numpy as np
 
 from mistfall.config import Config
 from mistfall.perifericos.protocolos import Interruptor, Mao, Tela
@@ -109,7 +112,10 @@ def _espera_para_proxima_volta(
 
 def executar_ciclo(tela: Tela, mao: Mao, config: Config, pasta: Path,
                    interruptor: Interruptor, ritmo: Ritmo = RITMO_PADRAO,
-                   sorteio: random.Random | None = None) -> Sessao:
+                   sorteio: random.Random | None = None,
+                   observador_frame_inicial: Callable[
+                       [np.ndarray], None
+                   ] | None = None) -> Sessao:
     if sorteio is None:
         sorteio = random.Random()
 
@@ -147,7 +153,8 @@ def executar_ciclo(tela: Tela, mao: Mao, config: Config, pasta: Path,
 
         resultado = executar(tela, mao, config, pasta_da_volta, ritmo=ritmo,
                              sorteio=sorteio, interruptor=interruptor,
-                             observador_ouro=registrar_ouro)
+                             observador_ouro=registrar_ouro,
+                             observador_frame_inicial=observador_frame_inicial)
         _contabilizar(sessao, resultado)
 
         resetou = None

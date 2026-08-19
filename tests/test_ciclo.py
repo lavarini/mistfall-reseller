@@ -28,10 +28,12 @@ class _PilotoFalso:
         self.roteiro = list(roteiro)
         self.chamadas = 0
         self.sorteios: list[random.Random | None] = []
+        self.frame_observadores = []
 
     def __call__(self, tela, mao, config, pasta, **kwargs) -> Resultado:
         self.chamadas += 1
         self.sorteios.append(kwargs.get("sorteio"))
+        self.frame_observadores.append(kwargs.get("observador_frame_inicial"))
         pasta = pathlib.Path(pasta)
         pasta.mkdir(parents=True, exist_ok=True)
         # O que o _Diario de verdade deixa: um PNG por captura e o relatorio.
@@ -181,6 +183,23 @@ def test_o_laco_roda_ate_a_parada(monkeypatch, tmp_path):
         parar_na_pergunta=4)
     assert piloto.chamadas == 3
     assert sessao.voltas == 3
+
+
+def test_ciclo_encaminha_observador_do_frame_inicial(monkeypatch, tmp_path):
+    piloto = _PilotoFalso([Resultado(Desfecho.PAROU)])
+    observador = object()
+    monkeypatch.setattr("mistfall.ciclo.executar", piloto)
+    monkeypatch.setattr("mistfall.ciclo.resetar_categoria", _ResetFalso())
+
+    executar_ciclo(
+        tela=None, mao=None, config=None, pasta=tmp_path,
+        interruptor=InterruptorFalso(parar_na_pergunta=2),
+        ritmo=Ritmo.instantaneo(),
+        observador_frame_inicial=observador,
+    )
+
+    assert piloto.chamadas == 1
+    assert piloto.frame_observadores == [observador]
 
 
 def test_o_laco_encerra_quando_o_piloto_devolve_parou(monkeypatch, tmp_path):
