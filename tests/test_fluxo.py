@@ -32,6 +32,23 @@ def test_tres_intervalos_lentos_consecutivos_entram_em_ritmo_lento():
     assert _rodar(sequencia) is ModoFluxo.LENTO
 
 
+def test_terceiro_intervalo_lento_dispara_venda_imediata():
+    estado = estado_inicial()
+    eventos = (
+        [EventoFluxo.INTENCAO]
+        + [EventoFluxo.RESET] * 3
+        + [EventoFluxo.INTENCAO]
+        + [EventoFluxo.RESET] * 3
+        + [EventoFluxo.INTENCAO]
+        + [EventoFluxo.RESET] * 3
+    )
+    for evento in eventos:
+        estado, _ = aplicar_evento(estado, evento)
+    estado, acao = aplicar_evento(estado, EventoFluxo.INTENCAO)
+    assert estado.modo is ModoFluxo.LENTO
+    assert acao is AcaoFluxo.VENDER_POR_FLUXO_LENTO
+
+
 def test_intervalos_lentos_sao_reiniciados_por_intervalo_rapido():
     estado = estado_inicial()
     for evento in (
@@ -49,6 +66,25 @@ def test_intervalos_lentos_sao_reiniciados_por_intervalo_rapido():
 
 def test_cinco_resets_consecutivos_entram_imediatamente_em_ritmo_lento():
     assert _rodar(["reset"] * 5) is ModoFluxo.LENTO
+
+
+def test_quinto_reset_dispara_venda_imediata():
+    estado = estado_inicial()
+    for _ in range(4):
+        estado, acao = aplicar_evento(estado, EventoFluxo.RESET)
+        assert acao is AcaoFluxo.CONTINUAR_COMPRA
+    estado, acao = aplicar_evento(estado, EventoFluxo.RESET)
+    assert estado.modo is ModoFluxo.LENTO
+    assert acao is AcaoFluxo.VENDER_POR_FLUXO_LENTO
+
+
+def test_sinal_nao_transicional_e_modo_ja_lento_continuam_compra():
+    estado, acao = aplicar_evento(estado_inicial(), EventoFluxo.RESET)
+    assert acao is AcaoFluxo.CONTINUAR_COMPRA
+    estado = estado_inicial(modo=ModoFluxo.LENTO)
+    estado, acao = aplicar_evento(estado, EventoFluxo.RESET)
+    assert estado.modo is ModoFluxo.LENTO
+    assert acao is AcaoFluxo.CONTINUAR_COMPRA
 
 
 def test_reset_zera_intencoes_desde_reset_e_intencao_incrementa():

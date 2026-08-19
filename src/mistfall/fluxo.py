@@ -145,6 +145,9 @@ def aplicar_evento(
             if intervalos >= 3 or estado.resets_consecutivos >= 5
             else estado.modo
         )
+        transicionou_para_lento = (
+            estado.modo is ModoFluxo.RAPIDO and modo is ModoFluxo.LENTO
+        )
         novo = replace(
             estado,
             intencoes_desde_reset=estado.intencoes_desde_reset + 1,
@@ -153,11 +156,19 @@ def aplicar_evento(
             resets_consecutivos=0,
             modo=modo,
         )
-        return novo, AcaoFluxo.EXECUTAR_COMPRA
+        acao = (
+            AcaoFluxo.VENDER_POR_FLUXO_LENTO
+            if transicionou_para_lento
+            else AcaoFluxo.EXECUTAR_COMPRA
+        )
+        return novo, acao
 
     if tipo is _TipoEvento.RESET_EXECUTADO:
         consecutivos = estado.resets_consecutivos + 1
         modo = ModoFluxo.LENTO if consecutivos >= 5 else estado.modo
+        transicionou_para_lento = (
+            estado.modo is ModoFluxo.RAPIDO and modo is ModoFluxo.LENTO
+        )
         novo = replace(
             estado,
             intencoes_desde_reset=0,
@@ -165,7 +176,12 @@ def aplicar_evento(
             resets_consecutivos=consecutivos,
             modo=modo,
         )
-        return novo, AcaoFluxo.CONTINUAR_COMPRA
+        acao = (
+            AcaoFluxo.VENDER_POR_FLUXO_LENTO
+            if transicionou_para_lento
+            else AcaoFluxo.CONTINUAR_COMPRA
+        )
+        return novo, acao
 
     if tipo is _TipoEvento.COMPRA_ENVIADA:
         return replace(estado, compra_pendente=True), AcaoFluxo.CONTINUAR_COMPRA
