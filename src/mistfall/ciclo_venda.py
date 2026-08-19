@@ -41,6 +41,7 @@ class SessaoVenda:
     desfecho: DesfechoSessaoVenda = DesfechoSessaoVenda.ABORTOU
     motivo: str = ""
     vendas: int = 0
+    unidades_listadas: int = 0
     capacidade_final: CapacidadeVenda | None = None
     baus_processados: list[int] = field(default_factory=list)
 
@@ -121,6 +122,28 @@ def _esperar_vaga(
     return (frame, capacidade), ""
 
 
+def _esperar_vaga_parcial(
+    tela: Tela,
+    interruptor: Interruptor,
+    capacidade: CapacidadeVenda,
+    ritmo: RitmoVenda,
+):
+    inicio = time.monotonic()
+    while capacidade.ocupadas >= capacidade.limite:
+        if interruptor.pediram_parada():
+            return None, "parou"
+        frame = tela.capturar()
+        capacidade = ler_capacidade(frame)
+        if capacidade is None:
+            return None, "capacidade ilegivel"
+        if capacidade.ocupadas < capacidade.limite:
+            return (frame, capacidade), ""
+        if time.monotonic() - inicio >= 3.0:
+            return (frame, capacidade), "capacidade cheia"
+        time.sleep(ritmo.intervalo_entre_perguntas)
+    return (frame, capacidade), ""
+
+
 def executar_ciclo_venda(
     tela: Tela,
     mao: Mao,
@@ -130,11 +153,42 @@ def executar_ciclo_venda(
     ritmo: RitmoVenda = RITMO_VENDA_PADRAO,
     sorteio: random.Random | None = None,
 ) -> SessaoVenda:
+    return _executar_sessao_venda(
+        tela, mao, config, pasta, interruptor, ritmo, sorteio, parcial=False,
+    )
+
+
+def executar_venda_parcial(
+    tela: Tela,
+    mao: Mao,
+    config: Config,
+    pasta: Path,
+    interruptor: Interruptor,
+    ritmo: RitmoVenda = RITMO_VENDA_PADRAO,
+    sorteio: random.Random | None = None,
+) -> SessaoVenda:
+    return _executar_sessao_venda(
+        tela, mao, config, pasta, interruptor, ritmo, sorteio, parcial=True,
+    )
+
+
+def _executar_sessao_venda(
+    tela: Tela,
+    mao: Mao,
+    config: Config,
+    pasta: Path,
+    interruptor: Interruptor,
+    ritmo: RitmoVenda,
+    sorteio: random.Random | None,
+    *,
+    parcial: bool,
+) -> SessaoVenda:
     pasta = Path(pasta)
     sessao = SessaoVenda()
     if sorteio is None:
         sorteio = random.Random()
-    interruptor.esperar_inicio()
+    if not parcial:
+        interruptor.esperar_inicio()
 
     def encerrar(desfecho, motivo=""):
         sessao.desfecho = desfecho
@@ -144,6 +198,12 @@ def executar_ciclo_venda(
     try:
         frame = tela.capturar()
         bau_confirmado = None
+        if parcial:
+            mao.clicar(*centro_bau(Bau.SEGUNDO))
+            frame = _esperar_bau(tela, Bau.SEGUNDO, ritmo)
+            if frame is None:
+                return encerrar(DesfechoSessaoVenda.ABORTOU, "Bau 2 nao abriu")
+            bau_confirmado = Bau.SEGUNDO
         while True:
             if not eh_tela_venda(frame):
                 return encerrar(DesfechoSessaoVenda.ABORTOU, "tela de Venda ilegivel")
@@ -174,11 +234,16 @@ def executar_ciclo_venda(
                         return encerrar(DesfechoSessaoVenda.PAROU)
 
                     if capacidade.ocupadas >= capacidade.limite:
-                        espera, motivo = _esperar_vaga(
-                            tela, interruptor, capacidade, ritmo,
+                        esperar_vaga = (
+                            _esperar_vaga_parcial if parcial else _esperar_vaga
                         )
+                        espera, motivo = esperar_vaga(tela, interruptor, capacidade, ritmo)
                         if motivo == "parou":
                             return encerrar(DesfechoSessaoVenda.PAROU)
+                        if motivo == "capacidade cheia":
+                            _, capacidade = espera
+                            sessao.capacidade_final = capacidade
+                            return encerrar(DesfechoSessaoVenda.CAPACIDADE_CHEIA)
                         if espera is None:
                             return encerrar(
                                 DesfechoSessaoVenda.ABORTOU,
@@ -200,6 +265,7 @@ def executar_ciclo_venda(
                     if resultado.desfecho is not DesfechoVenda.VENDEU:
                         return encerrar(DesfechoSessaoVenda.ABORTOU, resultado.motivo)
                     sessao.vendas += 1
+                    sessao.unidades_listadas = sessao.vendas * 3
 
                     frame = tela.capturar()
                     if not eh_tela_venda(frame):
@@ -214,6 +280,20 @@ def executar_ciclo_venda(
                             "Capacidade de Venda ilegivel depois da Venda",
                         )
                     sessao.capacidade_final = capacidade
+                    if parcial and capacidade.ocupadas >= capacidade.limite:
+                        espera, motivo = _esperar_vaga_parcial(
+                            tela, interruptor, capacidade, ritmo,
+                        )
+                        if motivo == "parou":
+                            return encerrar(DesfechoSessaoVenda.PAROU)
+                        if motivo == "capacidade cheia":
+                            _, capacidade = espera
+                            sessao.capacidade_final = capacidade
+                            return encerrar(DesfechoSessaoVenda.CAPACIDADE_CHEIA)
+                        if espera is None:
+                            return encerrar(DesfechoSessaoVenda.ABORTOU, motivo)
+                        frame, capacidade = espera
+                        sessao.capacidade_final = capacidade
 
                 if resetou_armazem:
                     break

@@ -10,6 +10,7 @@ from mistfall.venda import DesfechoVenda, ResultadoVenda, RitmoVenda
 from mistfall.ciclo_venda import (
     DesfechoSessaoVenda,
     executar_ciclo_venda,
+    executar_venda_parcial,
 )
 from mistfall.venda_visao import PainelItens
 
@@ -287,3 +288,93 @@ def test_f3_antes_do_primeiro_stack_nao_clica(monkeypatch, tmp_path):
     )
     assert mao.acoes == []
     assert sessao.desfecho is DesfechoSessaoVenda.PAROU
+
+
+def test_venda_parcial_inicia_no_segundo_bau_e_lista_stacks_ate_a_capacidade(
+    monkeypatch, tmp_path,
+):
+    slots = [
+        SlotArmazem(0, 0, ItemAlvo.BROCHE, 3),
+        SlotArmazem(0, 1, ItemAlvo.ORBE, 3),
+        SlotArmazem(0, 2, ItemAlvo.ADAGA, 3),
+    ]
+    capacidades = iter([
+        CapacidadeVenda(0, 2),
+        CapacidadeVenda(1, 2),
+        CapacidadeVenda(2, 2),
+        CapacidadeVenda(2, 2),
+        CapacidadeVenda(2, 2),
+    ])
+    vendidos = []
+    monkeypatch.setattr("mistfall.ciclo_venda.ler_capacidade", lambda _: next(capacidades))
+    monkeypatch.setattr("mistfall.ciclo_venda.ler_bau_selecionado", lambda _: Bau.SEGUNDO)
+    monkeypatch.setattr("mistfall.ciclo_venda.varrer_armazem", lambda _: slots)
+    monkeypatch.setattr(
+        "mistfall.ciclo_venda.executar_venda",
+        lambda *args: vendidos.append(args[2]) or sucesso(args[2]),
+    )
+    agora = [0.0]
+    monkeypatch.setattr("mistfall.ciclo_venda.time.monotonic", lambda: agora[0])
+    monkeypatch.setattr("mistfall.ciclo_venda.time.sleep", lambda _: agora.__setitem__(0, 3.0))
+    interruptor = InterruptorFalso()
+    mao = MaoFalsa()
+
+    sessao = executar_venda_parcial(
+        TelaFalsa([STASH]), mao, config(), tmp_path, interruptor,
+        RitmoVenda.instantaneo(), random.Random(42),
+    )
+
+    assert mao.acoes[0] == ("clicar", 1787, 286)
+    assert interruptor.inicios == 0
+    assert vendidos == slots[:2]
+    assert sessao.vendas == 2
+    assert sessao.unidades_listadas == 6
+    assert sessao.capacidade_final == CapacidadeVenda(2, 2)
+    assert sessao.desfecho is DesfechoSessaoVenda.CAPACIDADE_CHEIA
+
+
+def test_venda_parcial_aproveita_vaga_e_encerra_apos_tres_segundos_estaveis(
+    monkeypatch, tmp_path,
+):
+    slots = [
+        SlotArmazem(0, 0, ItemAlvo.BROCHE, 3),
+        SlotArmazem(0, 1, ItemAlvo.ORBE, 3),
+    ]
+    capacidades = iter([
+        CapacidadeVenda(1, 2),
+        CapacidadeVenda(2, 2),
+        CapacidadeVenda(1, 2),
+        CapacidadeVenda(2, 2),
+        CapacidadeVenda(2, 2),
+        CapacidadeVenda(2, 2),
+        CapacidadeVenda(2, 2),
+        CapacidadeVenda(2, 2),
+    ])
+    vendidos = []
+    agora = [0.0]
+    esperas = []
+
+    def dormir(segundos):
+        esperas.append(segundos)
+        agora[0] += segundos
+
+    monkeypatch.setattr("mistfall.ciclo_venda.ler_capacidade", lambda _: next(capacidades))
+    monkeypatch.setattr("mistfall.ciclo_venda.ler_bau_selecionado", lambda _: Bau.SEGUNDO)
+    monkeypatch.setattr("mistfall.ciclo_venda.varrer_armazem", lambda _: slots)
+    monkeypatch.setattr(
+        "mistfall.ciclo_venda.executar_venda",
+        lambda *args: vendidos.append(args[2]) or sucesso(args[2]),
+    )
+    monkeypatch.setattr("mistfall.ciclo_venda.time.monotonic", lambda: agora[0])
+    monkeypatch.setattr("mistfall.ciclo_venda.time.sleep", dormir)
+
+    sessao = executar_venda_parcial(
+        TelaFalsa([STASH]), MaoFalsa(), config(), tmp_path, InterruptorFalso(),
+        RitmoVenda(intervalo_entre_perguntas=1.0), random.Random(42),
+    )
+
+    assert vendidos == slots
+    assert sum(esperas) == pytest.approx(3.0)
+    assert sessao.unidades_listadas == 6
+    assert sessao.capacidade_final == CapacidadeVenda(2, 2)
+    assert sessao.desfecho is DesfechoSessaoVenda.CAPACIDADE_CHEIA
