@@ -43,7 +43,7 @@ mantêm a espera fixa de 150 ms, evitando desacelerar a varredura comum.
 Os cliques da Compra não repetem uma coordenada fixa. A Listagem escolhida e as duas
 Categorias usadas pelo Reset recebem pontos sorteados dentro de áreas centrais seguras.
 Esse sorteio só muda o ponto dentro do mesmo alvo: não muda a Listagem escolhida, a
-alternância Forja/Chave, as esperas ou as teclas Espaço/F2/F3.
+alternância Forja/Chave, as esperas ou as teclas Espaço/F3/F4.
 
 ## Onde roda
 
@@ -156,12 +156,12 @@ Cada processo deve usar uma pasta nova de sessão; reutilizar uma pasta existent
 JSONL, porque a numeração das Voltas e os relógios monotônicos relativos reiniciam em cada
 processo.
 
-Aperte **F2** dentro do jogo para começar e **F3** para parar. Cada Volta imprime uma linha
+Aperte **F3** dentro do jogo para começar e **F4** para parar. Cada Volta imprime uma linha
 no console e guarda a própria pasta; as Voltas sem nada comprável descartam os prints e
 mantêm só o relatório. O fecho informa `Compras enviadas`: cada uma significa apenas que o
 clique e o Espaço foram enviados, não que o jogo confirmou a Compra.
 
-Não há piso de Ouro: enquanto houver Listagem no Preço-alvo, o bot tenta; o único freio é o F3.
+Não há piso de Ouro: enquanto houver Listagem no Preço-alvo, o bot tenta; o único freio é o F4.
 Ter saldo suficiente é uma limitação do jogo, não uma guarda do bot.
 
 ### Vender stacks de três

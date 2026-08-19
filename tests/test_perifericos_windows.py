@@ -253,8 +253,15 @@ def test_capturar_converte_bgra_para_bgr():
     assert list(resultado[1, 1]) == [40, 50, 60]
 
 
-def test_esperar_inicio_bloqueia_ate_o_f2(monkeypatch):
-    # A primeira chamada limpa o trinco: sem isso, um F2 apertado antes de o
+def test_interruptor_padrao_usa_f3_para_inicio_e_f4_para_parada():
+    interruptor = windows.InterruptorWindows()
+
+    assert interruptor._vk_inicio == windows.VK_F3
+    assert interruptor._vk_parada == windows.VK_F4
+
+
+def test_esperar_inicio_bloqueia_ate_o_f3(monkeypatch):
+    # A primeira chamada limpa o trinco: sem isso, um F3 apertado antes de o
     # bot subir faria o laco comecar sozinho.
     respostas = [False, False, False, True]
     vistos = []
@@ -266,13 +273,13 @@ def test_esperar_inicio_bloqueia_ate_o_f2(monkeypatch):
     monkeypatch.setattr(windows, "_tecla_foi_pressionada", falso)
     monkeypatch.setattr(windows.time, "sleep", lambda _: None)
     windows.InterruptorWindows().esperar_inicio()
-    assert vistos == [windows.VK_F2] * 4
+    assert vistos == [windows.VK_F3] * 4
     assert respostas == []
 
 
-def test_pediram_parada_le_o_f3(monkeypatch):
+def test_pediram_parada_le_o_f4(monkeypatch):
     monkeypatch.setattr(windows, "_tecla_foi_pressionada",
-                        lambda vk: vk == windows.VK_F3)
+                        lambda vk: vk == windows.VK_F4)
     assert windows.InterruptorWindows().pediram_parada() is True
 
 

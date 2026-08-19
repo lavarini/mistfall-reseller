@@ -90,7 +90,7 @@ def _tecla_foi_pressionada(vk: int) -> bool:
     """Trinco: a tecla foi pressionada desde a chamada anterior?
 
     O bit 0x0001 do GetAsyncKeyState guarda a transicao, e nao o estado
-    atual. E o que faz o F3 ser notado mesmo quando apertado e solto durante
+    atual. E o que faz o F4 ser notado mesmo quando apertado e solto durante
     um time.sleep do piloto — sem ele, so pegaria a tecla segurada no
     instante exato da pergunta.
 
@@ -102,10 +102,10 @@ def _tecla_foi_pressionada(vk: int) -> bool:
 
 
 class InterruptorWindows:
-    """Interruptor com teclas configuraveis; Compra usa F2/F3."""
+    """Interruptor com teclas configuraveis; por padrao usa F3/F4."""
 
     def __init__(self, intervalo: float = 0.05,
-                 vk_inicio: int = VK_F2, vk_parada: int = VK_F3) -> None:
+                 vk_inicio: int = VK_F3, vk_parada: int = VK_F4) -> None:
         self._intervalo = intervalo
         self._vk_inicio = vk_inicio
         self._vk_parada = vk_parada
@@ -113,7 +113,7 @@ class InterruptorWindows:
 
     def esperar_inicio(self) -> None:
         self._parada_pedida = False
-        # A primeira leitura descarta o trinco acumulado: sem ela, um F2
+        # A primeira leitura descarta o trinco acumulado: sem ela, um F3
         # apertado antes de o bot subir faria o laco comecar sozinho.
         _tecla_foi_pressionada(self._vk_inicio)
         while not _tecla_foi_pressionada(self._vk_inicio):

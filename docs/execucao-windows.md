@@ -176,7 +176,7 @@ Cada processo deve usar uma pasta nova de sessao; reutilizar uma pasta existente
 JSONL, porque a numeracao das Voltas e os relogios monotonicos relativos reiniciam em cada
 processo.
 
-Aperte **F2 dentro do jogo** para iniciar e **F3** para parar. Ha uma espera de **150 ms
+Aperte **F3 dentro do jogo** para iniciar e **F4** para parar. Ha uma espera de **150 ms
 entre Voltas**, inclusive depois de um aborto rapido. A producao usa a analise sequencial
 (`concorrente=False`).
 

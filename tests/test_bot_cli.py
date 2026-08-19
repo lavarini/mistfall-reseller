@@ -26,7 +26,11 @@ def test_a_pasta_padrao_nao_e_a_do_piloto():
 
 def test_parar_antes_da_primeira_volta_sai_com_sucesso(monkeypatch, tmp_path):
     perifericos = types.ModuleType("mistfall.perifericos.windows")
-    perifericos.InterruptorWindows = type("InterruptorWindows", (), {})
+    class InterruptorWindows:
+        def __init__(self):
+            self.teclas = (0x72, 0x73)
+
+    perifericos.InterruptorWindows = InterruptorWindows
     perifericos.MaoWindows = type("MaoWindows", (), {})
     perifericos.TelaWindows = type("TelaWindows", (), {})
     monkeypatch.setitem(sys.modules, "mistfall.perifericos.windows", perifericos)
@@ -34,6 +38,7 @@ def test_parar_antes_da_primeira_volta_sai_com_sucesso(monkeypatch, tmp_path):
     visto = {}
 
     def executar_ciclo(*args, **kwargs):
+        visto["args"] = args
         visto.update(kwargs)
         return Sessao(voltas=0)
 
@@ -47,3 +52,22 @@ def test_parar_antes_da_primeira_volta_sai_com_sucesso(monkeypatch, tmp_path):
     assert ritmo.espera_entre_voltas == 0.15
     assert ritmo.espera_apos_compra == (0.65, 0.75)
     assert ritmo.espera_para_o_modal_abrir == (0.1, 0.15)
+    interruptor = visto["args"][4]
+    assert isinstance(interruptor, InterruptorWindows)
+    assert interruptor.teclas == (0x72, 0x73)
+
+
+def test_bot_anuncia_f3_para_comecar_e_f4_para_parar(capsys, monkeypatch, tmp_path):
+    monkeypatch.setattr(bot_cli, "carregar_config", lambda _: None)
+    monkeypatch.setattr(bot_cli, "executar_ciclo", lambda *args, **kwargs: None)
+    perifericos = types.ModuleType("mistfall.perifericos.windows")
+    perifericos.InterruptorWindows = type("InterruptorWindows", (), {})
+    perifericos.MaoWindows = type("MaoWindows", (), {})
+    perifericos.TelaWindows = type("TelaWindows", (), {})
+    monkeypatch.setitem(sys.modules, "mistfall.perifericos.windows", perifericos)
+
+    args = argparse.Namespace(
+        pasta=str(tmp_path), config="config.toml", espera_modal=100)
+    bot_cli._rodar(args)
+
+    assert "F3 no jogo para comecar, F4 para parar" in capsys.readouterr().out

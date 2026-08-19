@@ -1,6 +1,6 @@
-"""Roda o laco de Compra ate o operador apertar F3.
+"""Roda o laco de Compra ate o operador apertar F4.
 
-Sem contagem regressiva: o F2 substitui o Alt+Tab cronometrado do
+Sem contagem regressiva: o F3 substitui o Alt+Tab cronometrado do
 mistfall-piloto, porque e apertado de dentro do jogo.
 """
 
@@ -16,7 +16,7 @@ from mistfall.piloto import RITMO_PADRAO
 
 def montar_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        description="Repete a Compra no Leilao ate o F3.")
+        description="Repete a Compra no Leilao ate o F4.")
     p.add_argument("--pasta", default="sessao",
                    help="onde salvar as pastas de cada Volta")
     p.add_argument("--config", default="config.toml")
@@ -50,7 +50,7 @@ def _rodar(args: argparse.Namespace) -> int:
         espera_para_o_modal_abrir=(piso, teto),
     )
 
-    print("aperte F2 no jogo para comecar, F3 para parar", flush=True)
+    print("aperte F3 no jogo para comecar, F4 para parar", flush=True)
     executar_ciclo(
         TelaWindows(), MaoWindows(), config, Path(args.pasta),
         InterruptorWindows(), ritmo=ritmo,
