@@ -23,6 +23,7 @@ class _TipoEvento(Enum):
     UNIDADES_LISTADAS = "unidades_listadas"
     CAPACIDADE_ATUALIZADA = "capacidade_atualizada"
     RETORNO_COMPRA = "retorno_compra"
+    ESTOQUE_RECONCILIADO = "estoque_reconciliado"
 
 
 @dataclass(frozen=True)
@@ -68,6 +69,16 @@ class EventoFluxo:
             capacidade=(ocupadas, limite),
         )
 
+    @classmethod
+    def retorno_compra(cls) -> "EventoFluxo":
+        return cls(_TipoEvento.RETORNO_COMPRA)
+
+    @classmethod
+    def estoque_reconciliado(cls, unidades: int) -> "EventoFluxo":
+        if unidades < 0:
+            raise ValueError("estoque reconciliado não pode ser negativo")
+        return cls(_TipoEvento.ESTOQUE_RECONCILIADO, unidades=unidades)
+
 
 EventoFluxo.INTENCAO = EventoFluxo.intencao_detectada()
 EventoFluxo.INTENCAO_DETECTADA = EventoFluxo.intencao_detectada()
@@ -79,12 +90,13 @@ EventoFluxo.RESET_EXECUTADO = EventoFluxo.reset_executado()
 EventoFluxo.MENSAGEM_INVENTARIO_CHEIO = EventoFluxo(
     _TipoEvento.MENSAGEM_INVENTARIO_CHEIO
 )
+EventoFluxo.RETORNO_COMPRA = EventoFluxo.retorno_compra()
+EventoFluxo.ESTOQUE_RECONCILIADO = EventoFluxo.estoque_reconciliado(0)
 
 
 class AcaoFluxo(Enum):
     CONTINUAR_COMPRA = "continuar_compra"
     EXECUTAR_COMPRA = "executar_compra"
-    EXECUTAR_RESET = "executar_reset"
     VENDER_POR_INVENTARIO_CHEIO = "vender_por_inventario_cheio"
     VENDER_POR_FLUXO_LENTO = "vender_por_fluxo_lento"
     CONTINUAR_VENDA = "continuar_venda"
@@ -124,9 +136,10 @@ def aplicar_evento(
 
     tipo = evento.tipo
     if tipo is _TipoEvento.INTENCAO_DETECTADA:
-        intervalos = estado.intervalos_lentos_consecutivos
         if estado.resets_desde_intencao >= 3:
-            intervalos += 1
+            intervalos = estado.intervalos_lentos_consecutivos + 1
+        else:
+            intervalos = 0
         modo = (
             ModoFluxo.LENTO
             if intervalos >= 3 or estado.resets_consecutivos >= 5
@@ -147,6 +160,7 @@ def aplicar_evento(
         modo = ModoFluxo.LENTO if consecutivos >= 5 else estado.modo
         novo = replace(
             estado,
+            intencoes_desde_reset=0,
             resets_desde_intencao=estado.resets_desde_intencao + 1,
             resets_consecutivos=consecutivos,
             modo=modo,
@@ -157,6 +171,8 @@ def aplicar_evento(
         return replace(estado, compra_pendente=True), AcaoFluxo.CONTINUAR_COMPRA
 
     if tipo in (_TipoEvento.COMPRA_CONFIRMADA, _TipoEvento.COMPRA_INCONCLUSIVA):
+        if not estado.compra_pendente:
+            return estado, _acao_por_saldo(estado)
         unidades = evento.unidades or 1
         novo = replace(
             estado,
@@ -172,6 +188,8 @@ def aplicar_evento(
     if tipo is _TipoEvento.UNIDADES_LISTADAS:
         if evento.unidades < 0:
             raise ValueError("unidades listadas não podem ser negativas")
+        if evento.unidades > estado.estoque_estimado:
+            raise ValueError("unidades listadas excedem o estoque estimado")
         novo = replace(
             estado,
             estoque_estimado=estado.estoque_estimado - evento.unidades,
@@ -184,4 +202,11 @@ def aplicar_evento(
             AcaoFluxo.CONTINUAR_VENDA,
         )
 
-    return estado, AcaoFluxo.CONTINUAR_COMPRA
+    if tipo is _TipoEvento.ESTOQUE_RECONCILIADO:
+        novo = replace(estado, estoque_estimado=evento.unidades)
+        return novo, _acao_por_saldo(novo)
+
+    if tipo is _TipoEvento.RETORNO_COMPRA:
+        return estado, AcaoFluxo.CONTINUAR_COMPRA
+
+    raise ValueError(f"evento desconhecido: {tipo!r}")
