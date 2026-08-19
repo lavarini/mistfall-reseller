@@ -14,9 +14,6 @@ ESTADO_ESPERADO = {
     "broche-dragao-orbe-codice-padrao": EstadoTela.LISTA,
     "broche-tres-adaga-lanterna-rede-padrao": EstadoTela.LISTA,
     "broche-tres-dragao-padrao": EstadoTela.LISTA,
-    "cheio-1": EstadoTela.LISTA,
-    "cheio-2": EstadoTela.LISTA,
-    "cheio-3": EstadoTela.LISTA,
     "dragao-um-rede-padrao": EstadoTela.LISTA,
     "lanterna-dragao-orbe-rede": EstadoTela.LISTA,
     "rede-dois-dragao-padrao": EstadoTela.LISTA,
@@ -37,6 +34,11 @@ ESTADO_ESPERADO = {
     "loading-modal-venda": EstadoTela.JANELA_VENDA,
 }
 
+# Os tres frames de toast vieram de video e dois deles foram cortados para
+# 2560x1392. Eles exercitam compra_visao, mas nao sao screenshots validos do
+# jogo para o contrato 2560x1440 de EstadoTela.
+FIXTURES_TOAST_RECORTADAS = {"cheio-1", "cheio-2", "cheio-3"}
+
 @pytest.mark.parametrize("nome,esperado", sorted(ESTADO_ESPERADO.items()))
 def test_classifica_a_tela(nome, esperado):
     assert identificar_estado(cv2.imread(f"images/{nome}.png")) is esperado
@@ -45,6 +47,8 @@ def test_todo_print_do_corpus_tem_estado_declarado():
     # Sem isto, um print novo entraria em images/ sem ninguem dizer o que ele e,
     # e o teste acima continuaria verde por nao saber que ele existe.
     do_disco = {pathlib.Path(c).stem for c in glob.glob("images/*.png")}
+    assert FIXTURES_TOAST_RECORTADAS <= do_disco
+    do_disco -= FIXTURES_TOAST_RECORTADAS
     assert do_disco == set(ESTADO_ESPERADO)
 
 def test_todos_os_estados_reconheciveis_aparecem_no_corpus():
@@ -100,3 +104,9 @@ def test_recusa_resolucao_diferente_em_vez_de_dizer_desconhecido(largura, altura
     img = np.zeros((altura, largura, 3), dtype=np.uint8)
     with pytest.raises(ValueError, match="2560x1440"):
         identificar_estado(img)
+
+
+@pytest.mark.parametrize("nome", sorted(FIXTURES_TOAST_RECORTADAS - {"cheio-2"}))
+def test_frame_de_toast_recortado_nao_altera_contrato_de_estado(nome):
+    with pytest.raises(ValueError, match="2560x1440"):
+        identificar_estado(cv2.imread(f"images/{nome}.png"))

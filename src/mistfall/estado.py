@@ -1,10 +1,10 @@
 import cv2
 import numpy as np
+from mistfall.geometria import conferir_resolucao
 from mistfall.tipos import EstadoTela
 from mistfall.venda_visao import eh_janela_venda, eh_tela_venda
 
 REGIAO_CENTRO = (900, 500, 1700, 950)
-RESOLUCOES_SUPORTADAS_ESTADO = {(2560, 1440), (2560, 1392)}
 
 # Exatamente a linha "Material de Construcao" do menu lateral, e mais nada.
 #
@@ -42,10 +42,7 @@ MENU_JANELA = (20.0, 34.0)
 
 # Lista: centro normal, menu com o destaque de Material de Construcao.
 CENTRO_LISTA = (9.0, 18.0)
-# Os frames cheio-1 e cheio-3 perderam so as 48 linhas finais na captura. A
-# regiao do menu continua integra, mas sua media cai para 44.63; 44.0 preserva
-# uma margem abaixo desse ruido sem tocar na faixa de outra Categoria (<= 36).
-MENU_MATERIAL = (44.0, 62.0)
+MENU_MATERIAL = (45.0, 62.0)
 
 # Outra Categoria: centro normal, menu sem o destaque nessa linha.
 # 26.60 (janela) e 29.45 (reset) ficam a 2.85 um do outro, entao MENU_JANELA e
@@ -61,19 +58,10 @@ def _dentro_faixa(valor: float, faixa: tuple[float, float]) -> bool:
     return faixa[0] <= valor <= faixa[1]
 
 
-def _conferir_resolucao_estado(img: np.ndarray) -> None:
-    altura, largura = img.shape[:2]
-    if (largura, altura) not in RESOLUCOES_SUPORTADAS_ESTADO:
-        raise ValueError(
-            "esperava 2560x1440 ou 2560x1392, "
-            f"recebi {largura}x{altura}"
-        )
-
-
 def identificar_estado(img: np.ndarray) -> EstadoTela:
     # Resolucao errada e erro, nao DESCONHECIDO: DESCONHECIDO significa "tela
     # 2560x1440 que nao reconheci", e o guardrail conta essas telas.
-    _conferir_resolucao_estado(img)
+    conferir_resolucao(img)
     centro = _brilho(img, REGIAO_CENTRO)
     menu = _brilho(img, REGIAO_MENU)
 

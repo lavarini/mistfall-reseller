@@ -107,3 +107,31 @@ Saida:
 
 A execucao de `pytest -q` foi interrompida a pedido do usuario antes de
 concluir; nenhum resultado dela e reportado como verificacao.
+
+## Correcao — rodada 2
+
+### Alteracoes
+
+- Restaurado `identificar_estado` ao guardrail central de 2560x1440 e ao limite
+  original do menu de Lista.
+- As tres imagens `cheio-*` permanecem versionadas como fixtures de toast de
+  Compra, mas sao excluidas nominalmente da enumeracao do corpus de
+  `EstadoTela`. Duas sao frames de video cortados em 2560x1392; nenhuma das
+  tres e uma screenshot canonicamente catalogada do estado da tela.
+- Adicionado teste que prova que os dois frames cortados continuam sendo
+  rejeitados pelo contrato de EstadoTela.
+
+### Teste executado
+
+Comando:
+
+```console
+.venv/bin/pytest tests/test_compra_visao.py tests/test_estado.py tests/test_ouro.py -q
+```
+
+Saida:
+
+```text
+...............................................                          [100%]
+47 passed in 4.08s
+```
