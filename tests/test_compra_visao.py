@@ -40,6 +40,13 @@ def test_lista_sem_toast_nao_tem_mensagem_de_compra():
     )
 
 
+def test_regiao_central_clara_sem_palavra_de_toast_nao_e_mensagem_de_compra():
+    sem_toast = _imagem("sessao/volta-0001/00-pre-voo.png")
+    sem_toast[345:385, 950:1800] = 255
+
+    assert detectar_mensagem_compra(sem_toast) is MensagemCompra.NENHUMA
+
+
 def test_detecta_filtro_roxo_e_recusa_variante_sem_icone_roxo():
     com_filtro = _imagem("images/cheio-2.png")
     sem_filtro = com_filtro.copy()

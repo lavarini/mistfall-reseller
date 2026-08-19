@@ -1,16 +1,21 @@
 """Detectores visuais puros da aba Comprar."""
 
 from enum import Enum
+from difflib import SequenceMatcher
+import unicodedata
 
 import cv2
 import numpy as np
+import pytesseract
 
 
 # O texto do toast fica sempre no vazio entre as duas colunas de listagens.
-REGIAO_TEXTO_TOAST = (1000, 345, 1500, 385)
-LIMIAR_TEXTO_CLARO = 85
-PROPORCAO_MINIMA_TOAST = 0.02
-PROPORCAO_INVENTARIO_CHEIO = 0.20
+REGIAO_TEXTO_TOAST = (950, 345, 1800, 385)
+ESCALA_OCR_TOAST = 4
+CONFIG_OCR_TOAST = "--psm 7"
+PALAVRA_INVENTARIO_CHEIO = "cheios"
+PALAVRAS_SUCESSO = ("realizada", "guardado")
+SIMILARIDADE_MINIMA_CHEIOS = 0.80
 
 # Sexto icone da faixa de raridade: roxo com a moldura de selecao visivel.
 REGIAO_ICONE_ROXO = (775, 205, 825, 255)
@@ -31,20 +36,53 @@ def _recortar(img: np.ndarray, regiao: tuple[int, int, int, int]) -> np.ndarray:
     return img[y0:y1, x0:x1]
 
 
-def _proporcao_texto_claro(img: np.ndarray) -> float:
-    # A conversao para luminancia remove a variacao entre o dourado do aviso de
-    # Inventario e o cinza do aviso de sucesso antes de medir o texto.
+def _normalizar_texto(texto: str) -> str:
+    sem_acentos = unicodedata.normalize("NFD", texto)
+    return "".join(caractere for caractere in sem_acentos if not unicodedata.combining(caractere)).lower()
+
+
+def _ler_toast(img: np.ndarray, adaptativo: bool) -> str:
     cinza = cv2.cvtColor(_recortar(img, REGIAO_TEXTO_TOAST), cv2.COLOR_BGR2GRAY)
-    return float((cinza >= LIMIAR_TEXTO_CLARO).mean())
+    ampliado = cv2.resize(
+        cinza,
+        None,
+        fx=ESCALA_OCR_TOAST,
+        fy=ESCALA_OCR_TOAST,
+        interpolation=cv2.INTER_CUBIC,
+    )
+    if adaptativo:
+        binaria = cv2.adaptiveThreshold(
+            ampliado,
+            255,
+            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv2.THRESH_BINARY,
+            31,
+            5,
+        )
+    else:
+        _, binaria = cv2.threshold(
+            ampliado, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
+        )
+    return _normalizar_texto(
+        pytesseract.image_to_string(binaria, config=CONFIG_OCR_TOAST)
+    )
+
+
+def _contem_cheios(texto: str) -> bool:
+    return any(
+        SequenceMatcher(None, palavra, PALAVRA_INVENTARIO_CHEIO).ratio()
+        >= SIMILARIDADE_MINIMA_CHEIOS
+        for palavra in texto.split()
+    )
 
 
 def detectar_mensagem_compra(img: np.ndarray) -> MensagemCompra:
-    proporcao = _proporcao_texto_claro(img)
-    if proporcao < PROPORCAO_MINIMA_TOAST:
-        return MensagemCompra.NENHUMA
-    if proporcao >= PROPORCAO_INVENTARIO_CHEIO:
+    texto = _ler_toast(img, adaptativo=False)
+    if any(palavra in texto for palavra in PALAVRAS_SUCESSO):
+        return MensagemCompra.SUCESSO
+    if _contem_cheios(_ler_toast(img, adaptativo=True)):
         return MensagemCompra.INVENTARIO_CHEIO
-    return MensagemCompra.SUCESSO
+    return MensagemCompra.NENHUMA
 
 
 def filtro_roxo_ativo(img: np.ndarray) -> bool:
