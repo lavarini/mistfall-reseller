@@ -2,6 +2,7 @@
 
 import time
 from dataclasses import dataclass
+from typing import Callable, TypeAlias
 
 import numpy as np
 
@@ -26,6 +27,9 @@ CENTRO_ABA_VENDER = (300, 140)
 CENTRO_CATEGORIA_MATERIAL_CONSTRUCAO = CATEGORIA_MATERIAL_CONSTRUCAO
 CENTRO_FILTRO_ROXO = (800, 230)
 
+Frame: TypeAlias = np.ndarray
+PredicadoFrame: TypeAlias = Callable[[Frame], bool]
+
 
 @dataclass(frozen=True)
 class ResultadoNavegacao:
@@ -34,7 +38,11 @@ class ResultadoNavegacao:
     motivo: str
 
 
-def _esperar(tela: Tela, ritmo: RitmoVenda, predicado):
+def _esperar(
+    tela: Tela,
+    ritmo: RitmoVenda,
+    predicado: PredicadoFrame,
+) -> tuple[Frame | None, Frame | None]:
     inicio = time.monotonic()
     primeiro = True
     ultimo = None
@@ -42,17 +50,21 @@ def _esperar(tela: Tela, ritmo: RitmoVenda, predicado):
         primeiro = False
         ultimo = tela.capturar()
         if predicado(ultimo):
-            return ultimo
+            return ultimo, ultimo
         time.sleep(ritmo.intervalo_entre_perguntas)
     return None, ultimo
 
 
-def _aguardar(tela: Tela, ritmo: RitmoVenda, predicado, motivo: str) -> ResultadoNavegacao:
-    resposta = _esperar(tela, ritmo, predicado)
-    if isinstance(resposta, tuple):
-        _, ultimo = resposta
+def _aguardar(
+    tela: Tela,
+    ritmo: RitmoVenda,
+    predicado: PredicadoFrame,
+    motivo: str,
+) -> ResultadoNavegacao:
+    frame, ultimo = _esperar(tela, ritmo, predicado)
+    if frame is None:
         return ResultadoNavegacao(False, ultimo, motivo)
-    return ResultadoNavegacao(True, resposta, "")
+    return ResultadoNavegacao(True, frame, "")
 
 
 def ir_para_venda(tela: Tela, mao: Mao, ritmo: RitmoVenda) -> ResultadoNavegacao:
@@ -98,6 +110,7 @@ def garantir_filtro_roxo(tela: Tela, mao: Mao, ritmo: RitmoVenda) -> ResultadoNa
     )
     if not compra.sucesso:
         return compra
+    assert compra.frame is not None
     if filtro_roxo_ativo(compra.frame):
         return compra
 

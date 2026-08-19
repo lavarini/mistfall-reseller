@@ -4,14 +4,15 @@ import numpy as np
 from mistfall.navegacao import (
     CENTRO_ABA_COMPRAR,
     CENTRO_ABA_VENDER,
-    ResultadoNavegacao,
     garantir_filtro_roxo,
     ir_para_compra,
     ir_para_venda,
 )
-from mistfall.perifericos.falso import MaoFalsa, TelaFalsa
-from mistfall.tipos import Bau, EstadoTela
-from mistfall.venda import RitmoVenda
+from mistfall.ciclo_venda import DesfechoSessaoVenda, executar_ciclo_venda
+from mistfall.config import Config
+from mistfall.perifericos.falso import InterruptorFalso, MaoFalsa, TelaFalsa
+from mistfall.tipos import Bau, CapacidadeVenda, EstadoTela, ItemAlvo, SlotArmazem
+from mistfall.venda import DesfechoVenda, ResultadoVenda, RitmoVenda
 from mistfall.venda_visao import CENTRO_ABA_ARMAZEM, PainelItens, centro_bau
 
 
@@ -100,3 +101,126 @@ def test_garantir_filtro_roxo_rejeita_tela_de_compra_nao_confirmada(monkeypatch,
     assert resultado.frame is not None
     assert isinstance(resultado.motivo, str)
     assert "Compra" in resultado.motivo
+
+
+def test_ir_para_venda_para_no_primeiro_estado_que_nao_estabiliza(monkeypatch, tmp_path):
+    import mistfall.navegacao as navegacao
+
+    monkeypatch.setattr(navegacao, "eh_tela_venda", lambda _: False)
+    mao = MaoFalsa()
+
+    resultado = ir_para_venda(_tela(tmp_path, 10), mao, RITMO)
+
+    assert resultado.sucesso is False
+    assert resultado.motivo == "Venda nao confirmou Inventario"
+    assert [acao[1:] for acao in mao.acoes] == [CENTRO_ABA_VENDER]
+
+
+def test_ir_para_compra_para_no_primeiro_estado_que_nao_estabiliza(monkeypatch, tmp_path):
+    import mistfall.navegacao as navegacao
+
+    monkeypatch.setattr(navegacao, "identificar_estado", lambda _: EstadoTela.DESCONHECIDO)
+    mao = MaoFalsa()
+
+    resultado = ir_para_compra(_tela(tmp_path, 10), mao, RITMO)
+
+    assert resultado.sucesso is False
+    assert resultado.motivo == "Compra nao confirmou aba Comprar"
+    assert [acao[1:] for acao in mao.acoes] == [CENTRO_ABA_COMPRAR]
+
+
+def test_ir_para_venda_repetem_frames_intermediarios_antes_do_proximo_clique(
+    monkeypatch, tmp_path,
+):
+    import mistfall.navegacao as navegacao
+
+    monkeypatch.setattr(navegacao, "eh_tela_venda", lambda _: True)
+    monkeypatch.setattr(
+        navegacao,
+        "ler_painel_itens",
+        lambda frame: {
+            5: None,
+            10: PainelItens.INVENTARIO,
+            15: None,
+            20: PainelItens.ARMAZEM,
+            25: PainelItens.ARMAZEM,
+            30: PainelItens.ARMAZEM,
+        }[int(frame[0, 0, 0])],
+    )
+    monkeypatch.setattr(
+        navegacao,
+        "ler_bau_selecionado",
+        lambda frame: Bau.SEGUNDO if int(frame[0, 0, 0]) == 30 else Bau.PRIMEIRO,
+    )
+    tela = _tela(tmp_path, 5, 10, 15, 20, 25, 30)
+
+    class MaoQueObservaCapturas(MaoFalsa):
+        def __init__(self):
+            super().__init__()
+            self.capturas_ao_clicar = []
+
+        def clicar(self, x, y):
+            self.capturas_ao_clicar.append(tela.capturas_feitas)
+            super().clicar(x, y)
+
+    mao = MaoQueObservaCapturas()
+
+    resultado = ir_para_venda(tela, mao, RITMO)
+
+    assert resultado.sucesso is True
+    assert tela.capturas_feitas == 6
+    assert mao.capturas_ao_clicar == [0, 2, 4]
+    assert [acao[1:] for acao in mao.acoes] == [
+        CENTRO_ABA_VENDER,
+        CENTRO_ABA_ARMAZEM,
+        centro_bau(Bau.SEGUNDO),
+    ]
+
+
+def test_navegacao_bem_sucedida_nao_altera_a_sessao_isolada_de_venda(
+    monkeypatch, tmp_path,
+):
+    import mistfall.navegacao as navegacao
+
+    monkeypatch.setattr(navegacao, "eh_tela_venda", lambda _: True)
+    monkeypatch.setattr(
+        navegacao,
+        "ler_painel_itens",
+        lambda frame: PainelItens.INVENTARIO
+        if int(frame[0, 0, 0]) == 10
+        else PainelItens.ARMAZEM,
+    )
+    monkeypatch.setattr(
+        navegacao,
+        "ler_bau_selecionado",
+        lambda frame: Bau.SEGUNDO if int(frame[0, 0, 0]) == 30 else Bau.PRIMEIRO,
+    )
+    mao = MaoFalsa()
+    resultado = ir_para_venda(_tela(tmp_path, 10, 20, 30), mao, RITMO)
+
+    slot = SlotArmazem(0, 0, ItemAlvo.BROCHE, 3)
+    monkeypatch.setattr(
+        "mistfall.ciclo_venda.ler_capacidade", lambda _: CapacidadeVenda(0, 12),
+    )
+    monkeypatch.setattr("mistfall.ciclo_venda.ler_bau_selecionado", lambda _: Bau.QUARTO)
+    monkeypatch.setattr("mistfall.ciclo_venda.varrer_armazem", lambda _: [slot])
+    monkeypatch.setattr(
+        "mistfall.ciclo_venda.executar_venda",
+        lambda *args: ResultadoVenda(desfecho=DesfechoVenda.VENDEU, motivo=""),
+    )
+
+    sessao = executar_ciclo_venda(
+        TelaFalsa(["images/venda-stash-2.png"]),
+        mao,
+        Config(
+            precos_alvo={},
+            precos_venda={item: 200 for item in ItemAlvo},
+        ),
+        tmp_path / "sessao-venda",
+        InterruptorFalso(),
+        RITMO,
+    )
+
+    assert resultado.sucesso is True
+    assert sessao.desfecho is DesfechoSessaoVenda.ARMAZEM_ESGOTADO
+    assert sessao.vendas == 1
