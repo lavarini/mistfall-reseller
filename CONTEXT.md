@@ -93,6 +93,22 @@ Armazém. Uma Venda consome uma posição da Capacidade de Venda. O bot preenche
 de Venda e a Quantidade 3 na Janela de Confirmação e clica em "Listar para Venda".
 _Avoid_: Transação, Publicação.
 
+**Recuperável**:
+O Ouro acumulado pelas Listagens já vendidas, mostrado no topo da aba Vender e ainda
+não creditado. Ele não conta como Ouro disponível para Compra enquanto não for
+Resgatado.
+_Avoid_: Pendente, A receber, Saldo.
+
+**Resgatar**:
+A ação de recolher o Recuperável, pelo botão ao lado dele. O botão só existe quando há
+o que recolher, e é detectado por ficar **dourado** — sem nada a resgatar a região fica
+no fundo escuro do painel. Clicar não abre nada: o Ouro sobe, o Recuperável zera e o
+botão some, e é esse sumiço que confirma a ação.
+
+O Fluxo Completo resgata ao entrar na Venda, antes de qualquer leitura do Armazém.
+Falhar em resgatar **não** aborta a Venda: é bônus, não pré-condição.
+_Avoid_: Coletar, Receber, Claim.
+
 **Painel**:
 A aba Vender tem dois: **Inventário** e **Armazém**. A tela abre no Inventário, e é
 preciso trocar para o Armazém antes de qualquer Venda.

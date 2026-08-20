@@ -329,3 +329,10 @@ def test_o_glossario_nao_promete_somar_em_toda_compra_inconclusiva():
     # a cada Compra confirmada ou inconclusiva", sem a ressalva.
     assert "soma 1 a cada Compra confirmada ou inconclusiva" not in CONTEXT
     assert "sem queda" in CONTEXT
+
+
+def test_o_glossario_define_resgatar_e_recuperavel():
+    # Termos do jogo que o codigo passou a usar: sem verbete, cada um escreve
+    # de um jeito e o glossario deixa de ser a fonte unica.
+    assert "**Resgatar**" in CONTEXT
+    assert "**Recuperável**" in CONTEXT

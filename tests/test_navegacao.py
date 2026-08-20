@@ -15,7 +15,12 @@ from mistfall.config import Config
 from mistfall.perifericos.falso import InterruptorFalso, MaoFalsa, TelaFalsa
 from mistfall.tipos import CapacidadeVenda, EstadoTela, ItemAlvo, SlotArmazem
 from mistfall.venda import DesfechoVenda, ResultadoVenda, RitmoVenda
-from mistfall.venda_visao import CENTRO_ABA_ARMAZEM, PainelItens, centro_bau
+from mistfall.venda_visao import (
+    CENTRO_ABA_ARMAZEM,
+    CENTRO_BOTAO_RESGATAR,
+    PainelItens,
+    centro_bau,
+)
 
 
 RITMO = RitmoVenda.instantaneo()
@@ -431,3 +436,59 @@ def test_garantir_filtro_roxo_clica_quando_a_tela_real_esta_sem_filtro():
     assert [acao for acao in mao.acoes if acao[0] == "clicar"] == [
         ("clicar", *CENTRO_FILTRO_ROXO),
     ]
+
+
+def test_ir_para_venda_resgata_o_ouro_quando_o_botao_esta_dourado():
+    # "Recuperavel" so vira Ouro depois de clicar em Resgatar. O passo entra
+    # antes de qualquer leitura do Armazem: o resgate pode devolver itens nao
+    # vendidos, e varrer antes dele leria uma tela desatualizada.
+    tela = TelaFalsa([
+        "images/vender-inventario.png",    # depois de clicar em Vender
+        "images/tela-venda-resgatar.png",  # depois de Armazem: botao dourado
+        "images/venda-stash-2.png",        # depois de Resgatar: botao sumiu
+        "images/venda-stash-2.png",        # depois de clicar no Bau inicial
+    ])
+    mao = MaoFalsa()
+
+    resultado = ir_para_venda(tela, mao, RITMO)
+
+    assert resultado.sucesso, resultado.motivo
+    assert [acao for acao in mao.acoes if acao[0] == "clicar"] == [
+        ("clicar", *CENTRO_ABA_VENDER),
+        ("clicar", *CENTRO_ABA_ARMAZEM),
+        ("clicar", *CENTRO_BOTAO_RESGATAR),
+        ("clicar", *centro_bau(1)),
+    ]
+
+
+def test_ir_para_venda_nao_clica_em_resgatar_sem_ouro_recuperavel():
+    tela = TelaFalsa([
+        "images/vender-inventario.png",
+        "images/venda-stash-2.png",
+        "images/venda-stash-2.png",
+    ])
+    mao = MaoFalsa()
+
+    resultado = ir_para_venda(tela, mao, RITMO)
+
+    assert resultado.sucesso, resultado.motivo
+    assert ("clicar", *CENTRO_BOTAO_RESGATAR) not in mao.acoes
+
+
+def test_resgate_que_nao_confirma_nao_derruba_a_ida_para_a_venda():
+    # Decisao explicita: resgatar e bonus, nao pre-condicao para vender. Se o
+    # botao continuar dourado depois das retentativas, a navegacao segue — os
+    # passos seguintes conferem o proprio estado e dao diagnostico melhor.
+    tela = TelaFalsa([
+        "images/vender-inventario.png",
+        "images/tela-venda-resgatar.png",  # repetido: o botao nunca some
+    ])
+    mao = MaoFalsa()
+
+    resultado = ir_para_venda(tela, mao, RITMO)
+
+    assert resultado.sucesso, resultado.motivo
+    tentativas = [
+        acao for acao in mao.acoes if acao == ("clicar", *CENTRO_BOTAO_RESGATAR)
+    ]
+    assert len(tentativas) == TENTATIVAS_DE_CLIQUE

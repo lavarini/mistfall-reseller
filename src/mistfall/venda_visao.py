@@ -50,6 +50,16 @@ LINHAS_ARMAZEM = 7
 
 LIMIAR_DOURADO = 0.50
 MARGEM_DOURADA = 0.20
+
+# Botao "Resgatar", ao lado de "Recuperavel:". So existe quando ha Ouro a
+# recolher; sem nada a resgatar a regiao fica no fundo escuro do painel.
+# Medido: 0.9485 de dourado com o botao contra 0.0163 sem ele.
+REGIAO_BOTAO_RESGATAR = (1073, 205, 1472, 259)
+CENTRO_BOTAO_RESGATAR = (1272, 232)
+MATIZ_BOTAO_RESGATAR = (15, 40)
+SATURACAO_MINIMA_BOTAO_RESGATAR = 90
+VALOR_MINIMO_BOTAO_RESGATAR = 110
+PROPORCAO_MINIMA_BOTAO_RESGATAR = 0.30
 REGIAO_TITULO_JANELA_VENDA = (1000, 190, 1550, 300)
 REGIAO_CENTRO_JANELA_VENDA = (400, 280, 2150, 1150)
 _CONFIG_CAPACIDADE = "--psm 7 -c tessedit_char_whitelist=0123456789/"
@@ -106,6 +116,23 @@ def _proporcoes_douradas(img: np.ndarray) -> list[float]:
         )
         proporcoes.append(float(dourado.mean()))
     return proporcoes
+
+
+def botao_resgatar_ativo(img: np.ndarray) -> bool:
+    """Diz se ha Ouro recuperavel, pelo botao "Resgatar" estar dourado.
+
+    A regiao fica na coluna da esquerda, fora do painel de itens, entao a
+    leitura nao depende de Inventario ou Armazem estar aberto.
+    """
+    conferir_resolucao(img)
+    hsv = cv2.cvtColor(_recortar(img, REGIAO_BOTAO_RESGATAR), cv2.COLOR_BGR2HSV)
+    dourado = (
+        (hsv[:, :, 0] >= MATIZ_BOTAO_RESGATAR[0])
+        & (hsv[:, :, 0] <= MATIZ_BOTAO_RESGATAR[1])
+        & (hsv[:, :, 1] >= SATURACAO_MINIMA_BOTAO_RESGATAR)
+        & (hsv[:, :, 2] >= VALOR_MINIMO_BOTAO_RESGATAR)
+    )
+    return float(dourado.mean()) >= PROPORCAO_MINIMA_BOTAO_RESGATAR
 
 
 def contar_baus(img: np.ndarray) -> int:

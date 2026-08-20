@@ -14,6 +14,8 @@ from mistfall.tipos import BAU_INICIAL, EstadoTela
 from mistfall.venda import RitmoVenda
 from mistfall.venda_visao import (
     CENTRO_ABA_ARMAZEM,
+    CENTRO_BOTAO_RESGATAR,
+    botao_resgatar_ativo,
     PainelItens,
     centro_bau,
     eh_tela_venda,
@@ -127,6 +129,24 @@ def ir_para_venda(tela: Tela, mao: Mao, ritmo: RitmoVenda) -> ResultadoNavegacao
     )
     if not armazem.sucesso:
         return armazem
+
+    # Resgatar antes de qualquer leitura do Armazem: o resgate pode devolver
+    # itens nao vendidos, e varrer antes dele leria uma tela desatualizada.
+    if armazem.frame is not None and botao_resgatar_ativo(armazem.frame):
+        # O resultado e deliberadamente ignorado. Resgatar e bonus, nao
+        # pre-condicao para vender: matar a sessao por nao ter recolhido Ouro
+        # seria pior que nao recolher. Se a tela ficou mesmo num estado ruim,
+        # os passos seguintes conferem o proprio estado e abortam com
+        # diagnostico especifico, que e melhor que um "nao resgatou" generico.
+        _clicar_ate_confirmar(
+            tela,
+            mao,
+            ritmo,
+            CENTRO_BOTAO_RESGATAR,
+            lambda frame: ler_capacidade(frame) is not None
+            and not botao_resgatar_ativo(frame),
+            "Venda nao confirmou o resgate",
+        )
 
     return _clicar_ate_confirmar(
         tela,

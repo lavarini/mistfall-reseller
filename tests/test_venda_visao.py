@@ -5,6 +5,7 @@ import pytest
 from mistfall.tipos import CapacidadeVenda, ItemAlvo, SlotArmazem
 from mistfall.venda_visao import (
     PainelItens,
+    botao_resgatar_ativo,
     caixa_slot_armazem,
     centro_bau,
     contar_baus,
@@ -238,3 +239,21 @@ def _mover_selecao_de_bau(img, destino):
 
 def test_le_bau_selecionado_acima_do_quarto(baus_6):
     assert ler_bau_selecionado(_mover_selecao_de_bau(baus_6, 4)) == 4
+
+
+def test_detecta_o_botao_resgatar_dourado(baus_6):
+    # Com Ouro recuperavel o botao aparece dourado ao lado de "Recuperavel:".
+    # Sem nada a resgatar ele nao existe, e a regiao fica no fundo do painel.
+    com_botao = cv2.imread("images/tela-venda-resgatar.png")
+    assert com_botao is not None
+    assert botao_resgatar_ativo(com_botao)
+    assert not botao_resgatar_ativo(baus_6)
+
+
+def test_botao_resgatar_ausente_nos_dois_paineis():
+    # A regiao do botao fica na coluna da esquerda, fora do painel de itens,
+    # entao a leitura nao pode depender de Inventario ou Armazem estar aberto.
+    for nome in ("vender-inventario.png", "venda-stash-2.png"):
+        imagem = cv2.imread(f"images/{nome}")
+        assert imagem is not None
+        assert not botao_resgatar_ativo(imagem), nome
