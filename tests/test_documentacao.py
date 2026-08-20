@@ -308,3 +308,16 @@ def test_documentacao_registra_o_sessao_json_e_o_codigo_um_do_fluxo_completo():
 
     assert "sessao.json" in readme
     assert "sessao.json" in execucao_windows
+
+
+def test_o_glossario_nao_promete_quatro_baus():
+    # O Armazem expande entre seasons. O texto antigo dizia "Uma das quatro
+    # abas do Armazem", e foi essa promessa que travou a leitura em quatro.
+    assert "quatro abas" not in CONTEXT
+    assert "Baú" in CONTEXT
+
+
+def test_o_readme_nao_promete_encerrar_no_quarto_bau():
+    # A varredura vai ate o ultimo Bau detectado, nao ate o quarto.
+    assert "quarto Baú" not in README
+    assert "último Baú" in README

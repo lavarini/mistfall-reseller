@@ -10,7 +10,7 @@ from mistfall.compra_visao import filtro_roxo_ativo
 from mistfall.estado import identificar_estado
 from mistfall.geometria import CATEGORIA_MATERIAL_CONSTRUCAO
 from mistfall.perifericos.protocolos import Mao, Tela
-from mistfall.tipos import Bau, EstadoTela
+from mistfall.tipos import BAU_INICIAL, EstadoTela
 from mistfall.venda import RitmoVenda
 from mistfall.venda_visao import (
     CENTRO_ABA_ARMAZEM,
@@ -125,10 +125,10 @@ def ir_para_venda(tela: Tela, mao: Mao, ritmo: RitmoVenda) -> ResultadoNavegacao
         tela,
         mao,
         ritmo,
-        centro_bau(Bau.SEGUNDO),
+        centro_bau(BAU_INICIAL),
         lambda frame: eh_tela_venda(frame)
         and ler_painel_itens(frame) is PainelItens.ARMAZEM
-        and ler_bau_selecionado(frame) is Bau.SEGUNDO,
+        and ler_bau_selecionado(frame) == BAU_INICIAL,
         "Venda nao confirmou Bau 2",
     )
 

@@ -538,3 +538,69 @@ def test_grava_sessao_json_com_desfecho_e_motivo_mesmo_ao_abortar(
     assert dados["compras_enviadas"] == 0
     assert dados["estado"]["estoque_estimado"] == 0
     assert dados["estado"]["modo"] == "rapido"
+
+
+def test_conta_os_baus_na_primeira_venda_e_reusa_nas_seguintes(monkeypatch, tmp_path):
+    # A contagem sai da propria Venda: a primeira conta e devolve o total, e o
+    # coordenador o repassa. Recontar a cada Venda desperdicaria a leitura.
+    import mistfall.ciclo_completo as completo
+
+    _preparar(
+        monkeypatch,
+        [
+            _resultado(Desfecho.COMPRA_ENVIADA),
+            _resultado(Desfecho.NADA_COMPRAVEL, ouro=1000),
+            _resultado(Desfecho.COMPRA_ENVIADA),
+            _resultado(Desfecho.NADA_COMPRAVEL, ouro=900),
+        ] + [_resultado(Desfecho.NADA_COMPRAVEL, ouro=900)] * 8,
+        [
+            MensagemCompra.NENHUMA,
+            MensagemCompra.INVENTARIO_CHEIO,
+            MensagemCompra.NENHUMA,
+            MensagemCompra.INVENTARIO_CHEIO,
+        ],
+    )
+    totais_recebidos = []
+
+    def vender(*args, **kwargs):
+        totais_recebidos.append(kwargs.get("total_baus"))
+        return SessaoVenda(
+            DesfechoSessaoVenda.ARMAZEM_ESGOTADO, vendas=1,
+            unidades_listadas=3, total_baus=6,
+        )
+
+    monkeypatch.setattr(completo, "executar_venda_parcial", vender)
+    interruptor = InterruptorRoteirizado([False] * 7 + [True])
+
+    sessao = _executar(tmp_path, interruptor)
+
+    assert totais_recebidos == [0, 6]
+    assert sessao.total_baus == 6
+
+
+def test_sessao_json_registra_o_total_de_baus_contado(monkeypatch, tmp_path):
+    # A contagem e feita uma vez e vale a sessao inteira. Se sair errada, o
+    # relatorio e o unico lugar onde isso fica visivel depois.
+    import mistfall.ciclo_completo as completo
+
+    _preparar(
+        monkeypatch,
+        [
+            _resultado(Desfecho.COMPRA_ENVIADA),
+            _resultado(Desfecho.NADA_COMPRAVEL, ouro=1000),
+        ] + [_resultado(Desfecho.NADA_COMPRAVEL, ouro=900)] * 8,
+        [MensagemCompra.NENHUMA, MensagemCompra.INVENTARIO_CHEIO],
+    )
+    monkeypatch.setattr(
+        completo,
+        "executar_venda_parcial",
+        lambda *args, **kwargs: SessaoVenda(
+            DesfechoSessaoVenda.ARMAZEM_ESGOTADO, vendas=1,
+            unidades_listadas=3, total_baus=6,
+        ),
+    )
+
+    _executar(tmp_path, InterruptorRoteirizado([False] * 5 + [True]))
+
+    dados = json.loads((tmp_path / "sessao.json").read_text(encoding="utf-8"))
+    assert dados["total_baus"] == 6

@@ -13,7 +13,7 @@ from mistfall.navegacao import (
 from mistfall.ciclo_venda import DesfechoSessaoVenda, executar_ciclo_venda
 from mistfall.config import Config
 from mistfall.perifericos.falso import InterruptorFalso, MaoFalsa, TelaFalsa
-from mistfall.tipos import Bau, CapacidadeVenda, EstadoTela, ItemAlvo, SlotArmazem
+from mistfall.tipos import CapacidadeVenda, EstadoTela, ItemAlvo, SlotArmazem
 from mistfall.venda import DesfechoVenda, ResultadoVenda, RitmoVenda
 from mistfall.venda_visao import CENTRO_ABA_ARMAZEM, PainelItens, centro_bau
 
@@ -49,7 +49,7 @@ def test_ir_para_venda_confirma_inventario_armazem_e_bau_dois_sem_clicar_no_prim
     monkeypatch.setattr(
         navegacao,
         "ler_bau_selecionado",
-        lambda frame: Bau.SEGUNDO if int(frame[0, 0, 0]) == 30 else Bau.PRIMEIRO,
+        lambda frame: 1 if int(frame[0, 0, 0]) == 30 else 0,
     )
     mao = MaoFalsa()
 
@@ -60,9 +60,9 @@ def test_ir_para_venda_confirma_inventario_armazem_e_bau_dois_sem_clicar_no_prim
     assert [acao[1:] for acao in mao.acoes] == [
         CENTRO_ABA_VENDER,
         CENTRO_ABA_ARMAZEM,
-        centro_bau(Bau.SEGUNDO),
+        centro_bau(1),
     ]
-    assert centro_bau(Bau.PRIMEIRO) not in [acao[1:] for acao in mao.acoes]
+    assert centro_bau(0) not in [acao[1:] for acao in mao.acoes]
 
 
 def test_ir_para_compra_restaura_material_e_filtro_roxo(monkeypatch, tmp_path):
@@ -152,7 +152,7 @@ def test_ir_para_venda_repetem_frames_intermediarios_antes_do_proximo_clique(
     monkeypatch.setattr(
         navegacao,
         "ler_bau_selecionado",
-        lambda frame: Bau.SEGUNDO if int(frame[0, 0, 0]) == 30 else Bau.PRIMEIRO,
+        lambda frame: 1 if int(frame[0, 0, 0]) == 30 else 0,
     )
     tela = _tela(tmp_path, 5, 10, 15, 20, 25, 30)
 
@@ -175,7 +175,7 @@ def test_ir_para_venda_repetem_frames_intermediarios_antes_do_proximo_clique(
     assert [acao[1:] for acao in mao.acoes] == [
         CENTRO_ABA_VENDER,
         CENTRO_ABA_ARMAZEM,
-        centro_bau(Bau.SEGUNDO),
+        centro_bau(1),
     ]
 
 
@@ -195,7 +195,7 @@ def test_navegacao_bem_sucedida_nao_altera_a_sessao_isolada_de_venda(
     monkeypatch.setattr(
         navegacao,
         "ler_bau_selecionado",
-        lambda frame: Bau.SEGUNDO if int(frame[0, 0, 0]) == 30 else Bau.PRIMEIRO,
+        lambda frame: 1 if int(frame[0, 0, 0]) == 30 else 0,
     )
     mao = MaoFalsa()
     resultado = ir_para_venda(_tela(tmp_path, 10, 20, 30), mao, RITMO)
@@ -204,7 +204,7 @@ def test_navegacao_bem_sucedida_nao_altera_a_sessao_isolada_de_venda(
     monkeypatch.setattr(
         "mistfall.ciclo_venda.ler_capacidade", lambda _: CapacidadeVenda(0, 12),
     )
-    monkeypatch.setattr("mistfall.ciclo_venda.ler_bau_selecionado", lambda _: Bau.QUARTO)
+    monkeypatch.setattr("mistfall.ciclo_venda.ler_bau_selecionado", lambda _: 3)
     monkeypatch.setattr("mistfall.ciclo_venda.varrer_armazem", lambda _: [slot])
     monkeypatch.setattr(
         "mistfall.ciclo_venda.executar_venda",
@@ -255,7 +255,7 @@ def test_ir_para_venda_reclica_a_aba_quando_o_primeiro_clique_se_perde(
     monkeypatch.setattr(
         navegacao,
         "ler_bau_selecionado",
-        lambda _: Bau.SEGUNDO if len(mao.acoes) >= 4 else Bau.PRIMEIRO,
+        lambda _: 1 if len(mao.acoes) >= 4 else 0,
     )
 
     resultado = ir_para_venda(_tela(tmp_path, 10), mao, RITMO)
@@ -266,7 +266,7 @@ def test_ir_para_venda_reclica_a_aba_quando_o_primeiro_clique_se_perde(
         CENTRO_ABA_VENDER,
         CENTRO_ABA_VENDER,
         CENTRO_ABA_ARMAZEM,
-        centro_bau(Bau.SEGUNDO),
+        centro_bau(1),
     ]
 
 

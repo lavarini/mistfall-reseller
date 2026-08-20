@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from enum import Enum, IntEnum
+from enum import Enum
 
 class ItemAlvo(Enum):
     BROCHE = "broche"
@@ -19,11 +19,13 @@ class EstadoTela(Enum):
     JANELA_VENDA = "janela_venda"
 
 
-class Bau(IntEnum):
-    PRIMEIRO = 0
-    SEGUNDO = 1
-    TERCEIRO = 2
-    QUARTO = 3
+# O Bau e um indice inteiro base zero, nao um enum: o numero de abas do
+# Armazem muda entre seasons, entao fixar os membros aqui foi o que travou a
+# leitura em quatro. Quem descobre quantos existem e `contar_baus`.
+#
+# A ordenacao automatica do jogo empurra equipamento para o primeiro Bau, entao
+# a Venda comeca no segundo e o primeiro nunca e varrido.
+BAU_INICIAL = 1
 
 
 @dataclass(frozen=True)

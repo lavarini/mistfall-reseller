@@ -98,6 +98,7 @@ def _fechar(pasta: Path, sessao: "SessaoCompleta") -> None:
                 "motivo": sessao.motivo,
                 "compras_enviadas": sessao.compras_enviadas,
                 "unidades_listadas": sessao.unidades_listadas,
+                "total_baus": sessao.total_baus,
                 "estado": {
                     "estoque_estimado": estado.estoque_estimado,
                     "modo": estado.modo.value,
@@ -140,6 +141,9 @@ class SessaoCompleta:
     # `eventos-do-fluxo.jsonl`, escrita por `TelemetriaSessao.registrar_evento_fluxo`
     # a cada `aplicar()` — ver `executar_ciclo_completo`.
     eventos: list[EventoFluxo] = field(default_factory=list)
+    # Contado pela primeira Venda da sessao e reusado pelas seguintes. Fica no
+    # relatorio porque uma contagem errada erra a sessao inteira, em silencio.
+    total_baus: int = 0
 
 
 def executar_ciclo_completo(
@@ -309,7 +313,10 @@ def executar_ciclo_completo(
             pasta_da_venda = pasta / f"venda-{numero_da_venda:04d}"
             venda = executar_venda_parcial(
                 tela, mao, config, pasta_da_venda, interruptor, ritmo_venda, sorteio,
+                total_baus=sessao.total_baus,
             )
+            if venda.total_baus:
+                sessao.total_baus = venda.total_baus
             sessao.unidades_listadas += venda.unidades_listadas
             if venda.unidades_listadas:
                 gatilho_por_saldo_suspenso = False

@@ -213,7 +213,12 @@ python -m ferramentas.venda_cli --pasta sessao-venda
 Aperte **F3** dentro do jogo para começar e **F4** para parar. O comando identifica os
 Itens-alvo no Baú atual e cria uma Listagem para cada stack cuja quantidade seja
 exatamente `3`. Cada Baú é processado uma vez; depois ele avança somente para a direita
-e encerra no quarto Baú.
+e encerra no último Baú.
+
+Quantos Baús existem é **contado da tela**, uma vez por sessão, e não fica fixo em
+lugar nenhum — o jogo é sazonal e o Armazém expande entre resets. O número contado vai
+para o `sessao.json`: como a contagem acontece uma vez só, é lá que uma leitura errada
+fica visível depois.
 
 A Capacidade de Venda vem sempre de `X/Y` na tela. O bot relê os dois números depois de
 cada Venda e para quando `X == Y`; não existe limite fixo nem opção de linha de comando

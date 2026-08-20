@@ -2,11 +2,12 @@ import cv2
 import numpy as np
 import pytest
 
-from mistfall.tipos import Bau, CapacidadeVenda, ItemAlvo, SlotArmazem
+from mistfall.tipos import CapacidadeVenda, ItemAlvo, SlotArmazem
 from mistfall.venda_visao import (
     PainelItens,
     caixa_slot_armazem,
     centro_bau,
+    contar_baus,
     centro_slot_armazem,
     eh_janela_venda,
     eh_tela_venda,
@@ -40,8 +41,8 @@ def test_regiao_de_capacidade_tem_largura_para_contador_de_dois_digitos():
     assert x1 - x0 >= 105
 
 def test_detecta_bau_dourado_selecionado(stash_2, stash_3):
-    assert ler_bau_selecionado(stash_2) is Bau.SEGUNDO
-    assert ler_bau_selecionado(stash_3) is Bau.TERCEIRO
+    assert ler_bau_selecionado(stash_2) is 1
+    assert ler_bau_selecionado(stash_3) is 2
 
 
 def test_detecta_painel_armazem_selecionado(stash_2):
@@ -117,7 +118,10 @@ def test_ultima_coluna_fica_alinhada_com_a_grade_real():
 
 
 def test_centro_de_cada_bau_e_distinto():
-    assert len({centro_bau(bau) for bau in Bau}) == 4
+    from mistfall.venda_visao import MAX_BAUS
+
+    centros = {centro_bau(indice) for indice in range(MAX_BAUS)}
+    assert len(centros) == MAX_BAUS
 
 
 def test_capacidade_incoerente_e_recusada(monkeypatch, stash_2):
@@ -191,3 +195,46 @@ def test_centro_do_slot_fica_dentro_da_caixa():
     x0, y0, x1, y1 = caixa_slot_armazem(2, 4)
     assert x0 < x < x1
     assert y0 < y < y1
+
+
+@pytest.fixture
+def baus_6():
+    return cv2.imread("images/baus-6.png")
+
+
+def test_conta_quatro_baus_no_armazem_antigo(stash_2):
+    assert contar_baus(stash_2) == 4
+
+
+def test_conta_seis_baus_no_armazem_expandido(baus_6):
+    assert contar_baus(baus_6) == 6
+
+
+def _mover_selecao_de_bau(img, destino):
+    """Move o destaque dourado para a aba `destino`, trocando as caixas.
+
+    O corpus so tem prints com o Bau 1, 2 ou 3 selecionado. Para exercitar a
+    leitura acima do quarto Bau, a caixa acesa e a apagada trocam de lugar.
+    """
+    from mistfall.venda_visao import (
+        MEIA_CAIXA_BAU, PASSO_BAU, X_PRIMEIRO_BAU, Y_BAUS,
+    )
+
+    def caixa(indice):
+        x = X_PRIMEIRO_BAU + PASSO_BAU * indice
+        return (
+            slice(Y_BAUS - MEIA_CAIXA_BAU, Y_BAUS + MEIA_CAIXA_BAU),
+            slice(x - MEIA_CAIXA_BAU, x + MEIA_CAIXA_BAU),
+        )
+
+    copia = img.copy()
+    origem = int(ler_bau_selecionado(img))
+    acesa = img[caixa(origem)].copy()
+    apagada = img[caixa(destino)].copy()
+    copia[caixa(destino)] = acesa
+    copia[caixa(origem)] = apagada
+    return copia
+
+
+def test_le_bau_selecionado_acima_do_quarto(baus_6):
+    assert ler_bau_selecionado(_mover_selecao_de_bau(baus_6, 4)) == 4

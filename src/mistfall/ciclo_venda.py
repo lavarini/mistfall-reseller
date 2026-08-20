@@ -9,7 +9,7 @@ from pathlib import Path
 
 from mistfall.config import Config
 from mistfall.perifericos.protocolos import Interruptor, Mao, Tela
-from mistfall.tipos import Bau, CapacidadeVenda
+from mistfall.tipos import BAU_INICIAL, CapacidadeVenda
 from mistfall.venda import (
     DesfechoVenda,
     RITMO_VENDA_PADRAO,
@@ -22,6 +22,7 @@ from mistfall.venda_visao import (
     PainelItens,
     centro_bau,
     eh_tela_venda,
+    contar_baus,
     ler_bau_selecionado,
     ler_capacidade,
     ler_painel_itens,
@@ -44,6 +45,9 @@ class SessaoVenda:
     unidades_listadas: int = 0
     capacidade_final: CapacidadeVenda | None = None
     baus_processados: list[int] = field(default_factory=list)
+    # Quantos Baus o Armazem tinha nesta sessao. Contado uma vez, da
+    # propria tela: o numero muda entre seasons.
+    total_baus: int = 0
 
 
 def _fechar(pasta: Path, sessao: SessaoVenda) -> None:
@@ -55,13 +59,13 @@ def _fechar(pasta: Path, sessao: SessaoVenda) -> None:
     )
 
 
-def _esperar_bau(tela: Tela, esperado: Bau, ritmo: RitmoVenda):
+def _esperar_bau(tela: Tela, esperado: int, ritmo: RitmoVenda):
     inicio = time.monotonic()
     primeira = True
     while primeira or time.monotonic() - inicio < ritmo.teto_espera_fechamento:
         primeira = False
         frame = tela.capturar()
-        if eh_tela_venda(frame) and ler_bau_selecionado(frame) is esperado:
+        if eh_tela_venda(frame) and ler_bau_selecionado(frame) == esperado:
             return frame
         time.sleep(ritmo.intervalo_entre_perguntas)
     return None
@@ -80,7 +84,7 @@ def _esperar_painel(tela: Tela, esperado: PainelItens, ritmo: RitmoVenda):
 
 
 def _forcar_reset_armazem(
-    tela: Tela, mao: Mao, bau: Bau, ritmo: RitmoVenda,
+    tela: Tela, mao: Mao, bau: int, ritmo: RitmoVenda,
 ):
     mao.clicar(*CENTRO_ABA_INVENTARIO)
     if _esperar_painel(tela, PainelItens.INVENTARIO, ritmo) is None:
@@ -166,9 +170,16 @@ def executar_venda_parcial(
     interruptor: Interruptor,
     ritmo: RitmoVenda = RITMO_VENDA_PADRAO,
     sorteio: random.Random | None = None,
+    total_baus: int = 0,
 ) -> SessaoVenda:
+    """Venda parcial, opcionalmente com a contagem de Baus ja conhecida.
+
+    O Fluxo Completo conta os Baus na primeira Venda e repassa o numero nas
+    seguintes; sem ele, a sessao conta sozinha.
+    """
     return _executar_sessao_venda(
         tela, mao, config, pasta, interruptor, ritmo, sorteio, parcial=True,
+        total_baus=total_baus,
     )
 
 
@@ -182,9 +193,10 @@ def _executar_sessao_venda(
     sorteio: random.Random | None,
     *,
     parcial: bool,
+    total_baus: int = 0,
 ) -> SessaoVenda:
     pasta = Path(pasta)
-    sessao = SessaoVenda()
+    sessao = SessaoVenda(total_baus=total_baus)
     if sorteio is None:
         sorteio = random.Random()
     if not parcial:
@@ -199,11 +211,14 @@ def _executar_sessao_venda(
         frame = tela.capturar()
         bau_confirmado = None
         if parcial:
-            mao.clicar(*centro_bau(Bau.SEGUNDO))
-            frame = _esperar_bau(tela, Bau.SEGUNDO, ritmo)
+            mao.clicar(*centro_bau(BAU_INICIAL))
+            frame = _esperar_bau(tela, BAU_INICIAL, ritmo)
             if frame is None:
-                return encerrar(DesfechoSessaoVenda.ABORTOU, "Bau 2 nao abriu")
-            bau_confirmado = Bau.SEGUNDO
+                return encerrar(
+                    DesfechoSessaoVenda.ABORTOU,
+                    f"Bau {BAU_INICIAL + 1} nao abriu",
+                )
+            bau_confirmado = BAU_INICIAL
         while True:
             if not eh_tela_venda(frame):
                 return encerrar(DesfechoSessaoVenda.ABORTOU, "tela de Venda ilegivel")
@@ -222,7 +237,16 @@ def _executar_sessao_venda(
             bau_confirmado = None
             if bau is None:
                 return encerrar(DesfechoSessaoVenda.ABORTOU, "Bau selecionado ilegivel")
-            sessao.baus_processados.append(int(bau) + 1)
+            if not sessao.total_baus:
+                sessao.total_baus = contar_baus(frame)
+                if sessao.total_baus < 2:
+                    # O jogo sempre da ao menos dois Baus, entao menos que isso
+                    # e leitura errada, nao Armazem pequeno.
+                    return encerrar(
+                        DesfechoSessaoVenda.ABORTOU,
+                        f"contagem de Baus implausivel: {sessao.total_baus}",
+                    )
+            sessao.baus_processados.append(bau + 1)
 
             candidatos = _candidatos(frame)
             # Uma lista inicialmente não vazia já representa trabalho válido;
@@ -314,17 +338,17 @@ def _executar_sessao_venda(
                 candidatos = _candidatos(frame)
                 resetou_armazem = True
 
-            if bau is Bau.QUARTO:
+            if bau >= sessao.total_baus - 1:
                 return encerrar(DesfechoSessaoVenda.ARMAZEM_ESGOTADO)
             if interruptor.pediram_parada():
                 return encerrar(DesfechoSessaoVenda.PAROU)
-            proximo_bau = Bau(int(bau) + 1)
+            proximo_bau = bau + 1
             mao.clicar(*centro_bau(proximo_bau))
             frame = _esperar_bau(tela, proximo_bau, ritmo)
             if frame is None:
                 return encerrar(
                     DesfechoSessaoVenda.ABORTOU,
-                    f"Bau {int(proximo_bau) + 1} nao abriu",
+                    f"Bau {proximo_bau + 1} nao abriu",
                 )
             bau_confirmado = proximo_bau
     finally:

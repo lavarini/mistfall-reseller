@@ -10,12 +10,26 @@ import pytesseract
 from mistfall.geometria import conferir_resolucao
 from mistfall.itens import identificar_item, pontuar
 from mistfall.paralelo import TRABALHADORES_PADRAO, mapear
-from mistfall.tipos import Bau, CapacidadeVenda, SlotArmazem
+from mistfall.tipos import CapacidadeVenda, SlotArmazem
 
 
 REGIAO_CAPACIDADE = (345, 200, 450, 250)
-CENTROS_BAUS = ((1723, 286), (1787, 286), (1851, 286), (1915, 286))
+# As abas de Bau crescem para a direita a partir de um primeiro centro fixo. O
+# numero delas muda entre seasons, entao a geometria e derivada do passo em vez
+# de listada: `contar_baus` descobre quantas existem lendo a propria tela.
+X_PRIMEIRO_BAU = 1723
+PASSO_BAU = 64
+Y_BAUS = 286
 MEIA_CAIXA_BAU = 22
+# Teto da varredura, nao promessa: e onde a faixa de abas esbarra na borda do
+# painel do Armazem. A contagem para muito antes disso, na primeira ausente.
+MAX_BAUS = 10
+# Brilho medio da caixa da aba. Medido nas fixtures: 19 sem aba, 41 com aba nao
+# selecionada, 115 com aba selecionada. O limiar fica no vale entre 19 e 41.
+LIMIAR_PRESENCA_BAU = 30.0
+CENTROS_BAUS = tuple(
+    (X_PRIMEIRO_BAU + PASSO_BAU * i, Y_BAUS) for i in range(MAX_BAUS)
+)
 REGIOES_ABAS_ITENS = (
     (1570, 190, 1755, 240),  # Inventario
     (1770, 190, 1940, 240),  # Armazem
@@ -94,7 +108,27 @@ def _proporcoes_douradas(img: np.ndarray) -> list[float]:
     return proporcoes
 
 
-def ler_bau_selecionado(img: np.ndarray) -> Bau | None:
+def contar_baus(img: np.ndarray) -> int:
+    """Conta as abas de Bau presentes, da esquerda para a direita.
+
+    A varredura para na primeira posicao vazia em vez de contar todas as
+    posicoes acesas: um brilho solto a direita da faixa nao vira Bau fantasma.
+    """
+    conferir_resolucao(img)
+    cinza = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    total = 0
+    for x, y in CENTROS_BAUS:
+        caixa = cinza[
+            y - MEIA_CAIXA_BAU:y + MEIA_CAIXA_BAU,
+            x - MEIA_CAIXA_BAU:x + MEIA_CAIXA_BAU,
+        ]
+        if caixa.size == 0 or caixa.mean() < LIMIAR_PRESENCA_BAU:
+            break
+        total += 1
+    return total
+
+
+def ler_bau_selecionado(img: np.ndarray) -> int | None:
     proporcoes = _proporcoes_douradas(img)
     ordem = sorted(range(len(proporcoes)), key=proporcoes.__getitem__, reverse=True)
     melhor, segundo = ordem[:2]
@@ -103,7 +137,7 @@ def ler_bau_selecionado(img: np.ndarray) -> Bau | None:
         or proporcoes[melhor] - proporcoes[segundo] < MARGEM_DOURADA
     ):
         return None
-    return Bau(melhor)
+    return melhor
 
 
 def _proporcoes_douradas_abas(img: np.ndarray) -> list[float]:
@@ -134,8 +168,8 @@ def ler_painel_itens(img: np.ndarray) -> PainelItens | None:
     return PainelItens.INVENTARIO if melhor == 0 else PainelItens.ARMAZEM
 
 
-def centro_bau(bau: Bau) -> tuple[int, int]:
-    return CENTROS_BAUS[int(bau)]
+def centro_bau(bau: int) -> tuple[int, int]:
+    return CENTROS_BAUS[bau]
 
 
 def caixa_slot_armazem(linha: int, coluna: int) -> tuple[int, int, int, int]:

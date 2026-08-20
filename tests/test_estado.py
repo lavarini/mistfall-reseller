@@ -33,6 +33,8 @@ ESTADO_ESPERADO = {
     "reset-chave": EstadoTela.OUTRA_CATEGORIA,
     "venda-stash-2": EstadoTela.VENDA,
     "venda-stash-3": EstadoTela.VENDA,
+    # Armazem depois da expansao de season: seis Baus em vez de quatro.
+    "baus-6": EstadoTela.VENDA,
     "tela-venda-resgatar": EstadoTela.VENDA,
     "modal-venda-broche": EstadoTela.JANELA_VENDA,
     "modal-venda-resgatar": EstadoTela.JANELA_VENDA,

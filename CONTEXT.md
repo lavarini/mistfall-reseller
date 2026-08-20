@@ -105,8 +105,16 @@ NPC e pode resetar entre seasons.
 _Avoid_: Limite configurado, Vagas fixas.
 
 **Baú**:
-Uma das quatro abas do Armazém abaixo do título "Armazém". O ciclo de Venda começa no
-Baú selecionado, processa sua imagem uma vez e avança somente para a direita.
+Uma das abas do Armazém abaixo do título "Armazém". Quantas existem **não é fixo**: o
+jogo é sazonal e o Armazém expande entre resets, então o número é contado da própria
+tela no início de cada sessão de Venda. O ciclo processa a imagem de cada Baú uma vez e
+avança somente para a direita, até o último detectado.
+
+Onde ele começa depende do modo: `mistfall-venda` começa no Baú que estiver aberto,
+enquanto a Venda do Fluxo Completo seleciona o segundo explicitamente e pula o primeiro
+— a ordenação automática do jogo empurra equipamento para lá, e equipamento não é
+Item-alvo. Menos de dois Baús é leitura errada, não Armazém pequeno: o jogo sempre dá
+ao menos dois.
 _Avoid_: Stash, Página, Guia.
 
 **Filtro Roxo**:
