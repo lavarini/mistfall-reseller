@@ -250,3 +250,44 @@ def test_f4_para_durante_compra_ou_venda(monkeypatch, tmp_path):
     assert sessao_venda.desfecho is DesfechoSessaoCompleta.PAROU
     assert chamadas[-2:] == ["ir_venda", "venda"]
     assert "ir_compra" not in chamadas
+
+
+def test_cinco_abortos_consecutivos_encerram_a_sessao_com_o_motivo(
+    monkeypatch, tmp_path,
+):
+    resultados = [
+        Resultado(Desfecho.ABORTOU, motivo=f"pre-voo ilegivel {n}", ouro_observado=1000)
+        for n in range(1, 6)
+    ]
+    chamadas = _preparar(monkeypatch, resultados)
+    interruptor = InterruptorRoteirizado([False] * 5)
+
+    sessao = _executar(tmp_path, interruptor)
+
+    assert sessao.desfecho is DesfechoSessaoCompleta.ABORTOU
+    assert sessao.motivo == "pre-voo ilegivel 5"
+    assert chamadas.count("compra") == 5
+    assert "venda" not in chamadas
+
+
+def test_um_resultado_que_nao_e_abortou_zera_o_contador_de_abortos(
+    monkeypatch, tmp_path,
+):
+    def aborto(n):
+        return Resultado(
+            Desfecho.ABORTOU, motivo=f"pre-voo ilegivel {n}", ouro_observado=1000,
+        )
+
+    resultados = (
+        [aborto(n) for n in range(1, 5)]
+        + [_resultado(Desfecho.NADA_COMPRAVEL)]
+        + [aborto(n) for n in range(5, 9)]
+    )
+    chamadas = _preparar(monkeypatch, resultados)
+    interruptor = InterruptorRoteirizado([False] * 9 + [True])
+
+    sessao = _executar(tmp_path, interruptor)
+
+    assert sessao.desfecho is DesfechoSessaoCompleta.PAROU
+    assert chamadas.count("compra") == 9
+    assert chamadas.count("reset") == 1

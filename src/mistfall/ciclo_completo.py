@@ -27,8 +27,15 @@ prioridade:
    nao ha evidencia contra a Compra ter acontecido.
 
 Nenhum desses sinais isolados encerra o laco. So a falha persistente de
-navegacao (depois das retentativas que `navegacao.py` ja faz sozinho) e o
-F4 do operador — em Compra ou em Venda — terminam a sessao.
+navegacao (depois das retentativas que `navegacao.py` ja faz sozinho), a
+falha persistente de visao (`Desfecho.ABORTOU` do proprio `piloto.executar`
+por `LIMITE_ABORTOS_CONSECUTIVOS` Voltas seguidas) e o F4 do operador — em
+Compra ou em Venda — terminam a sessao.
+
+Uma Volta `ABORTOU` conta para esse limite; qualquer Volta que nao seja
+`ABORTOU` zera o contador, incluindo `Desfecho.SIMULOU` — SIMULOU e uma
+simulacao bem-sucedida, nao falha, e contá-la junto derrubaria uma sessao
+inteira rodada com `simular=True` na quinta Volta.
 """
 
 import itertools
@@ -63,6 +70,12 @@ from mistfall.venda import RITMO_VENDA_PADRAO, RitmoVenda
 _ALTERNANCIA_RESET = (CategoriaAlternativa.FORJA, CategoriaAlternativa.CHAVE)
 
 _ACOES_DE_VENDA = (AcaoFluxo.VENDER_POR_INVENTARIO_CHEIO, AcaoFluxo.VENDER_POR_FLUXO_LENTO)
+
+# Mesma ideia de `resets_consecutivos >= 5` que `fluxo.py` ja usa como
+# limiar de persistencia — um so vocabulario de limiar para o modo completo.
+# Falha de visao (ABORTOU) e uma queda cega do piloto, entao o limite vive
+# aqui, fora do contrato puro de `fluxo.py`, que continua selado.
+LIMITE_ABORTOS_CONSECUTIVOS = 5
 
 
 class DesfechoSessaoCompleta(Enum):
@@ -126,6 +139,7 @@ def executar_ciclo_completo(
     ouro_no_envio: int | None = None
     numero_da_volta = 0
     numero_da_venda = 0
+    abortos_consecutivos = 0
 
     while True:
         if interruptor.pediram_parada():
@@ -150,6 +164,15 @@ def executar_ciclo_completo(
         # clique). Nao e falha estrategica: encerra a sessao na hora.
         if resultado.desfecho is Desfecho.PAROU:
             return encerrar(DesfechoSessaoCompleta.PAROU)
+
+        # Falha persistente de visao: SIMULOU nao conta (e sucesso, nao
+        # falha), e qualquer Volta que nao seja ABORTOU zera o contador.
+        if resultado.desfecho is Desfecho.ABORTOU:
+            abortos_consecutivos += 1
+            if abortos_consecutivos >= LIMITE_ABORTOS_CONSECUTIVOS:
+                return encerrar(DesfechoSessaoCompleta.ABORTOU, resultado.motivo)
+        else:
+            abortos_consecutivos = 0
 
         mensagem = (
             detectar_mensagem_compra(frame_inicial)
