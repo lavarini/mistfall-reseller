@@ -100,9 +100,16 @@ def _preparar(monkeypatch, resultados, mensagens=None, venda=None, vendas=None):
     return chamadas
 
 
-def _executar(tmp_path, interruptor):
+def _config(**ajustes):
+    from mistfall.config import Config
+    from mistfall.tipos import ItemAlvo
+
+    return Config(precos_alvo={ItemAlvo.BROCHE: 188}, **ajustes)
+
+
+def _executar(tmp_path, interruptor, config=None):
     return executar_ciclo_completo(
-        object(), object(), object(), tmp_path, interruptor,
+        object(), object(), config or _config(), tmp_path, interruptor,
         RITMO_COMPRA, RITMO_VENDA, random.Random(42),
     )
 
@@ -604,3 +611,19 @@ def test_sessao_json_registra_o_total_de_baus_contado(monkeypatch, tmp_path):
 
     dados = json.loads((tmp_path / "sessao.json").read_text(encoding="utf-8"))
     assert dados["total_baus"] == 6
+
+
+def test_ouro_abaixo_do_piso_manda_vender_mesmo_no_regime_rapido(monkeypatch, tmp_path):
+    # O buraco da #24: com o Ouro esgotado as Listagens no Preco-alvo continuam
+    # aparecendo, entao o regime nunca vira lento, e nada e comprado, entao o
+    # Inventario nunca enche. Os dois gatilhos antigos ficam inalcancaveis.
+    chamadas = _preparar(
+        monkeypatch,
+        [_resultado(Desfecho.COMPRA_ENVIADA, ouro=250)] * 10,
+        [MensagemCompra.NENHUMA] * 10,
+    )
+
+    _executar(tmp_path, InterruptorRoteirizado([False] * 3 + [True]))
+
+    assert "venda" in chamadas
+    assert chamadas.index("ir_venda") < chamadas.index("venda")

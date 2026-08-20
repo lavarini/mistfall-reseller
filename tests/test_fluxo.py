@@ -216,3 +216,20 @@ def test_compra_inconclusiva_sem_argumento_soma_a_unidade_provisoria():
     estado = replace(estado_inicial(), compra_pendente=True)
     depois, _ = aplicar_evento(estado, EventoFluxo.compra_inconclusiva())
     assert depois.estoque_estimado == 1
+
+
+def test_ouro_abaixo_do_piso_manda_vender():
+    # Terceiro motivo de Venda, separado dos outros dois para a telemetria
+    # distinguir. Vale mesmo no regime rapido e com o Inventario vazio: sao
+    # justamente esses os estados em que os outros dois gatilhos nao alcancam.
+    estado, acao = aplicar_evento(estado_inicial(), EventoFluxo.ouro_abaixo_do_piso())
+    assert acao is AcaoFluxo.VENDER_POR_OURO_BAIXO
+    assert estado == estado_inicial()
+
+
+def test_ouro_abaixo_do_piso_nao_mexe_no_regime_nem_no_estoque():
+    # E um sinal, nao uma Compra nem um Reset: nao pode contaminar a cadencia
+    # que decide rapido/lento.
+    partida = replace(estado_inicial(), estoque_estimado=7, resets_consecutivos=2)
+    depois, _ = aplicar_evento(partida, EventoFluxo.ouro_abaixo_do_piso())
+    assert depois == partida

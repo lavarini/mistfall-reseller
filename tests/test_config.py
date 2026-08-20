@@ -125,3 +125,39 @@ def test_trabalhadores_invalido_diz_o_arquivo_e_a_chave(tmp_path):
     arquivo.write_text("trabalhadores = 0\n[precos_alvo]\nbroche = 188\n", encoding="utf-8")
     with pytest.raises(ValueError, match="trabalhadores"):
         carregar_config(arquivo)
+
+
+def test_piso_e_alvo_de_ouro_tem_defaults(tmp_path):
+    # O piso fica acima do maior Preco-alvo (281): abaixo dele o bot nao
+    # compra o Item-alvo mais caro e varrer vira desperdicio. O alvo tem folga
+    # para o bot nao voltar a Venda na Volta seguinte.
+    arquivo = tmp_path / "config.toml"
+    arquivo.write_text("[precos_alvo]\nbroche = 188\n", encoding="utf-8")
+    config = carregar_config(arquivo)
+    assert config.piso_ouro == 300
+    assert config.ouro_alvo_recuperacao == 10000
+
+
+def test_piso_e_alvo_de_ouro_vem_do_arquivo(tmp_path):
+    arquivo = tmp_path / "config.toml"
+    arquivo.write_text(
+        "piso_ouro = 500\nouro_alvo_recuperacao = 25000\n"
+        "[precos_alvo]\nbroche = 188\n",
+        encoding="utf-8",
+    )
+    config = carregar_config(arquivo)
+    assert config.piso_ouro == 500
+    assert config.ouro_alvo_recuperacao == 25000
+
+
+def test_alvo_de_ouro_abaixo_do_piso_e_recusado(tmp_path):
+    # Sair da recuperacao com menos Ouro do que o piso que a disparou faria o
+    # bot voltar para a Venda na Volta seguinte, para sempre.
+    arquivo = tmp_path / "config.toml"
+    arquivo.write_text(
+        "piso_ouro = 500\nouro_alvo_recuperacao = 400\n"
+        "[precos_alvo]\nbroche = 188\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="ouro_alvo_recuperacao"):
+        carregar_config(arquivo)

@@ -4,11 +4,21 @@ from pathlib import Path
 from mistfall.paralelo import TRABALHADORES_PADRAO
 from mistfall.tipos import ItemAlvo
 
+PISO_OURO_PADRAO = 300
+OURO_ALVO_RECUPERACAO_PADRAO = 10000
+
 @dataclass(frozen=True)
 class Config:
     precos_alvo: dict[ItemAlvo, int]
     trabalhadores: int = TRABALHADORES_PADRAO
     precos_venda: dict[ItemAlvo, int] = field(default_factory=dict)
+    # Abaixo do piso o Fluxo Completo para de comprar e vai recuperar Ouro. O
+    # default fica acima do maior Preco-alvo (281): abaixo disso o bot nao
+    # compra o Item-alvo mais caro e varrer e desperdicio garantido.
+    piso_ouro: int = PISO_OURO_PADRAO
+    # Ouro necessario para sair da recuperacao e voltar a comprar. A folga
+    # sobre o piso evita o vaivem entre Compra e Venda.
+    ouro_alvo_recuperacao: int = OURO_ALVO_RECUPERACAO_PADRAO
 
 
 def _carregar_precos(dados: dict, secao: str, arquivo: Path) -> dict[ItemAlvo, int]:
@@ -40,6 +50,15 @@ def validar_precos_venda(config: Config) -> None:
     if faltantes:
         nomes = ", ".join(sorted(item.value for item in faltantes))
         raise ValueError(f"faltam Precos de Venda para: {nomes}")
+
+def _inteiro_positivo(dados: dict, chave: str, padrao: int, arquivo: Path) -> int:
+    valor = dados.get(chave, padrao)
+    if not isinstance(valor, int) or isinstance(valor, bool) or valor <= 0:
+        raise ValueError(
+            f"{arquivo}: {chave} = {valor!r}; precisa ser um inteiro maior que zero"
+        )
+    return valor
+
 
 def carregar_config(caminho: str | Path = "config.toml") -> Config:
     """Le os Precos-alvo do arquivo de configuracao.
@@ -74,8 +93,22 @@ def carregar_config(caminho: str | Path = "config.toml") -> Config:
             "precisa ser um inteiro maior que zero"
         )
 
+    piso_ouro = _inteiro_positivo(dados, "piso_ouro", PISO_OURO_PADRAO, arquivo)
+    ouro_alvo_recuperacao = _inteiro_positivo(
+        dados, "ouro_alvo_recuperacao", OURO_ALVO_RECUPERACAO_PADRAO, arquivo
+    )
+    if ouro_alvo_recuperacao < piso_ouro:
+        raise ValueError(
+            f"{arquivo}: ouro_alvo_recuperacao = {ouro_alvo_recuperacao} e menor "
+            f"que piso_ouro = {piso_ouro}; sair da recuperacao com menos Ouro do "
+            "que o piso que a disparou faria o bot voltar para a Venda na Volta "
+            "seguinte, para sempre"
+        )
+
     return Config(
         precos_alvo=precos_alvo,
         trabalhadores=trabalhadores,
         precos_venda=precos_venda,
+        piso_ouro=piso_ouro,
+        ouro_alvo_recuperacao=ouro_alvo_recuperacao,
     )

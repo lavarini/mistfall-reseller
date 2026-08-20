@@ -24,6 +24,7 @@ class _TipoEvento(Enum):
     CAPACIDADE_ATUALIZADA = "capacidade_atualizada"
     RETORNO_COMPRA = "retorno_compra"
     ESTOQUE_RECONCILIADO = "estoque_reconciliado"
+    OURO_ABAIXO_DO_PISO = "ouro_abaixo_do_piso"
 
 
 @dataclass(frozen=True)
@@ -70,6 +71,15 @@ class EventoFluxo:
         )
 
     @classmethod
+    def ouro_abaixo_do_piso(cls) -> "EventoFluxo":
+        """O Ouro caiu abaixo do piso que permite comprar.
+
+        O numero do piso vive na configuracao e a comparacao e do coordenador:
+        a politica continua pura e sem conhecer precos.
+        """
+        return cls(_TipoEvento.OURO_ABAIXO_DO_PISO)
+
+    @classmethod
     def retorno_compra(cls) -> "EventoFluxo":
         return cls(_TipoEvento.RETORNO_COMPRA)
 
@@ -90,6 +100,7 @@ EventoFluxo.RESET_EXECUTADO = EventoFluxo.reset_executado()
 EventoFluxo.MENSAGEM_INVENTARIO_CHEIO = EventoFluxo(
     _TipoEvento.MENSAGEM_INVENTARIO_CHEIO
 )
+EventoFluxo.OURO_ABAIXO_DO_PISO = EventoFluxo.ouro_abaixo_do_piso()
 EventoFluxo.RETORNO_COMPRA = EventoFluxo.retorno_compra()
 EventoFluxo.ESTOQUE_RECONCILIADO = EventoFluxo.estoque_reconciliado(0)
 
@@ -99,6 +110,7 @@ class AcaoFluxo(Enum):
     EXECUTAR_COMPRA = "executar_compra"
     VENDER_POR_INVENTARIO_CHEIO = "vender_por_inventario_cheio"
     VENDER_POR_FLUXO_LENTO = "vender_por_fluxo_lento"
+    VENDER_POR_OURO_BAIXO = "vender_por_ouro_baixo"
     CONTINUAR_VENDA = "continuar_venda"
     ENCERRAR = "encerrar"
 
@@ -182,6 +194,11 @@ def aplicar_evento(
             else AcaoFluxo.CONTINUAR_COMPRA
         )
         return novo, acao
+
+    if tipo is _TipoEvento.OURO_ABAIXO_DO_PISO:
+        # Sinal, nao Compra nem Reset: nao pode contaminar a cadencia que
+        # decide rapido/lento, entao o estado passa intacto.
+        return estado, AcaoFluxo.VENDER_POR_OURO_BAIXO
 
     if tipo is _TipoEvento.COMPRA_ENVIADA:
         return replace(estado, compra_pendente=True), AcaoFluxo.CONTINUAR_COMPRA

@@ -73,7 +73,11 @@ from mistfall.venda import RITMO_VENDA_PADRAO, RitmoVenda
 # apoio.
 _ALTERNANCIA_RESET = (CategoriaAlternativa.FORJA, CategoriaAlternativa.CHAVE)
 
-_ACOES_DE_VENDA = (AcaoFluxo.VENDER_POR_INVENTARIO_CHEIO, AcaoFluxo.VENDER_POR_FLUXO_LENTO)
+_ACOES_DE_VENDA = (
+    AcaoFluxo.VENDER_POR_INVENTARIO_CHEIO,
+    AcaoFluxo.VENDER_POR_FLUXO_LENTO,
+    AcaoFluxo.VENDER_POR_OURO_BAIXO,
+)
 
 # Mesma ideia de `resets_consecutivos >= 5` que `fluxo.py` ja usa como
 # limiar de persistencia — um so vocabulario de limiar para o modo completo.
@@ -291,6 +295,18 @@ def executar_ciclo_completo(
                 acao_propria = AcaoFluxo.CONTINUAR_COMPRA
 
             acao = acao_confirmacao if acao_confirmacao in _ACOES_DE_VENDA else acao_propria
+
+            # Terceiro gatilho de Venda, e o unico alcancavel quando o Ouro
+            # acaba: as Listagens no Preco-alvo continuam aparecendo, entao o
+            # regime nunca vira lento, e nada e comprado, entao o Inventario
+            # nunca enche. Entra como ultimo recurso, sem competir com os
+            # outros dois quando eles ja decidiram vender.
+            if (
+                acao not in _ACOES_DE_VENDA
+                and ouro_agora is not None
+                and ouro_agora < config.piso_ouro
+            ):
+                acao = aplicar(EventoFluxo.ouro_abaixo_do_piso())
 
             # Livelock: com a Capacidade de Venda do NPC cheia, a Venda volta sem
             # listar nada, o Estoque estimado nao muda e o gatilho por saldo segue
