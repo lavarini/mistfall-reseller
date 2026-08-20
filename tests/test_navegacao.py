@@ -38,6 +38,9 @@ def test_ir_para_venda_confirma_inventario_armazem_e_bau_dois_sem_clicar_no_prim
 
     monkeypatch.setattr(navegacao, "eh_tela_venda", lambda _: True)
     monkeypatch.setattr(
+        navegacao, "ler_capacidade", lambda _: CapacidadeVenda(0, 15)
+    )
+    monkeypatch.setattr(
         navegacao,
         "ler_painel_itens",
         lambda frame: {
@@ -109,6 +112,7 @@ def test_ir_para_venda_para_no_primeiro_estado_que_nao_estabiliza(monkeypatch, t
     import mistfall.navegacao as navegacao
 
     monkeypatch.setattr(navegacao, "eh_tela_venda", lambda _: False)
+    monkeypatch.setattr(navegacao, "ler_capacidade", lambda _: None)
     mao = MaoFalsa()
 
     resultado = ir_para_venda(_tela(tmp_path, 10), mao, RITMO)
@@ -137,6 +141,9 @@ def test_ir_para_venda_repetem_frames_intermediarios_antes_do_proximo_clique(
     import mistfall.navegacao as navegacao
 
     monkeypatch.setattr(navegacao, "eh_tela_venda", lambda _: True)
+    monkeypatch.setattr(
+        navegacao, "ler_capacidade", lambda _: CapacidadeVenda(0, 15)
+    )
     monkeypatch.setattr(
         navegacao,
         "ler_painel_itens",
@@ -185,6 +192,9 @@ def test_navegacao_bem_sucedida_nao_altera_a_sessao_isolada_de_venda(
     import mistfall.navegacao as navegacao
 
     monkeypatch.setattr(navegacao, "eh_tela_venda", lambda _: True)
+    monkeypatch.setattr(
+        navegacao, "ler_capacidade", lambda _: CapacidadeVenda(0, 15)
+    )
     monkeypatch.setattr(
         navegacao,
         "ler_painel_itens",
@@ -243,6 +253,9 @@ def test_ir_para_venda_reclica_a_aba_quando_o_primeiro_clique_se_perde(
 
     mao = MaoFalsa()
     monkeypatch.setattr(navegacao, "eh_tela_venda", lambda _: True)
+    monkeypatch.setattr(
+        navegacao, "ler_capacidade", lambda _: CapacidadeVenda(0, 15)
+    )
     monkeypatch.setattr(
         navegacao,
         "ler_painel_itens",
@@ -358,3 +371,63 @@ def test_motivo_do_passo_da_categoria_diz_o_que_foi_de_fato_verificado(
 
     assert resultado.sucesso is False
     assert resultado.motivo == "tela de Compra nao confirmou LISTA depois da Categoria"
+
+
+def test_ir_para_venda_atravessa_o_inventario_real_sem_dubles():
+    # Bug de execucao real: a navegacao clicava em Vender e parava. O passo do
+    # Inventario exigia `eh_tela_venda`, que so e verdadeiro quando ha um Bau
+    # selecionado legivel — e os Baus sao abas do Armazem, entao no Inventario
+    # nao existe nenhum. A condicao era insatisfazivel na propria tela que ela
+    # deveria reconhecer.
+    #
+    # Sem dubles de visao de proposito: os testes que dublavam `eh_tela_venda`
+    # para `True` nunca podiam pegar isto.
+    tela = TelaFalsa([
+        "images/vender-inventario.png",   # depois de clicar em Vender
+        "images/venda-stash-2.png",       # depois de clicar em Armazem
+        "images/venda-stash-2.png",       # depois de clicar no Bau inicial
+    ])
+    mao = MaoFalsa()
+
+    resultado = ir_para_venda(tela, mao, RITMO)
+
+    assert resultado.sucesso, resultado.motivo
+    cliques = [acao for acao in mao.acoes if acao[0] == "clicar"]
+    assert cliques == [
+        ("clicar", *CENTRO_ABA_VENDER),
+        ("clicar", *CENTRO_ABA_ARMAZEM),
+        ("clicar", *centro_bau(1)),
+    ]
+
+
+def test_as_fixtures_de_navegacao_estao_versionadas():
+    # O teste acima navega contra prints reais. Num clone limpo, ou em CI, um
+    # PNG que so existe nesta maquina o faz morrer sem nada a ver com a
+    # navegacao. Foi assim que as fixtures do toast de Compra quase passaram.
+    import subprocess
+
+    for caminho in ("images/vender-inventario.png", "images/venda-stash-2.png"):
+        conferencia = subprocess.run(
+            ["git", "ls-files", "--error-unmatch", caminho],
+            capture_output=True,
+        )
+        assert conferencia.returncode == 0, f"{caminho} nao esta versionado"
+
+
+def test_garantir_filtro_roxo_clica_quando_a_tela_real_esta_sem_filtro():
+    # Bug de execucao real: o filtro nunca era selecionado. `filtro_roxo_ativo`
+    # media a proporcao de roxo do losango, mas a marca de selecao (borda
+    # branca e tique dourado) COBRE o roxo — entao a proporcao caia quando o
+    # filtro ligava, e o detector respondia "ativo" nos dois estados.
+    tela = TelaFalsa([
+        "images/sem-filtro.png",                  # filtro desligado
+        "images/broche-tres-dragao-padrao.png",   # depois do clique, ligado
+    ])
+    mao = MaoFalsa()
+
+    resultado = garantir_filtro_roxo(tela, mao, RITMO)
+
+    assert resultado.sucesso, resultado.motivo
+    assert [acao for acao in mao.acoes if acao[0] == "clicar"] == [
+        ("clicar", *CENTRO_FILTRO_ROXO),
+    ]

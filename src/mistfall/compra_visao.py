@@ -21,10 +21,19 @@ SIMILARIDADE_MINIMA_CHEIOS = 0.80
 
 # Sexto icone da faixa de raridade: roxo com a moldura de selecao visivel.
 REGIAO_ICONE_ROXO = (775, 205, 825, 255)
-MATIZ_ROXO = (130, 170)
-SATURACAO_MINIMA_ROXO = 80
-VALOR_MINIMO_ROXO = 80
-PROPORCAO_MINIMA_ROXO = 0.04
+# O filtro nao se detecta pela cor do losango, e sim pela MARCA de selecao que
+# o jogo poe por cima dele: uma borda branca e um tique dourado. Medir o roxo
+# le o sinal invertido — a marca COBRE o roxo, entao a proporcao de roxo cai
+# quando o filtro liga (0.116 desligado contra 0.053 ligado) e nenhum limiar
+# separa os dois estados no sentido esperado.
+MATIZ_TIQUE = (15, 40)
+SATURACAO_MINIMA_TIQUE = 100
+VALOR_MINIMO_TIQUE = 120
+SATURACAO_MAXIMA_BORDA = 60
+VALOR_MINIMO_BORDA = 170
+# Medido no corpus: 0.0000 nos dois sinais com o filtro desligado, contra
+# 0.047 (tique) e 0.078 (borda) com ele ligado. O limiar fica no meio do vao.
+PROPORCAO_MINIMA_MARCA = 0.02
 
 
 class MensagemCompra(Enum):
@@ -93,10 +102,20 @@ def filtro_roxo_ativo(img: np.ndarray) -> bool:
     # silencioso. Resolucao diferente e erro, nao caso a tratar (ADR-0002).
     conferir_resolucao(img)
     hsv = cv2.cvtColor(_recortar(img, REGIAO_ICONE_ROXO), cv2.COLOR_BGR2HSV)
-    roxo = (
-        (hsv[:, :, 0] >= MATIZ_ROXO[0])
-        & (hsv[:, :, 0] <= MATIZ_ROXO[1])
-        & (hsv[:, :, 1] >= SATURACAO_MINIMA_ROXO)
-        & (hsv[:, :, 2] >= VALOR_MINIMO_ROXO)
+    tique = (
+        (hsv[:, :, 0] >= MATIZ_TIQUE[0])
+        & (hsv[:, :, 0] <= MATIZ_TIQUE[1])
+        & (hsv[:, :, 1] >= SATURACAO_MINIMA_TIQUE)
+        & (hsv[:, :, 2] >= VALOR_MINIMO_TIQUE)
     )
-    return float(roxo.mean()) >= PROPORCAO_MINIMA_ROXO
+    borda = (
+        (hsv[:, :, 1] <= SATURACAO_MAXIMA_BORDA)
+        & (hsv[:, :, 2] >= VALOR_MINIMO_BORDA)
+    )
+    # Qualquer uma das duas basta. Falso negativo aqui e o erro caro: ele faz
+    # `garantir_filtro_roxo` clicar num filtro que ja estava ligado, o que o
+    # DESLIGA.
+    return (
+        float(tique.mean()) >= PROPORCAO_MINIMA_MARCA
+        or float(borda.mean()) >= PROPORCAO_MINIMA_MARCA
+    )

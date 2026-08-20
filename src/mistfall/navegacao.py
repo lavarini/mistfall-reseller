@@ -18,6 +18,7 @@ from mistfall.venda_visao import (
     centro_bau,
     eh_tela_venda,
     ler_bau_selecionado,
+    ler_capacidade,
     ler_painel_itens,
 )
 
@@ -102,7 +103,13 @@ def ir_para_venda(tela: Tela, mao: Mao, ritmo: RitmoVenda) -> ResultadoNavegacao
         mao,
         ritmo,
         CENTRO_ABA_VENDER,
-        lambda frame: eh_tela_venda(frame)
+        # Nao usar `eh_tela_venda` aqui: ele exige um Bau selecionado legivel,
+        # e os Baus sao abas do Armazem — no Inventario nao existe nenhum. A
+        # condicao ficava insatisfazivel na propria tela que devia reconhecer,
+        # e a navegacao morria com "Venda nao confirmou Inventario" depois de
+        # clicar em Vender. A Capacidade `X/Y` aparece nos dois paineis, entao
+        # ela e o que prova que estamos na tela de Venda sem exigir Bau.
+        lambda frame: ler_capacidade(frame) is not None
         and ler_painel_itens(frame) is PainelItens.INVENTARIO,
         "Venda nao confirmou Inventario",
     )

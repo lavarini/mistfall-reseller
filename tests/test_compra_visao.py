@@ -17,6 +17,7 @@ from mistfall.compra_visao import (
 # coordenador do fluxo completo.
 COMPRA_REALIZADA = "images/compra-realizada.png"
 LISTA_SEM_TOAST = "images/lista-sem-toast.png"
+SEM_FILTRO = "images/sem-filtro.png"
 
 
 def _imagem(caminho: str):
@@ -72,7 +73,7 @@ def test_as_fixtures_do_toast_de_compra_estao_versionadas():
     # Num clone limpo, ou em CI, um PNG que so existe nesta maquina faz os
     # tres testes acima morrerem no `assert imagem is not None`. `git
     # ls-files` e a unica pergunta que distingue os dois casos.
-    for caminho in (COMPRA_REALIZADA, LISTA_SEM_TOAST):
+    for caminho in (COMPRA_REALIZADA, LISTA_SEM_TOAST, SEM_FILTRO):
         conferencia = subprocess.run(
             ["git", "ls-files", "--error-unmatch", caminho],
             capture_output=True,
@@ -86,3 +87,20 @@ def test_filtro_roxo_recusa_resolucao_fora_do_padrao():
     # falha silenciosa que faria o fluxo clicar no filtro para sempre.
     with pytest.raises(ValueError, match="2560x1440"):
         filtro_roxo_ativo(np.zeros((1080, 1920, 3), dtype=np.uint8))
+
+
+def test_filtro_roxo_desligado_na_tela_real():
+    # O losango roxo selecionado ganha borda branca e um tique dourado por
+    # cima. Medir "quanto roxo ha na caixa" le o sinal ao contrario: com o
+    # filtro LIGADO o roxo cai (0.053), porque a marca o cobre; com ele
+    # DESLIGADO o losango fica cheio de roxo (0.116). O detector antigo
+    # respondia True nos dois estados, entao o filtro nunca era clicado.
+    sem_filtro = cv2.imread("images/sem-filtro.png")
+    assert sem_filtro is not None
+    assert not filtro_roxo_ativo(sem_filtro)
+
+
+def test_filtro_roxo_ligado_continua_detectado():
+    com_filtro = cv2.imread("images/broche-tres-dragao-padrao.png")
+    assert com_filtro is not None
+    assert filtro_roxo_ativo(com_filtro)

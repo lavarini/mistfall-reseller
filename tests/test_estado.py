@@ -35,6 +35,15 @@ ESTADO_ESPERADO = {
     "venda-stash-3": EstadoTela.VENDA,
     # Armazem depois da expansao de season: seis Baus em vez de quatro.
     "baus-6": EstadoTela.VENDA,
+    # Lista do Leilao com o filtro de raridade DESLIGADO. E o caso negativo
+    # real do `filtro_roxo_ativo`; antes so existia uma variante sintetica.
+    "sem-filtro": EstadoTela.LISTA,
+    # Tela de Venda com o painel Inventario aberto. Sai DESCONHECIDO de
+    # proposito: `EstadoTela.VENDA` e definido por `eh_tela_venda`, que exige
+    # um Bau selecionado legivel, e no Inventario nao ha Bau. Reconhecer este
+    # estado como VENDA e mudanca maior, porque `ciclo_venda` usa o mesmo
+    # predicado como garantia de que existe Bau para processar.
+    "vender-inventario": EstadoTela.DESCONHECIDO,
     "tela-venda-resgatar": EstadoTela.VENDA,
     "modal-venda-broche": EstadoTela.JANELA_VENDA,
     "modal-venda-resgatar": EstadoTela.JANELA_VENDA,
@@ -61,7 +70,13 @@ def test_todo_print_do_corpus_tem_estado_declarado():
 def test_todos_os_estados_reconheciveis_aparecem_no_corpus():
     # O teste antigo se chamava "mutuamente exclusivos" e nao verificava nada
     # disso. O que da para afirmar de verdade e que o corpus exercita os tres.
-    assert set(ESTADO_ESPERADO.values()) == {
+    #
+    # DESCONHECIDO sai da conta porque nao e estado reconhecivel: e o que
+    # sobra quando nenhum outro casa. O corpus tem uma fixture declarada assim
+    # de proposito (`vender-inventario`), e ela documenta um limite conhecido
+    # de `identificar_estado`, nao um estado que o bot saiba usar.
+    reconheciveis = set(ESTADO_ESPERADO.values()) - {EstadoTela.DESCONHECIDO}
+    assert reconheciveis == {
         EstadoTela.LISTA,
         EstadoTela.JANELA_CONFIRMACAO,
         EstadoTela.OUTRA_CATEGORIA,
