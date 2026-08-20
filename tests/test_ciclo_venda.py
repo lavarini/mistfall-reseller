@@ -422,3 +422,19 @@ def test_venda_parcial_aceita_a_contagem_ja_feita_e_nao_reconta(monkeypatch, tmp
     )
     assert sessao.total_baus == 6
     assert sessao.baus_processados == [2, 3, 4, 5, 6]
+
+
+def test_contagem_de_baus_implausivel_aborta(monkeypatch, tmp_path):
+    # O jogo sempre da ao menos dois Baus, entao contar menos que isso e a
+    # deteccao errando — nao Armazem pequeno. Seguir com um numero errado
+    # varreria o Armazem pela metade em silencio.
+    monkeypatch.setattr("mistfall.ciclo_venda.contar_baus", lambda _: 1)
+    monkeypatch.setattr("mistfall.ciclo_venda.ler_capacidade", lambda _: CapacidadeVenda(0, 12))
+    monkeypatch.setattr("mistfall.ciclo_venda.ler_bau_selecionado", lambda _: 0)
+    monkeypatch.setattr("mistfall.ciclo_venda.varrer_armazem", lambda _: [])
+    sessao = executar_ciclo_venda(
+        TelaFalsa([STASH] * 4), MaoFalsa(), config(),
+        tmp_path, InterruptorFalso(), RitmoVenda.instantaneo(),
+    )
+    assert sessao.desfecho is DesfechoSessaoVenda.ABORTOU
+    assert "implausivel" in sessao.motivo
