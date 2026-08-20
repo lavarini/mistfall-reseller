@@ -4,6 +4,8 @@ import numpy as np
 from mistfall.navegacao import (
     CENTRO_ABA_COMPRAR,
     CENTRO_ABA_VENDER,
+    CENTRO_FILTRO_ROXO,
+    TENTATIVAS_DE_CLIQUE,
     garantir_filtro_roxo,
     ir_para_compra,
     ir_para_venda,
@@ -113,7 +115,7 @@ def test_ir_para_venda_para_no_primeiro_estado_que_nao_estabiliza(monkeypatch, t
 
     assert resultado.sucesso is False
     assert resultado.motivo == "Venda nao confirmou Inventario"
-    assert [acao[1:] for acao in mao.acoes] == [CENTRO_ABA_VENDER]
+    assert [acao[1:] for acao in mao.acoes] == [CENTRO_ABA_VENDER] * TENTATIVAS_DE_CLIQUE
 
 
 def test_ir_para_compra_para_no_primeiro_estado_que_nao_estabiliza(monkeypatch, tmp_path):
@@ -126,7 +128,7 @@ def test_ir_para_compra_para_no_primeiro_estado_que_nao_estabiliza(monkeypatch, 
 
     assert resultado.sucesso is False
     assert resultado.motivo == "Compra nao confirmou aba Comprar"
-    assert [acao[1:] for acao in mao.acoes] == [CENTRO_ABA_COMPRAR]
+    assert [acao[1:] for acao in mao.acoes] == [CENTRO_ABA_COMPRAR] * TENTATIVAS_DE_CLIQUE
 
 
 def test_ir_para_venda_repetem_frames_intermediarios_antes_do_proximo_clique(
@@ -224,3 +226,135 @@ def test_navegacao_bem_sucedida_nao_altera_a_sessao_isolada_de_venda(
     assert resultado.sucesso is True
     assert sessao.desfecho is DesfechoSessaoVenda.ARMAZEM_ESGOTADO
     assert sessao.vendas == 1
+
+
+def test_navegacao_tenta_o_clique_mais_de_uma_vez():
+    # A spec manda "falhas transitorias geram nova tentativa"; um clique
+    # perdido nao pode ser tratado como falha persistente.
+    assert TENTATIVAS_DE_CLIQUE >= 2
+
+
+def test_ir_para_venda_reclica_a_aba_quando_o_primeiro_clique_se_perde(
+    monkeypatch, tmp_path,
+):
+    # Um clique perdido na aba Vender esgotava o teto de espera, devolvia
+    # sucesso=False e encerrava a sessao inteira com ABORTOU.
+    import mistfall.navegacao as navegacao
+
+    mao = MaoFalsa()
+    monkeypatch.setattr(navegacao, "eh_tela_venda", lambda _: True)
+    monkeypatch.setattr(
+        navegacao,
+        "ler_painel_itens",
+        lambda _: (
+            PainelItens.ARMAZEM
+            if len(mao.acoes) >= 3
+            else PainelItens.INVENTARIO if len(mao.acoes) >= 2 else None
+        ),
+    )
+    monkeypatch.setattr(
+        navegacao,
+        "ler_bau_selecionado",
+        lambda _: Bau.SEGUNDO if len(mao.acoes) >= 4 else Bau.PRIMEIRO,
+    )
+
+    resultado = ir_para_venda(_tela(tmp_path, 10), mao, RITMO)
+
+    assert resultado.sucesso is True
+    assert resultado.motivo == ""
+    assert [acao[1:] for acao in mao.acoes] == [
+        CENTRO_ABA_VENDER,
+        CENTRO_ABA_VENDER,
+        CENTRO_ABA_ARMAZEM,
+        centro_bau(Bau.SEGUNDO),
+    ]
+
+
+def test_ir_para_compra_reclica_a_aba_comprar_quando_o_primeiro_clique_se_perde(
+    monkeypatch, tmp_path,
+):
+    import mistfall.navegacao as navegacao
+
+    mao = MaoFalsa()
+    monkeypatch.setattr(
+        navegacao,
+        "identificar_estado",
+        lambda _: EstadoTela.LISTA if len(mao.acoes) >= 2 else EstadoTela.DESCONHECIDO,
+    )
+    monkeypatch.setattr(navegacao, "filtro_roxo_ativo", lambda _: True)
+
+    resultado = ir_para_compra(_tela(tmp_path, 10), mao, RITMO)
+
+    assert resultado.sucesso is True
+    assert [acao[1:] for acao in mao.acoes] == [
+        CENTRO_ABA_COMPRAR,
+        CENTRO_ABA_COMPRAR,
+        navegacao.CENTRO_CATEGORIA_MATERIAL_CONSTRUCAO,
+    ]
+
+
+def test_garantir_filtro_roxo_reclica_o_filtro_quando_o_primeiro_clique_se_perde(
+    monkeypatch, tmp_path,
+):
+    import mistfall.navegacao as navegacao
+
+    mao = MaoFalsa()
+    monkeypatch.setattr(navegacao, "identificar_estado", lambda _: EstadoTela.LISTA)
+    monkeypatch.setattr(navegacao, "filtro_roxo_ativo", lambda _: len(mao.acoes) >= 2)
+
+    resultado = garantir_filtro_roxo(_tela(tmp_path, 10), mao, RITMO)
+
+    assert resultado.sucesso is True
+    assert [acao[1:] for acao in mao.acoes] == [CENTRO_FILTRO_ROXO] * 2
+
+
+def test_filtro_roxo_esgotado_continua_devolvendo_falha_com_motivo(
+    monkeypatch, tmp_path,
+):
+    import mistfall.navegacao as navegacao
+
+    mao = MaoFalsa()
+    monkeypatch.setattr(navegacao, "identificar_estado", lambda _: EstadoTela.LISTA)
+    monkeypatch.setattr(navegacao, "filtro_roxo_ativo", lambda _: False)
+
+    resultado = garantir_filtro_roxo(_tela(tmp_path, 10), mao, RITMO)
+
+    assert resultado.sucesso is False
+    assert resultado.motivo == "Compra nao confirmou filtro roxo"
+    assert [acao[1:] for acao in mao.acoes] == [CENTRO_FILTRO_ROXO] * TENTATIVAS_DE_CLIQUE
+
+
+def test_motivo_da_tela_de_compra_nao_promete_categoria_verificada(
+    monkeypatch, tmp_path,
+):
+    # `garantir_filtro_roxo` so confere que a tela e LISTA. Nao existe
+    # detector de Categoria: dizer "nao confirmou Material de Construcao" era
+    # diagnostico mentiroso.
+    import mistfall.navegacao as navegacao
+
+    monkeypatch.setattr(navegacao, "identificar_estado", lambda _: EstadoTela.DESCONHECIDO)
+    monkeypatch.setattr(navegacao, "filtro_roxo_ativo", lambda _: False)
+
+    resultado = garantir_filtro_roxo(_tela(tmp_path, 10), MaoFalsa(), RITMO)
+
+    assert resultado.sucesso is False
+    assert resultado.motivo == "tela de Compra nao confirmou LISTA"
+
+
+def test_motivo_do_passo_da_categoria_diz_o_que_foi_de_fato_verificado(
+    monkeypatch, tmp_path,
+):
+    import mistfall.navegacao as navegacao
+
+    mao = MaoFalsa()
+    monkeypatch.setattr(
+        navegacao,
+        "identificar_estado",
+        lambda _: EstadoTela.LISTA if len(mao.acoes) < 2 else EstadoTela.DESCONHECIDO,
+    )
+    monkeypatch.setattr(navegacao, "filtro_roxo_ativo", lambda _: True)
+
+    resultado = ir_para_compra(_tela(tmp_path, 10), mao, RITMO)
+
+    assert resultado.sucesso is False
+    assert resultado.motivo == "tela de Compra nao confirmou LISTA depois da Categoria"

@@ -27,6 +27,12 @@ CENTRO_ABA_VENDER = (300, 140)
 CENTRO_CATEGORIA_MATERIAL_CONSTRUCAO = CATEGORIA_MATERIAL_CONSTRUCAO
 CENTRO_FILTRO_ROXO = (800, 230)
 
+# A spec manda: "falhas transitorias geram nova tentativa; falhas persistentes
+# encerram o modo completo com diagnostico". O jogo perde cliques de aba e de
+# filtro; sem re-clicar, todo clique perdido virava falha persistente e
+# derrubava a sessao inteira com ABORTOU.
+TENTATIVAS_DE_CLIQUE = 3
+
 Frame: TypeAlias = np.ndarray
 PredicadoFrame: TypeAlias = Callable[[Frame], bool]
 
@@ -67,11 +73,35 @@ def _aguardar(
     return ResultadoNavegacao(True, frame, "")
 
 
+def _clicar_ate_confirmar(
+    tela: Tela,
+    mao: Mao,
+    ritmo: RitmoVenda,
+    alvo: tuple[int, int],
+    predicado: PredicadoFrame,
+    motivo: str,
+) -> ResultadoNavegacao:
+    """Clica e espera a confirmacao, re-clicando ate `TENTATIVAS_DE_CLIQUE`.
+
+    Esgotadas as tentativas, devolve a ultima falha — com o motivo — em vez de
+    tentar para sempre: falha persistente continua encerrando o modo completo
+    com diagnostico.
+    """
+    resultado = ResultadoNavegacao(False, None, motivo)
+    for _ in range(TENTATIVAS_DE_CLIQUE):
+        mao.clicar(*alvo)
+        resultado = _aguardar(tela, ritmo, predicado, motivo)
+        if resultado.sucesso:
+            return resultado
+    return resultado
+
+
 def ir_para_venda(tela: Tela, mao: Mao, ritmo: RitmoVenda) -> ResultadoNavegacao:
-    mao.clicar(*CENTRO_ABA_VENDER)
-    inventario = _aguardar(
+    inventario = _clicar_ate_confirmar(
         tela,
+        mao,
         ritmo,
+        CENTRO_ABA_VENDER,
         lambda frame: eh_tela_venda(frame)
         and ler_painel_itens(frame) is PainelItens.INVENTARIO,
         "Venda nao confirmou Inventario",
@@ -79,10 +109,11 @@ def ir_para_venda(tela: Tela, mao: Mao, ritmo: RitmoVenda) -> ResultadoNavegacao
     if not inventario.sucesso:
         return inventario
 
-    mao.clicar(*CENTRO_ABA_ARMAZEM)
-    armazem = _aguardar(
+    armazem = _clicar_ate_confirmar(
         tela,
+        mao,
         ritmo,
+        CENTRO_ABA_ARMAZEM,
         lambda frame: eh_tela_venda(frame)
         and ler_painel_itens(frame) is PainelItens.ARMAZEM,
         "Venda nao confirmou Armazem",
@@ -90,10 +121,11 @@ def ir_para_venda(tela: Tela, mao: Mao, ritmo: RitmoVenda) -> ResultadoNavegacao
     if not armazem.sucesso:
         return armazem
 
-    mao.clicar(*centro_bau(Bau.SEGUNDO))
-    return _aguardar(
+    return _clicar_ate_confirmar(
         tela,
+        mao,
         ritmo,
+        centro_bau(Bau.SEGUNDO),
         lambda frame: eh_tela_venda(frame)
         and ler_painel_itens(frame) is PainelItens.ARMAZEM
         and ler_bau_selecionado(frame) is Bau.SEGUNDO,
@@ -102,11 +134,17 @@ def ir_para_venda(tela: Tela, mao: Mao, ritmo: RitmoVenda) -> ResultadoNavegacao
 
 
 def garantir_filtro_roxo(tela: Tela, mao: Mao, ritmo: RitmoVenda) -> ResultadoNavegacao:
+    # A Categoria e ASSUMIDA, nao validada: nao existe detector de Categoria
+    # hoje, e `identificar_estado` so distingue LISTA de Janela de Confirmacao
+    # e de outra Categoria pelo brilho do menu. Por isso os motivos abaixo
+    # dizem "nao confirmou LISTA", que e o que de fato foi verificado, e nao
+    # "nao confirmou Material de Construcao", que seria diagnostico
+    # mentiroso — um clique de Categoria perdido passa por aqui sem alarme.
     compra = _aguardar(
         tela,
         ritmo,
         lambda frame: identificar_estado(frame) is EstadoTela.LISTA,
-        "Compra nao confirmou Material de Construcao",
+        "tela de Compra nao confirmou LISTA",
     )
     if not compra.sucesso:
         return compra
@@ -114,10 +152,11 @@ def garantir_filtro_roxo(tela: Tela, mao: Mao, ritmo: RitmoVenda) -> ResultadoNa
     if filtro_roxo_ativo(compra.frame):
         return compra
 
-    mao.clicar(*CENTRO_FILTRO_ROXO)
-    return _aguardar(
+    return _clicar_ate_confirmar(
         tela,
+        mao,
         ritmo,
+        CENTRO_FILTRO_ROXO,
         lambda frame: identificar_estado(frame) is EstadoTela.LISTA
         and filtro_roxo_ativo(frame),
         "Compra nao confirmou filtro roxo",
@@ -125,22 +164,27 @@ def garantir_filtro_roxo(tela: Tela, mao: Mao, ritmo: RitmoVenda) -> ResultadoNa
 
 
 def ir_para_compra(tela: Tela, mao: Mao, ritmo: RitmoVenda) -> ResultadoNavegacao:
-    mao.clicar(*CENTRO_ABA_COMPRAR)
-    compra = _aguardar(
+    compra = _clicar_ate_confirmar(
         tela,
+        mao,
         ritmo,
+        CENTRO_ABA_COMPRAR,
         lambda frame: identificar_estado(frame) is EstadoTela.LISTA,
         "Compra nao confirmou aba Comprar",
     )
     if not compra.sucesso:
         return compra
 
-    mao.clicar(*CENTRO_CATEGORIA_MATERIAL_CONSTRUCAO)
-    material = _aguardar(
+    # Mesma limitacao de `garantir_filtro_roxo`: o predicado so sabe dizer que
+    # a tela e LISTA, entao um clique de Categoria perdido passa daqui sem ser
+    # notado. O motivo diz o que foi verificado, e nada alem disso.
+    material = _clicar_ate_confirmar(
         tela,
+        mao,
         ritmo,
+        CENTRO_CATEGORIA_MATERIAL_CONSTRUCAO,
         lambda frame: identificar_estado(frame) is EstadoTela.LISTA,
-        "Compra nao confirmou Material de Construcao",
+        "tela de Compra nao confirmou LISTA depois da Categoria",
     )
     if not material.sucesso:
         return material
