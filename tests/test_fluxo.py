@@ -163,14 +163,29 @@ def test_reset_nao_e_acao_publica_da_politica():
     assert not hasattr(AcaoFluxo, "EXECUTAR_RESET")
 
 
-def test_listagem_acima_do_saldo_e_rejeitada():
+def test_listagem_acima_do_saldo_satura_o_estoque_em_zero():
+    # O Estoque estimado é contagem interna otimista, não invariante: quando a
+    # Venda lista mais unidades do que ele contava, a divergência é informação,
+    # não erro de programação. Levantar aqui derrubava a sessão inteira no
+    # caminho canônico do regime rápido, onde o Estoque começa em 0 e a única
+    # Venda é a disparada pelo toast de inventário cheio.
     estado = estado_inicial(estoque_estimado=2)
+
+    estado, acao = aplicar_evento(estado, EventoFluxo.unidades_listadas(3))
+
+    assert estado.estoque_estimado == 0
+    assert acao is AcaoFluxo.CONTINUAR_VENDA
+
+
+def test_listagem_de_unidades_negativas_continua_sendo_erro():
+    # Saturar não vale para o negativo: nenhuma Venda lista -1 unidade, então
+    # isso só chega aqui por erro de programação.
     try:
-        aplicar_evento(estado, EventoFluxo.unidades_listadas(3))
+        aplicar_evento(estado_inicial(estoque_estimado=2), EventoFluxo.unidades_listadas(-1))
     except ValueError as exc:
-        assert "estoque" in str(exc)
+        assert "negativas" in str(exc)
     else:
-        raise AssertionError("a política não pode produzir estoque negativo")
+        raise AssertionError("unidades negativas deveriam ser rejeitadas")
 
 
 def test_estoque_lento_atingindo_45_decide_venda_por_fluxo_lento():

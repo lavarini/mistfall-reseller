@@ -204,11 +204,16 @@ def aplicar_evento(
     if tipo is _TipoEvento.UNIDADES_LISTADAS:
         if evento.unidades < 0:
             raise ValueError("unidades listadas não podem ser negativas")
-        if evento.unidades > estado.estoque_estimado:
-            raise ValueError("unidades listadas excedem o estoque estimado")
+        # O Estoque estimado é contagem interna otimista, nunca relida do
+        # Armazém: ele subconta sempre que uma Compra acontece sem queda de
+        # Ouro legível. Listar mais do que ele contava é informação sobre a
+        # divergência, não erro de programação — o Crítico se corrige por
+        # saturação. Levantar aqui matava a sessão no caminho canônico do
+        # regime rápido, onde o Estoque começa em 0 e a única Venda é a do
+        # toast de inventário cheio.
         novo = replace(
             estado,
-            estoque_estimado=estado.estoque_estimado - evento.unidades,
+            estoque_estimado=max(0, estado.estoque_estimado - evento.unidades),
         )
         return novo, AcaoFluxo.CONTINUAR_VENDA
 
@@ -218,6 +223,12 @@ def aplicar_evento(
             AcaoFluxo.CONTINUAR_VENDA,
         )
 
+    # Sem chamador fora dos testes, de propósito: não existe hoje leitura dos
+    # stacks restantes no Baú que sirva de fonte de verdade para reconciliar o
+    # Estoque estimado com o Armazém real. `varrer_armazem` só enxerga o Baú
+    # aberto no momento, e a Venda parcial nem chega a percorrer todos. Ligar
+    # este evento exige trabalho de visão que não está feito; o ramo fica
+    # implementado e testado para quando estiver.
     if tipo is _TipoEvento.ESTOQUE_RECONCILIADO:
         novo = replace(estado, estoque_estimado=evento.unidades)
         return novo, _acao_por_saldo(novo)
