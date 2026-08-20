@@ -9,6 +9,7 @@ from mistfall.compra_visao import MensagemCompra
 from mistfall.fluxo import ModoFluxo, estado_inicial
 from mistfall.navegacao import ResultadoNavegacao
 from mistfall.piloto import Desfecho, Resultado, Ritmo
+from mistfall.tipos import CapacidadeVenda
 from mistfall.venda import RitmoVenda
 
 from mistfall.ciclo_completo import (
@@ -44,10 +45,11 @@ def _resultado(desfecho, *, ouro=1000, preco=100):
     return resultado
 
 
-def _preparar(monkeypatch, resultados, mensagens=None, venda=None):
+def _preparar(monkeypatch, resultados, mensagens=None, venda=None, vendas=None):
     import mistfall.ciclo_completo as completo
 
     resultados = deque(resultados)
+    fila_de_vendas = deque(vendas or [])
     mensagens = deque(mensagens or [MensagemCompra.NENHUMA] * len(resultados))
     chamadas = []
     frame_atual = [0]
@@ -88,12 +90,13 @@ def _preparar(monkeypatch, resultados, mensagens=None, venda=None):
         "resetar_categoria",
         lambda *args, **kwargs: chamadas.append("reset") or True,
     )
-    monkeypatch.setattr(
-        completo,
-        "executar_venda_parcial",
-        lambda *args, **kwargs: chamadas.append("venda")
-        or (venda or SessaoVenda(DesfechoSessaoVenda.ARMAZEM_ESGOTADO)),
-    )
+    def vender(*args, **kwargs):
+        chamadas.append("venda")
+        if fila_de_vendas:
+            return fila_de_vendas.popleft()
+        return venda or SessaoVenda(DesfechoSessaoVenda.ARMAZEM_ESGOTADO)
+
+    monkeypatch.setattr(completo, "executar_venda_parcial", vender)
     return chamadas
 
 
@@ -327,6 +330,13 @@ def test_grava_eventos_do_fluxo_completo_em_jsonl_na_pasta_da_sessao(
         "vender_por_inventario_cheio",
         "continuar_compra",
         "continuar_venda",
+        "continuar_compra",
+    ]
+    assert [linha["evento"] for linha in linhas] == [
+        "mensagem_inventario_cheio",
+        "reset_executado",
+        "unidades_listadas",
+        "retorno_compra",
     ]
     assert all(linha["volta"] == 1 for linha in linhas)
     assert all(linha["modo"] == "rapido" for linha in linhas)
@@ -337,3 +347,194 @@ def test_grava_eventos_do_fluxo_completo_em_jsonl_na_pasta_da_sessao(
 
     assert not (tmp_path / "telemetria-ouro.jsonl").exists()
     assert not (tmp_path / "tempos-do-laco.jsonl").exists()
+
+
+def test_venda_real_com_estoque_inicial_de_producao_nao_derruba_a_sessao(
+    monkeypatch, tmp_path,
+):
+    # Producao comeca com `estoque_estimado = 0`, como a spec manda, e no
+    # regime rapido a unica Venda que existe e a disparada pelo toast de
+    # inventario cheio. Ela lista unidades que a contagem interna nunca viu.
+    # Sem saturacao isso levantava ValueError dentro do laco, e o
+    # `completo_cli` traduzia para "problema de ambiente" com codigo 2.
+    # Note que este teste NAO faz monkeypatch de `estado_inicial`.
+    venda = SessaoVenda(DesfechoSessaoVenda.CAPACIDADE_CHEIA, unidades_listadas=45)
+    _preparar(
+        monkeypatch,
+        [_resultado(Desfecho.NADA_COMPRAVEL)],
+        [MensagemCompra.INVENTARIO_CHEIO],
+        venda,
+    )
+    interruptor = InterruptorRoteirizado([False] * 2 + [True])
+
+    sessao = _executar(tmp_path, interruptor)
+
+    assert sessao.desfecho is DesfechoSessaoCompleta.PAROU
+    assert sessao.estado.estoque_estimado == 0
+    assert sessao.unidades_listadas == 45
+
+
+def test_capacidade_cheia_sem_listar_suspende_o_gatilho_por_saldo(
+    monkeypatch, tmp_path,
+):
+    # Com a Capacidade de Venda do NPC cheia, `executar_venda_parcial` volta
+    # com CAPACIDADE_CHEIA e zero unidades: o Estoque estimado nao muda e o
+    # gatilho por saldo continua verdadeiro na Volta seguinte. Sem a
+    # supressao, cada Compra confirmada paga um ida-e-volta completo de aba
+    # para nao listar nada.
+    import mistfall.ciclo_completo as completo
+
+    venda = SessaoVenda(DesfechoSessaoVenda.CAPACIDADE_CHEIA, unidades_listadas=0)
+    chamadas = _preparar(
+        monkeypatch,
+        [_resultado(Desfecho.COMPRA_ENVIADA, ouro=ouro) for ouro in (1000, 900, 800, 700)],
+        venda=venda,
+    )
+    monkeypatch.setattr(
+        completo,
+        "estado_inicial",
+        lambda: estado_inicial(modo=ModoFluxo.LENTO, estoque_estimado=45),
+    )
+    interruptor = InterruptorRoteirizado([False] * 5 + [True])
+
+    sessao = _executar(tmp_path, interruptor)
+
+    assert chamadas.count("venda") == 1
+    assert chamadas.count("ir_venda") == 1
+    assert sessao.unidades_listadas == 0
+
+
+def test_uma_venda_com_unidades_reabre_o_gatilho_por_saldo(monkeypatch, tmp_path):
+    # A supressao nao pode ser definitiva: assim que uma Venda volta a listar,
+    # o gatilho por saldo tem de voltar a valer.
+    import mistfall.ciclo_completo as completo
+
+    chamadas = _preparar(
+        monkeypatch,
+        [_resultado(Desfecho.COMPRA_ENVIADA, ouro=ouro) for ouro in (1000, 900, 850, 800)],
+        [
+            MensagemCompra.NENHUMA,
+            MensagemCompra.NENHUMA,
+            MensagemCompra.INVENTARIO_CHEIO,
+            MensagemCompra.NENHUMA,
+        ],
+        vendas=[
+            SessaoVenda(DesfechoSessaoVenda.CAPACIDADE_CHEIA, unidades_listadas=0),
+            SessaoVenda(DesfechoSessaoVenda.CAPACIDADE_CHEIA, unidades_listadas=45),
+            SessaoVenda(DesfechoSessaoVenda.CAPACIDADE_CHEIA, unidades_listadas=45),
+        ],
+    )
+    monkeypatch.setattr(
+        completo,
+        "estado_inicial",
+        lambda: estado_inicial(modo=ModoFluxo.LENTO, estoque_estimado=90),
+    )
+    interruptor = InterruptorRoteirizado([False] * 7 + [True])
+
+    sessao = _executar(tmp_path, interruptor)
+
+    assert chamadas.count("venda") == 3
+    assert sessao.unidades_listadas == 90
+
+
+def test_a_volta_de_venda_registra_capacidade_observada_e_retorno_a_compra(
+    monkeypatch, tmp_path,
+):
+    # `capacidade_atualizada` e `retorno_compra` existiam no contrato do fluxo
+    # e nunca tinham chamador: a chave `capacidade_observada` do JSONL saia
+    # `null` em toda linha de toda sessao real.
+    venda = SessaoVenda(
+        DesfechoSessaoVenda.CAPACIDADE_CHEIA,
+        unidades_listadas=45,
+        capacidade_final=CapacidadeVenda(12, 40),
+    )
+    _preparar(
+        monkeypatch,
+        [_resultado(Desfecho.NADA_COMPRAVEL)],
+        [MensagemCompra.INVENTARIO_CHEIO],
+        venda,
+    )
+    interruptor = InterruptorRoteirizado([False] * 2 + [True])
+
+    sessao = _executar(tmp_path, interruptor)
+
+    linhas = [
+        json.loads(linha)
+        for linha in (tmp_path / "eventos-do-fluxo.jsonl").read_text().splitlines()
+    ]
+    assert [linha["evento"] for linha in linhas] == [
+        "mensagem_inventario_cheio",
+        "reset_executado",
+        "unidades_listadas",
+        "capacidade_atualizada",
+        "retorno_compra",
+    ]
+    assert linhas[-1]["capacidade_observada"] == [12, 40]
+    assert sessao.estado.capacidade_observada == (12, 40)
+
+
+def test_venda_sem_capacidade_lida_nao_emite_capacidade_atualizada(
+    monkeypatch, tmp_path,
+):
+    # `capacidade_final` fica None quando a Venda nem chegou a ler `X/Y`;
+    # emitir o evento nesse caso gravaria uma Capacidade inventada.
+    venda = SessaoVenda(DesfechoSessaoVenda.CAPACIDADE_CHEIA, unidades_listadas=45)
+    _preparar(
+        monkeypatch,
+        [_resultado(Desfecho.NADA_COMPRAVEL)],
+        [MensagemCompra.INVENTARIO_CHEIO],
+        venda,
+    )
+    interruptor = InterruptorRoteirizado([False] * 2 + [True])
+
+    sessao = _executar(tmp_path, interruptor)
+
+    linhas = [
+        json.loads(linha)
+        for linha in (tmp_path / "eventos-do-fluxo.jsonl").read_text().splitlines()
+    ]
+    assert "capacidade_atualizada" not in [linha["evento"] for linha in linhas]
+    assert sessao.estado.capacidade_observada is None
+
+
+def test_nao_reseta_a_categoria_quando_a_mesma_volta_ja_decidiu_vender(
+    monkeypatch, tmp_path,
+):
+    # A ida a Venda e a volta por `ir_para_compra` ja restauram a Categoria e
+    # recarregam a Listagem: o Reset desta Volta seria clique jogado fora.
+    chamadas = _preparar(
+        monkeypatch,
+        [_resultado(Desfecho.NADA_COMPRAVEL)],
+        [MensagemCompra.INVENTARIO_CHEIO],
+    )
+    interruptor = InterruptorRoteirizado([False] * 2 + [True])
+
+    _executar(tmp_path, interruptor)
+
+    assert "reset" not in chamadas
+    assert chamadas.count("venda") == 1
+
+
+def test_grava_sessao_json_com_desfecho_e_motivo_mesmo_ao_abortar(
+    monkeypatch, tmp_path,
+):
+    # Sem isto o operador encontra a sessao terminada sem nenhum registro do
+    # porque — o modo completo era o unico dos tres que nao escrevia nada.
+    import mistfall.ciclo_completo as completo
+
+    _preparar(monkeypatch, [])
+    monkeypatch.setattr(
+        completo,
+        "garantir_filtro_roxo",
+        lambda *args: ResultadoNavegacao(None, None, "Compra nao confirmou filtro roxo"),
+    )
+
+    sessao = _executar(tmp_path, InterruptorRoteirizado([True]))
+
+    assert sessao.desfecho is DesfechoSessaoCompleta.ABORTOU
+    dados = json.loads((tmp_path / "sessao.json").read_text(encoding="utf-8"))
+    assert dados["desfecho"] == "abortou"
+    assert dados["motivo"] == "Compra nao confirmou filtro roxo"
+    assert dados["compras_enviadas"] == 0
+    assert dados["estado"]["estoque_estimado"] == 0
+    assert dados["estado"]["modo"] == "rapido"

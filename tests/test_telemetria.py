@@ -1,7 +1,7 @@
 import json
 from datetime import datetime, timezone
 
-from mistfall.fluxo import AcaoFluxo, EstadoFluxo, ModoFluxo
+from mistfall.fluxo import AcaoFluxo, EstadoFluxo, EventoFluxo, ModoFluxo
 from mistfall.telemetria import TelemetriaSessao
 
 
@@ -64,6 +64,7 @@ def test_registra_evento_do_fluxo_completo_com_estado_e_motivo_da_transicao(tmp_
     telemetria.registrar_evento_fluxo(
         5, 10.9, horario, estado, unidades_listadas=45,
         acao=AcaoFluxo.VENDER_POR_FLUXO_LENTO,
+        evento=EventoFluxo.unidades_listadas(45),
     )
 
     linha = json.loads((tmp_path / "eventos-do-fluxo.jsonl").read_text())
@@ -78,6 +79,7 @@ def test_registra_evento_do_fluxo_completo_com_estado_e_motivo_da_transicao(tmp_
         "estoque_estimado": 48,
         "unidades_listadas": 45,
         "capacidade_observada": [12, 40],
+        "evento": "unidades_listadas",
         "motivo_transicao": "vender_por_fluxo_lento",
     }
 
@@ -90,6 +92,7 @@ def test_registra_evento_do_fluxo_completo_sem_capacidade_observada(tmp_path):
     telemetria.registrar_evento_fluxo(
         1, 10.0, horario, estado, unidades_listadas=0,
         acao=AcaoFluxo.EXECUTAR_COMPRA,
+        evento=EventoFluxo.INTENCAO,
     )
 
     linha = json.loads((tmp_path / "eventos-do-fluxo.jsonl").read_text())
@@ -108,6 +111,7 @@ def test_eventos_do_fluxo_nao_interfere_nos_jsonl_existentes(tmp_path):
     telemetria.registrar_evento_fluxo(
         1, 10.4, horario, EstadoFluxo(), unidades_listadas=0,
         acao=AcaoFluxo.CONTINUAR_COMPRA,
+        evento=EventoFluxo.RESET,
     )
 
     arquivos = sorted(caminho.name for caminho in tmp_path.iterdir())
@@ -121,3 +125,32 @@ def test_eventos_do_fluxo_nao_interfere_nos_jsonl_existentes(tmp_path):
     assert ouro["ouro"] == 500
     intervalo = json.loads((tmp_path / "tempos-do-laco.jsonl").read_text())
     assert intervalo["espera_efetiva_ms"] == 50.0
+
+
+def test_o_evento_aplicado_distingue_linhas_de_estado_identico(tmp_path):
+    # `compra_confirmada` e `compra_inconclusiva(1)` chegam ao mesmo estado
+    # resultante e a mesma acao. Sem o evento aplicado, as duas linhas ficam
+    # identicas — e e exatamente a divergencia entre elas que a analise do
+    # Estoque estimado precisa medir.
+    telemetria = TelemetriaSessao(tmp_path, inicio_monotonico=10.0)
+    horario = datetime(2026, 8, 18, 9, 0, tzinfo=timezone.utc)
+    estado = EstadoFluxo(estoque_estimado=1)
+
+    telemetria.registrar_evento_fluxo(
+        1, 10.0, horario, estado, unidades_listadas=0,
+        acao=AcaoFluxo.CONTINUAR_COMPRA, evento=EventoFluxo.compra_confirmada(),
+    )
+    telemetria.registrar_evento_fluxo(
+        2, 10.0, horario, estado, unidades_listadas=0,
+        acao=AcaoFluxo.CONTINUAR_COMPRA, evento=EventoFluxo.compra_inconclusiva(1),
+    )
+
+    linhas = [
+        json.loads(linha)
+        for linha in (tmp_path / "eventos-do-fluxo.jsonl").read_text().splitlines()
+    ]
+
+    assert [linha["evento"] for linha in linhas] == [
+        "compra_confirmada",
+        "compra_inconclusiva",
+    ]

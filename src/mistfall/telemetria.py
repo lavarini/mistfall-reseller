@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from mistfall.fluxo import AcaoFluxo, EstadoFluxo
+from mistfall.fluxo import AcaoFluxo, EstadoFluxo, EventoFluxo
 
 
 class TelemetriaSessao:
@@ -63,6 +63,7 @@ class TelemetriaSessao:
         estado: EstadoFluxo,
         unidades_listadas: int,
         acao: AcaoFluxo,
+        evento: EventoFluxo,
     ) -> None:
         """Grava uma transição do coordenador do Fluxo Completo.
 
@@ -70,6 +71,12 @@ class TelemetriaSessao:
         históricos `telemetria-ouro.jsonl` e `tempos-do-laco.jsonl`, que não
         mudam. `estado` fornece o regime, as Intenções e os Resets desde a
         última, e o saldo estimado; `acao` é o motivo da transição.
+
+        `evento` é o que foi aplicado, e não é redundante com `acao`: uma
+        Compra confirmada e uma Compra inconclusiva de uma unidade chegam ao
+        mesmo estado resultante e à mesma ação, e sem esta chave as duas
+        linhas ficam idênticas — apagando justamente a divergência entre o
+        Estoque estimado e o Armazém real que esta trilha existe para medir.
         """
         capacidade = (
             list(estado.capacidade_observada)
@@ -90,6 +97,7 @@ class TelemetriaSessao:
                 "estoque_estimado": estado.estoque_estimado,
                 "unidades_listadas": unidades_listadas,
                 "capacidade_observada": capacidade,
+                "evento": evento.tipo.value,
                 "motivo_transicao": acao.value,
             },
         )

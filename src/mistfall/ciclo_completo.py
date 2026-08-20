@@ -27,7 +27,8 @@ prioridade:
    nao ha evidencia contra a Compra ter acontecido.
 
 Nenhum desses sinais isolados encerra o laco. So a falha persistente de
-navegacao (depois das retentativas que `navegacao.py` ja faz sozinho), a
+navegacao (depois das `TENTATIVAS_DE_CLIQUE` que `navegacao.py` faz
+sozinho em cada passo), a
 falha persistente de visao (`Desfecho.ABORTOU` do proprio `piloto.executar`
 por `LIMITE_ABORTOS_CONSECUTIVOS` Voltas seguidas) e o F4 do operador — em
 Compra ou em Venda — terminam a sessao.
@@ -39,6 +40,7 @@ inteira rodada com `simular=True` na quinta Volta.
 """
 
 import itertools
+import json
 import random
 import time
 from dataclasses import dataclass, field
@@ -78,6 +80,47 @@ _ACOES_DE_VENDA = (AcaoFluxo.VENDER_POR_INVENTARIO_CHEIO, AcaoFluxo.VENDER_POR_F
 # Falha de visao (ABORTOU) e uma queda cega do piloto, entao o limite vive
 # aqui, fora do contrato puro de `fluxo.py`, que continua selado.
 LIMITE_ABORTOS_CONSECUTIVOS = 5
+
+
+def _fechar(pasta: Path, sessao: "SessaoCompleta") -> None:
+    """Grava o diagnostico da sessao, como `ciclo_venda` faz com o dele.
+
+    Chamado num `finally`: o modo completo roda sem supervisao numa maquina
+    onde ninguem pode depurar, entao a sessao que morre e justamente a que
+    precisa deixar registro.
+    """
+    pasta.mkdir(parents=True, exist_ok=True)
+    estado = sessao.estado
+    (pasta / "sessao.json").write_text(
+        json.dumps(
+            {
+                "desfecho": sessao.desfecho.value,
+                "motivo": sessao.motivo,
+                "compras_enviadas": sessao.compras_enviadas,
+                "unidades_listadas": sessao.unidades_listadas,
+                "estado": {
+                    "estoque_estimado": estado.estoque_estimado,
+                    "modo": estado.modo.value,
+                    "intencoes_desde_reset": estado.intencoes_desde_reset,
+                    "resets_desde_intencao": estado.resets_desde_intencao,
+                    "resets_consecutivos": estado.resets_consecutivos,
+                    "intervalos_lentos_consecutivos": (
+                        estado.intervalos_lentos_consecutivos
+                    ),
+                    "compra_pendente": estado.compra_pendente,
+                    "capacidade_observada": (
+                        list(estado.capacidade_observada)
+                        if estado.capacidade_observada is not None
+                        else None
+                    ),
+                },
+                "eventos": [evento.tipo.value for evento in sessao.eventos],
+            },
+            indent=2,
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
 
 
 class DesfechoSessaoCompleta(Enum):
@@ -126,7 +169,7 @@ def executar_ciclo_completo(
         sessao.estado = estado
         telemetria.registrar_evento_fluxo(
             numero_da_volta, time.monotonic(), datetime.now(),
-            estado, sessao.unidades_listadas, acao,
+            estado, sessao.unidades_listadas, acao, evento,
         )
         return acao
 
@@ -136,131 +179,164 @@ def executar_ciclo_completo(
         sessao.estado = estado
         return sessao
 
-    # O modo completo comeca em Comprar, Item -> Material de Construcao: a
-    # unica coisa que falta confirmar antes do laco e o filtro roxo.
-    filtro = garantir_filtro_roxo(tela, mao, ritmo_venda)
-    if not filtro.sucesso:
-        return encerrar(DesfechoSessaoCompleta.ABORTOU, filtro.motivo)
+    try:
+        # O modo completo comeca em Comprar, Item -> Material de Construcao: a
+        # unica coisa que falta confirmar antes do laco e o filtro roxo.
+        filtro = garantir_filtro_roxo(tela, mao, ritmo_venda)
+        if not filtro.sucesso:
+            return encerrar(DesfechoSessaoCompleta.ABORTOU, filtro.motivo)
 
-    categorias = itertools.cycle(_ALTERNANCIA_RESET)
-    proxima_categoria = next(categorias)
-    ouro_no_envio: int | None = None
-    numero_da_volta = 0
-    numero_da_venda = 0
-    abortos_consecutivos = 0
+        categorias = itertools.cycle(_ALTERNANCIA_RESET)
+        proxima_categoria = next(categorias)
+        ouro_no_envio: int | None = None
+        numero_da_volta = 0
+        numero_da_venda = 0
+        abortos_consecutivos = 0
+        gatilho_por_saldo_suspenso = False
 
-    while True:
-        if interruptor.pediram_parada():
-            return encerrar(DesfechoSessaoCompleta.PAROU)
+        while True:
+            if interruptor.pediram_parada():
+                return encerrar(DesfechoSessaoCompleta.PAROU)
 
-        numero_da_volta += 1
-        pasta_da_volta = pasta / f"volta-{numero_da_volta:04d}"
+            numero_da_volta += 1
+            pasta_da_volta = pasta / f"volta-{numero_da_volta:04d}"
 
-        frame_inicial: np.ndarray | None = None
+            frame_inicial: np.ndarray | None = None
 
-        def observar(frame: np.ndarray) -> None:
-            nonlocal frame_inicial
-            frame_inicial = frame
+            def observar(frame: np.ndarray) -> None:
+                nonlocal frame_inicial
+                frame_inicial = frame
 
-        resultado = executar(
-            tela, mao, config, pasta_da_volta,
-            ritmo=ritmo_compra, sorteio=sorteio, interruptor=interruptor,
-            observador_frame_inicial=observar,
-        )
-
-        # F4 pode ter sido apertado dentro da propria Compra (antes do
-        # clique). Nao e falha estrategica: encerra a sessao na hora.
-        if resultado.desfecho is Desfecho.PAROU:
-            return encerrar(DesfechoSessaoCompleta.PAROU)
-
-        # Falha persistente de visao: SIMULOU nao conta (e sucesso, nao
-        # falha), e qualquer Volta que nao seja ABORTOU zera o contador.
-        if resultado.desfecho is Desfecho.ABORTOU:
-            abortos_consecutivos += 1
-            if abortos_consecutivos >= LIMITE_ABORTOS_CONSECUTIVOS:
-                return encerrar(DesfechoSessaoCompleta.ABORTOU, resultado.motivo)
-        else:
-            abortos_consecutivos = 0
-
-        mensagem = (
-            detectar_mensagem_compra(frame_inicial)
-            if frame_inicial is not None
-            else MensagemCompra.NENHUMA
-        )
-        ouro_agora = resultado.ouro_observado
-
-        # Confirmacao da Compra da Volta anterior, lida no mesmo frame que
-        # abriu esta Volta.
-        acao_confirmacao: AcaoFluxo | None = None
-        if mensagem is MensagemCompra.INVENTARIO_CHEIO:
-            acao_confirmacao = aplicar(EventoFluxo.MENSAGEM_INVENTARIO_CHEIO)
-            ouro_no_envio = None
-        elif estado.compra_pendente:
-            confirmou = mensagem is MensagemCompra.SUCESSO or (
-                ouro_agora is not None
-                and ouro_no_envio is not None
-                and ouro_agora < ouro_no_envio
+            resultado = executar(
+                tela, mao, config, pasta_da_volta,
+                ritmo=ritmo_compra, sorteio=sorteio, interruptor=interruptor,
+                observador_frame_inicial=observar,
             )
-            sem_queda_legivel = (
-                not confirmou
-                and ouro_agora is not None
-                and ouro_no_envio is not None
-                and ouro_agora >= ouro_no_envio
-            )
-            if confirmou:
-                acao_confirmacao = aplicar(EventoFluxo.compra_confirmada(unidades=1))
-            elif sem_queda_legivel:
-                acao_confirmacao = aplicar(EventoFluxo.compra_inconclusiva(unidades=0))
+
+            # F4 pode ter sido apertado dentro da propria Compra (antes do
+            # clique). Nao e falha estrategica: encerra a sessao na hora.
+            if resultado.desfecho is Desfecho.PAROU:
+                return encerrar(DesfechoSessaoCompleta.PAROU)
+
+            # Falha persistente de visao: SIMULOU nao conta (e sucesso, nao
+            # falha), e qualquer Volta que nao seja ABORTOU zera o contador.
+            if resultado.desfecho is Desfecho.ABORTOU:
+                abortos_consecutivos += 1
+                if abortos_consecutivos >= LIMITE_ABORTOS_CONSECUTIVOS:
+                    return encerrar(DesfechoSessaoCompleta.ABORTOU, resultado.motivo)
             else:
-                acao_confirmacao = aplicar(EventoFluxo.compra_inconclusiva())
-            ouro_no_envio = None
+                abortos_consecutivos = 0
 
-        # O que esta propria Volta encontrou: uma intencao (Listagem no
-        # Preco-alvo, envie-se ou nao a Compra) ou nada compravel.
-        if resultado.listagem is not None:
-            acao_propria = aplicar(EventoFluxo.intencao_detectada())
-            if resultado.desfecho is Desfecho.COMPRA_ENVIADA:
-                sessao.compras_enviadas += 1
-                aplicar(EventoFluxo.compra_enviada())
-                ouro_no_envio = ouro_agora
-        elif resultado.desfecho is Desfecho.NADA_COMPRAVEL:
-            resetar_categoria(
-                tela, mao, ritmo_compra,
-                categoria_alternativa=proxima_categoria, sorteio=sorteio,
+            mensagem = (
+                detectar_mensagem_compra(frame_inicial)
+                if frame_inicial is not None
+                else MensagemCompra.NENHUMA
             )
-            proxima_categoria = next(categorias)
-            acao_propria = aplicar(EventoFluxo.reset_executado())
-        else:
-            # ABORTOU/SIMULOU isolado: sinal ambiguo, nao e terminal e nao
-            # justifica Reset por si so.
-            acao_propria = AcaoFluxo.CONTINUAR_COMPRA
+            ouro_agora = resultado.ouro_observado
 
-        acao = acao_confirmacao if acao_confirmacao in _ACOES_DE_VENDA else acao_propria
+            # Confirmacao da Compra da Volta anterior, lida no mesmo frame que
+            # abriu esta Volta.
+            acao_confirmacao: AcaoFluxo | None = None
+            if mensagem is MensagemCompra.INVENTARIO_CHEIO:
+                acao_confirmacao = aplicar(EventoFluxo.MENSAGEM_INVENTARIO_CHEIO)
+                ouro_no_envio = None
+            elif estado.compra_pendente:
+                confirmou = mensagem is MensagemCompra.SUCESSO or (
+                    ouro_agora is not None
+                    and ouro_no_envio is not None
+                    and ouro_agora < ouro_no_envio
+                )
+                sem_queda_legivel = (
+                    not confirmou
+                    and ouro_agora is not None
+                    and ouro_no_envio is not None
+                    and ouro_agora >= ouro_no_envio
+                )
+                if confirmou:
+                    acao_confirmacao = aplicar(EventoFluxo.compra_confirmada(unidades=1))
+                elif sem_queda_legivel:
+                    acao_confirmacao = aplicar(EventoFluxo.compra_inconclusiva(unidades=0))
+                else:
+                    acao_confirmacao = aplicar(EventoFluxo.compra_inconclusiva())
+                ouro_no_envio = None
 
-        if acao not in _ACOES_DE_VENDA:
-            time.sleep(ritmo_compra.espera_entre_voltas)
-            continue
+            # O que esta propria Volta encontrou: uma intencao (Listagem no
+            # Preco-alvo, envie-se ou nao a Compra) ou nada compravel.
+            if resultado.listagem is not None:
+                acao_propria = aplicar(EventoFluxo.intencao_detectada())
+                if resultado.desfecho is Desfecho.COMPRA_ENVIADA:
+                    sessao.compras_enviadas += 1
+                    aplicar(EventoFluxo.compra_enviada())
+                    ouro_no_envio = ouro_agora
+            elif resultado.desfecho is Desfecho.NADA_COMPRAVEL:
+                # Se a confirmacao desta mesma Volta ja decidiu vender, a ida a
+                # Venda e a volta por `ir_para_compra` restauram a Categoria e
+                # recarregam a Listagem sozinhas: o Reset aqui seria clique
+                # jogado fora. O evento continua valendo — nao havia nada
+                # compravel, e e isso que o regime conta.
+                if acao_confirmacao not in _ACOES_DE_VENDA:
+                    resetar_categoria(
+                        tela, mao, ritmo_compra,
+                        categoria_alternativa=proxima_categoria, sorteio=sorteio,
+                    )
+                    proxima_categoria = next(categorias)
+                acao_propria = aplicar(EventoFluxo.reset_executado())
+            else:
+                # ABORTOU/SIMULOU isolado: sinal ambiguo, nao e terminal e nao
+                # justifica Reset por si so.
+                acao_propria = AcaoFluxo.CONTINUAR_COMPRA
 
-        nav_venda = ir_para_venda(tela, mao, ritmo_venda)
-        if not nav_venda.sucesso:
-            return encerrar(DesfechoSessaoCompleta.ABORTOU, nav_venda.motivo)
+            acao = acao_confirmacao if acao_confirmacao in _ACOES_DE_VENDA else acao_propria
 
-        numero_da_venda += 1
-        pasta_da_venda = pasta / f"venda-{numero_da_venda:04d}"
-        venda = executar_venda_parcial(
-            tela, mao, config, pasta_da_venda, interruptor, ritmo_venda, sorteio,
-        )
-        sessao.unidades_listadas += venda.unidades_listadas
-        if venda.unidades_listadas:
-            aplicar(EventoFluxo.unidades_listadas(venda.unidades_listadas))
+            # Livelock: com a Capacidade de Venda do NPC cheia, a Venda volta sem
+            # listar nada, o Estoque estimado nao muda e o gatilho por saldo segue
+            # verdadeiro para sempre — um ida-e-volta completo de aba a cada
+            # Compra confirmada, indefinidamente, sem nenhuma unidade listada. O
+            # toast "cheios" continua valendo: suprimido e so o gatilho por saldo,
+            # ate uma Venda voltar a listar alguma coisa.
+            if acao is AcaoFluxo.VENDER_POR_FLUXO_LENTO and gatilho_por_saldo_suspenso:
+                acao = AcaoFluxo.CONTINUAR_COMPRA
 
-        # F4 tambem pode ter sido apertado dentro da Venda.
-        if venda.desfecho is DesfechoSessaoVenda.PAROU:
-            return encerrar(DesfechoSessaoCompleta.PAROU)
+            if acao not in _ACOES_DE_VENDA:
+                time.sleep(ritmo_compra.espera_entre_voltas)
+                continue
 
-        nav_compra = ir_para_compra(tela, mao, ritmo_venda)
-        if not nav_compra.sucesso:
-            return encerrar(DesfechoSessaoCompleta.ABORTOU, nav_compra.motivo)
+            nav_venda = ir_para_venda(tela, mao, ritmo_venda)
+            if not nav_venda.sucesso:
+                return encerrar(DesfechoSessaoCompleta.ABORTOU, nav_venda.motivo)
 
-        if interruptor.pediram_parada():
-            return encerrar(DesfechoSessaoCompleta.PAROU)
+            numero_da_venda += 1
+            pasta_da_venda = pasta / f"venda-{numero_da_venda:04d}"
+            venda = executar_venda_parcial(
+                tela, mao, config, pasta_da_venda, interruptor, ritmo_venda, sorteio,
+            )
+            sessao.unidades_listadas += venda.unidades_listadas
+            if venda.unidades_listadas:
+                gatilho_por_saldo_suspenso = False
+                aplicar(EventoFluxo.unidades_listadas(venda.unidades_listadas))
+            elif venda.desfecho is DesfechoSessaoVenda.CAPACIDADE_CHEIA:
+                gatilho_por_saldo_suspenso = True
+
+            # `capacidade_final` fica None quando a Venda nem chegou a ler `X/Y`;
+            # emitir o evento nesse caso registraria uma Capacidade inventada.
+            if venda.capacidade_final is not None:
+                aplicar(
+                    EventoFluxo.capacidade_atualizada(
+                        venda.capacidade_final.ocupadas,
+                        venda.capacidade_final.limite,
+                    )
+                )
+
+            # F4 tambem pode ter sido apertado dentro da Venda.
+            if venda.desfecho is DesfechoSessaoVenda.PAROU:
+                return encerrar(DesfechoSessaoCompleta.PAROU)
+
+            nav_compra = ir_para_compra(tela, mao, ritmo_venda)
+            if not nav_compra.sucesso:
+                return encerrar(DesfechoSessaoCompleta.ABORTOU, nav_compra.motivo)
+            aplicar(EventoFluxo.retorno_compra())
+
+            if interruptor.pediram_parada():
+                return encerrar(DesfechoSessaoCompleta.PAROU)
+    finally:
+        _fechar(pasta, sessao)
