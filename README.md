@@ -420,6 +420,28 @@ Moral: **um `monkeypatch` que troca o valor inicial troca o cenário.** Se o tes
 com o estado inicial substituído, ele não cobre a estreia — cobre um regime que o programa
 nunca vive.
 
+Dois bugs de visão do Fluxo Completo, encontrados rodando valendo e não pela suíte,
+apertaram esse mesmo parafuso mais uma volta.
+
+O primeiro: a navegação para a Venda exigia `eh_tela_venda`, que só é verdadeiro com um
+Baú legível — e os Baús não existem no Painel Inventário, que é justamente onde a tela
+abre. A condição era **insatisfazível na própria tela que deveria reconhecer**. O teste
+não pegou porque fazia `monkeypatch` de `eh_tela_venda` para `True`: ele substituiu o
+predicado sob teste pela resposta que queria.
+
+O segundo: o detector do Filtro Roxo media a cor do losango, mas a marca de seleção
+*cobre* a cor — então a proporção de roxo **cai** quando o filtro liga. O detector dizia
+"ativo" nos dois estados e o filtro nunca era clicado. O caso negativo era uma variante
+sintética com o roxo apagado, que só provava que apagar roxo dá `False`.
+
+As duas morais, que valem além destes bugs:
+
+- **Dublar o predicado sob teste é não testá-lo.** Se o teste força `X` para `True` e a
+  função existe para decidir `X`, ele mede a fixture, não o código.
+- **Um caso negativo sintético não é o caso negativo.** Ele prova o que você removeu,
+  não o que o jogo mostra. Os dois estados que faltavam no corpus — Inventário aberto e
+  filtro desligado — nunca tinham sido capturados, e por isso nenhum teste podia falhar.
+
 ## Documentação
 
 | Arquivo | O que traz |

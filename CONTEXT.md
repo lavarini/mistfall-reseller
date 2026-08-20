@@ -93,6 +93,17 @@ Armazém. Uma Venda consome uma posição da Capacidade de Venda. O bot preenche
 de Venda e a Quantidade 3 na Janela de Confirmação e clica em "Listar para Venda".
 _Avoid_: Transação, Publicação.
 
+**Painel**:
+A aba Vender tem dois: **Inventário** e **Armazém**. A tela abre no Inventário, e é
+preciso trocar para o Armazém antes de qualquer Venda.
+
+A distinção não é cosmética: **os Baús pertencem ao Painel Armazém e não existem no
+Inventário**. Qualquer conferência que exija Baú legível é insatisfazível enquanto o
+Inventário estiver aberto — foi o que travou a navegação da Compra para a Venda. O que
+prova estar na tela de Venda nos dois Painéis é a Capacidade `X/Y`, que aparece em
+ambos.
+_Avoid_: Aba (as abas são Comprar/Vender/Registro de Trocas), Tab, Seção.
+
 **Preço de Venda**:
 O Preço-unitário fixo pelo qual um Item-alvo é listado. Vem de `[precos_venda]` e não
 é inferido da Tendência de Mercado nem relido da Janela de Confirmação.
@@ -118,10 +129,21 @@ ao menos dois.
 _Avoid_: Stash, Página, Guia.
 
 **Filtro Roxo**:
-O filtro de raridade roxa da lista do Leilão, ativado por um clique fixo ao lado da
-Categoria. O Fluxo Completo garante essa ativação antes de cada Compra e depois de
-cada Venda.
+O filtro de raridade roxa da lista do Leilão, ativado por um clique fixo na barra
+"Raridade", ao lado da Categoria. O Fluxo Completo garante essa ativação antes de cada
+Compra e depois de cada Venda.
+
+Ele é detectado pela **Marca de Seleção**, não pela cor. Medir "quanto roxo há no
+losango" lê o sinal invertido: com o filtro desligado o losango fica cheio de roxo, e
+ligá-lo *cobre* esse roxo com a marca. Foi assim que o filtro deixou de ser clicado —
+o detector respondia "ativo" nos dois estados.
 _Avoid_: Filtro de raridade, Filtro épico.
+
+**Marca de Seleção**:
+A borda branca mais o tique dourado que o jogo desenha sobre o losango de raridade
+escolhido na barra "Raridade". É o que distingue ligado de desligado; a cor do losango
+não distingue.
+_Avoid_: Check, Highlight, Seleção.
 
 **Intenção**:
 Uma Listagem de Item-alvo visível no Preço-alvo. Existe independente de a Compra ter
