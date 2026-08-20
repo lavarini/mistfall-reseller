@@ -45,6 +45,29 @@ Categorias usadas pelo Reset recebem pontos sorteados dentro de áreas centrais 
 Esse sorteio só muda o ponto dentro do mesmo alvo: não muda a Listagem escolhida, a
 alternância Forja/Chave, as esperas ou as teclas Espaço/F3/F4.
 
+### O Fluxo Completo
+
+O que está acima é uma Volta de Compra, e é o que `mistfall-bot` faz em laço. O
+`mistfall-completo` põe Compra e Venda no mesmo laço e decide sozinho quando trocar de
+aba, sem ninguém entre uma coisa e outra.
+
+A decisão é de ritmo, não de relógio. Ele conta **Intenções** — Listagens de Item-alvo no
+Preço-alvo — e os Resets entre elas. Enquanto aparece Item-alvo, o regime é rápido e ele
+só vende quando o jogo acusa Inventário cheio. Quando o mercado seca — três intervalos de
+três Resets seguidos, ou cinco Resets sem nenhuma Intenção — o regime vira lento, e aí
+vender 45 unidades acumuladas passa a valer mais que continuar varrendo.
+
+Três coisas que valem saber antes de confiar nele por horas:
+
+- O **Estoque estimado** é uma contagem interna, nunca relida do Armazém. Ele pode
+  divergir do real quando o OCR do Ouro fica instável; isso é conhecido e não há
+  reconciliação implementada.
+- Um sinal ambíguo isolado — um toast não lido, um Ouro ilegível — nunca derruba a
+  sessão. O que derruba é falha **persistente**: cinco Voltas abortadas seguidas, ou uma
+  navegação que não confirma depois das retentativas.
+- Quando ele encerra, grava `sessao.json` com desfecho e motivo, e sai com código 1. Um
+  processo que terminou em silêncio com código 0 terminou porque você apertou F4.
+
 ## Onde roda
 
 O jogo roda num PC **Windows**; o desenvolvimento acontece num **Mac**. Por isso existem três
@@ -378,6 +401,20 @@ quebrando o código de propósito.
 
 Se você mexer numa proteção, **quebre-a e confirme que a suíte reclama.**
 
+O Fluxo Completo trouxe uma variante nova da família, que vale reconhecer porque não se
+parece com as outras. O teste que cobria a Venda de 45 unidades fazia `monkeypatch` do
+Estoque inicial para 100 — um valor que produção nenhuma produz, já que o modo começa
+assumindo zero. O caminho real levantava `ValueError` e matava a sessão, e o teste passava
+verde porque tinha substituído justamente a condição que quebrava.
+
+Nenhuma revisão por task pegou: cada uma via só o seu pedaço, e o defeito morava na junção
+entre a política e o executor da Venda, onde todo colaborador é dublê. Precisou de uma
+revisão do branch inteiro, rodando o cenário de produção à mão.
+
+Moral: **um `monkeypatch` que troca o valor inicial troca o cenário.** Se o teste só passa
+com o estado inicial substituído, ele não cobre a estreia — cobre um regime que o programa
+nunca vive.
+
 ## Documentação
 
 | Arquivo | O que traz |
@@ -386,6 +423,7 @@ Se você mexer numa proteção, **quebre-a e confirme que a suíte reclama.**
 | [`docs/execucao-windows.md`](docs/execucao-windows.md) | Roteiro operacional das execuções no Windows |
 | [`docs/adr/`](docs/adr/) | Decisões arquiteturais e o porquê delas |
 | [`docs/superpowers/specs/`](docs/superpowers/specs/) | Designs, com as premissas que os moldaram |
+| [`docs/superpowers/plans/`](docs/superpowers/plans/) | Planos de execução, task a task, ao lado das specs que os originaram |
 
 Vale ler o [ADR-0002](docs/adr/0002-deteccao-slots-fixos-template.md) antes de mexer em
 detecção: o acoplamento à resolução 2560×1440 é **deliberado**, não descuido. Se a resolução

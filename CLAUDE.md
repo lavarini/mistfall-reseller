@@ -15,11 +15,15 @@ O projeto é escrito assim por padrão; repetir isso em cada artefato só polui.
 ## Linguagem
 
 Código, commits, issues e documentação em **português**, usando o glossário de
-[`CONTEXT.md`](CONTEXT.md): Leilão, Listagem, Item-alvo, Preço-alvo, Preço-unitário,
-Estoque, Compra, Janela de Confirmação, Ouro, Categoria, Reset.
+[`CONTEXT.md`](CONTEXT.md) — que é a **única** fonte dos termos. Não reproduza a lista
+aqui: ela já ficou desatualizada uma vez por estar em dois lugares.
 
-Não usar `Item`, `Offer`, `Listing`, `price` — cada termo do glossário tem uma lista de
-sinônimos a evitar, e ela vale para nomes de função, variável e teste.
+Cada verbete traz também os sinônimos a evitar, e eles valem para nomes de função,
+variável e teste. Os quatro proibidos que mais reaparecem: `Item` isolado, `Offer`,
+`Listing`, `price`.
+
+Formas compostas do glossário — `Item-alvo`, `Preço-alvo`, `preco_unitario` — são
+corretas. Um revisor que acusa `Item-alvo` por causa da regra do `Item` está errado.
 
 ## Ambiente
 
@@ -31,6 +35,25 @@ Interpretador e testes saem do venv do projeto:
 
 A camada de visão roda no macOS contra os prints em `images/`, sem jogo e sem Windows.
 **Nenhuma dependência exclusiva de Windows pode entrar nela** (ADR-0001).
+
+## Modos
+
+São três comandos, e mexer num não pode mudar os outros:
+
+| Comando | O que faz |
+|---|---|
+| `mistfall-bot` | Só Compra, em laço |
+| `mistfall-venda` | Só Venda, em laço |
+| `mistfall-completo` | Alterna Compra e Venda sozinho (Fluxo Completo) |
+
+Todos usam **F3** para iniciar e **F4** para parar. O Fluxo Completo é o único que
+navega entre abas, e ele consome os outros dois em vez de reimplementá-los: a política
+de ritmo vive pura em `fluxo.py`, a navegação confirmada em `navegacao.py`, e
+`ciclo_completo.py` só coordena.
+
+Ao alterar `fluxo.py`, `navegacao.py` ou `ciclo_venda.py`, confira se `mistfall-bot` e
+`mistfall-venda` continuam com o comportamento e os defaults anteriores — a suíte cobre
+isso, mas o acoplamento não é óbvio na leitura.
 
 ## Decisões
 
