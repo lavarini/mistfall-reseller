@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 from mistfall.fluxo import (
     AcaoFluxo,
     EventoFluxo,
@@ -196,3 +198,21 @@ def test_estoque_lento_atingindo_45_decide_venda_por_fluxo_lento():
     )
     assert estado.estoque_estimado == 45
     assert acao is AcaoFluxo.VENDER_POR_FLUXO_LENTO
+
+
+def test_compra_inconclusiva_com_zero_unidades_nao_soma_estoque():
+    # `unidades=0` e o sinal "o Ouro estava legivel e nao caiu", ou seja, a
+    # Compra provavelmente nao aconteceu. Somar uma unidade otimista aqui
+    # inflaria o Estoque estimado a cada Volta com o Ouro zerado.
+    estado = replace(estado_inicial(), compra_pendente=True)
+    depois, _ = aplicar_evento(estado, EventoFluxo.compra_inconclusiva(unidades=0))
+    assert depois.estoque_estimado == 0
+    assert depois.compra_pendente is False
+
+
+def test_compra_inconclusiva_sem_argumento_soma_a_unidade_provisoria():
+    # O default continua sendo a unidade otimista: sem evidencia contra, a
+    # Compra pode ter acontecido.
+    estado = replace(estado_inicial(), compra_pendente=True)
+    depois, _ = aplicar_evento(estado, EventoFluxo.compra_inconclusiva())
+    assert depois.estoque_estimado == 1

@@ -321,3 +321,11 @@ def test_o_readme_nao_promete_encerrar_no_quarto_bau():
     # A varredura vai ate o ultimo Bau detectado, nao ate o quarto.
     assert "quarto Baú" not in README
     assert "último Baú" in README
+
+
+def test_o_glossario_nao_promete_somar_em_toda_compra_inconclusiva():
+    # Compra inconclusiva com Ouro legivel e SEM queda soma zero: o sinal diz
+    # que a Compra provavelmente nao aconteceu. O texto antigo prometia "soma 1
+    # a cada Compra confirmada ou inconclusiva", sem a ressalva.
+    assert "soma 1 a cada Compra confirmada ou inconclusiva" not in CONTEXT
+    assert "sem queda" in CONTEXT

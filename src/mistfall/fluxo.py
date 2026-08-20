@@ -189,7 +189,11 @@ def aplicar_evento(
     if tipo in (_TipoEvento.COMPRA_CONFIRMADA, _TipoEvento.COMPRA_INCONCLUSIVA):
         if not estado.compra_pendente:
             return estado, _acao_por_saldo(estado)
-        unidades = evento.unidades or 1
+        # Nao usar `or 1`: em Python `0 or 1` e 1, e isso engolia o
+        # `compra_inconclusiva(unidades=0)` que significa "o Ouro estava
+        # legivel e nao caiu". As fabricas ja default 1 quando ninguem
+        # informa, entao a defesa aqui so servia para desfazer o zero.
+        unidades = evento.unidades
         novo = replace(
             estado,
             estoque_estimado=estado.estoque_estimado + unidades,

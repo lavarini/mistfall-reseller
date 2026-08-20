@@ -138,11 +138,18 @@ _Avoid_: Modo (reservado para os comandos `mistfall-bot`/`mistfall-venda`/
 `mistfall-completo`), Velocidade.
 
 **Estoque estimado**:
-A contagem interna que o Fluxo Completo mantém do que está no Armazém: soma 1 a cada
-Compra confirmada ou inconclusiva e subtrai as unidades de cada Venda. Nunca é relido
-do Armazém depois do estado inicial. Quando o Ouro sai ilegível com uma Compra
-pendente, a soma acontece do mesmo jeito — uma unidade otimista, para não perder o
-sinal — e nunca é revista depois. Em sessões longas com OCR de Ouro instável, isso
+A contagem interna que o Fluxo Completo mantém do que está no Armazém: soma a cada
+Compra confirmada e subtrai as unidades de cada Venda. Nunca é relido do Armazém depois
+do estado inicial.
+
+Quando a Compra não se confirma, quanto soma depende do que o Ouro diz. Ouro **ilegível**
+soma uma unidade otimista, para não perder o sinal. Ouro **legível e sem queda** soma
+zero: o Ouro não ter caído é evidência de que a Compra não aconteceu — é o que segura a
+contagem quando o Ouro acaba e o bot segue tentando comprar sem conseguir.
+
+Nenhuma dessas somas é revista depois. Em sessões longas com OCR de Ouro instável, o
+Estoque estimado pode divergir do Armazém real; não há reconciliação persistente
+implementada. Em sessões longas com OCR de Ouro instável, isso
 pode deixar o Estoque estimado divergir do Armazém real; não há reconciliação
 persistente implementada.
 _Avoid_: Saldo, Inventário (o Inventário é a aba do jogo).
