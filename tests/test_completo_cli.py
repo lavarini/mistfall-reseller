@@ -4,6 +4,7 @@ import sys
 import tomllib
 import types
 
+from mistfall.ciclo_completo import DesfechoSessaoCompleta, SessaoCompleta
 from mistfall.config import Config
 from mistfall.tipos import ItemAlvo
 
@@ -13,6 +14,19 @@ from ferramentas.completo_cli import montar_parser
 
 def _config_completo():
     return Config(precos_alvo={}, precos_venda={item: 200 for item in ItemAlvo})
+
+
+def _perifericos_falsos(monkeypatch):
+    perifericos = types.ModuleType("mistfall.perifericos.windows")
+    perifericos.VK_F3 = 0x72
+    perifericos.VK_F4 = 0x73
+    perifericos.InterruptorWindows = lambda **kwargs: object()
+    perifericos.MaoWindows = type("MaoWindows", (), {})
+    perifericos.TelaWindows = type("TelaWindows", (), {})
+    monkeypatch.setitem(sys.modules, "mistfall.perifericos.windows", perifericos)
+    monkeypatch.setattr(completo_cli, "carregar_config", lambda _: _config_completo())
+    monkeypatch.setattr(completo_cli, "validar_precos_venda", lambda _: None)
+    return perifericos
 
 
 def test_parser_aceita_pasta_config_e_ritmos():
@@ -47,7 +61,8 @@ def test_rodar_valida_venda_e_monta_f3_f4(monkeypatch, tmp_path):
     monkeypatch.setattr(
         completo_cli,
         "executar_ciclo_completo",
-        lambda *args, **kwargs: chamadas.append((args, kwargs)),
+        lambda *args, **kwargs: chamadas.append((args, kwargs))
+        or SessaoCompleta(DesfechoSessaoCompleta.PAROU),
     )
     args = argparse.Namespace(
         pasta=str(tmp_path), config="config.toml", espera_modal=150,
@@ -72,16 +87,12 @@ def test_rodar_valida_venda_e_monta_f3_f4(monkeypatch, tmp_path):
 def test_anuncia_f3_f4_e_main_converte_erro_em_codigo_dois(
     monkeypatch, capsys,
 ):
-    monkeypatch.setattr(completo_cli, "carregar_config", lambda _: _config_completo())
-    monkeypatch.setattr(completo_cli, "validar_precos_venda", lambda _: None)
-    monkeypatch.setattr(completo_cli, "executar_ciclo_completo", lambda *a, **k: None)
-    perifericos = types.ModuleType("mistfall.perifericos.windows")
-    perifericos.VK_F3 = 0x72
-    perifericos.VK_F4 = 0x73
-    perifericos.InterruptorWindows = lambda **kwargs: object()
-    perifericos.MaoWindows = type("MaoWindows", (), {})
-    perifericos.TelaWindows = type("TelaWindows", (), {})
-    monkeypatch.setitem(sys.modules, "mistfall.perifericos.windows", perifericos)
+    _perifericos_falsos(monkeypatch)
+    monkeypatch.setattr(
+        completo_cli,
+        "executar_ciclo_completo",
+        lambda *a, **k: SessaoCompleta(DesfechoSessaoCompleta.PAROU),
+    )
     args = montar_parser().parse_args([])
 
     assert completo_cli._rodar(args) == 0
@@ -102,3 +113,45 @@ def test_entry_point_mistfall_completo_existe():
         dados["project"]["scripts"]["mistfall-completo"]
         == "ferramentas.completo_cli:main"
     )
+
+
+def test_imprime_o_desfecho_e_devolve_um_quando_a_sessao_aborta(monkeypatch, capsys):
+    # Sem isto o operador encontrava processo terminado em codigo 0, console
+    # silencioso e nenhum registro do porque — justo no modo que roda mais
+    # tempo sem supervisao.
+    _perifericos_falsos(monkeypatch)
+    monkeypatch.setattr(
+        completo_cli,
+        "executar_ciclo_completo",
+        lambda *a, **k: SessaoCompleta(
+            DesfechoSessaoCompleta.ABORTOU,
+            motivo="Compra nao confirmou filtro roxo",
+            compras_enviadas=7,
+            unidades_listadas=45,
+        ),
+    )
+    args = montar_parser().parse_args([])
+
+    assert completo_cli._rodar(args) == 1
+
+    saida = capsys.readouterr().out
+    assert "abortou" in saida
+    assert "Compra nao confirmou filtro roxo" in saida
+
+
+def test_imprime_o_desfecho_e_devolve_zero_quando_o_operador_para(monkeypatch, capsys):
+    _perifericos_falsos(monkeypatch)
+    monkeypatch.setattr(
+        completo_cli,
+        "executar_ciclo_completo",
+        lambda *a, **k: SessaoCompleta(
+            DesfechoSessaoCompleta.PAROU, compras_enviadas=3, unidades_listadas=45,
+        ),
+    )
+    args = montar_parser().parse_args([])
+
+    assert completo_cli._rodar(args) == 0
+
+    saida = capsys.readouterr().out
+    assert "parou" in saida
+    assert "3" in saida and "45" in saida

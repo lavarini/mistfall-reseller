@@ -282,3 +282,29 @@ def test_o_context_define_os_termos_do_fluxo_completo():
     contexto = " ".join(CONTEXT.split())
     assert "unidade otimista" in contexto
     assert "não há reconciliação persistente" in contexto
+
+
+def test_documentacao_repete_o_aviso_de_io_no_jsonl_do_fluxo_completo():
+    # O aviso de gravação síncrona existia só para os dois JSONL antigos.
+    # `eventos-do-fluxo.jsonl` grava do mesmo jeito, dentro do laço, e pode
+    # encerrar a execução do mesmo jeito — o modo completo é justamente o que
+    # roda mais tempo sem ninguém olhando.
+    readme = " ".join(README.split())
+    execucao_windows = " ".join(EXECUCAO_WINDOWS.split())
+    aviso_readme = "erro de I/O ainda pode encerrar a execução"
+    aviso_execucao = "erro de I/O ainda pode encerrar a execucao"
+
+    assert readme.count(aviso_readme) >= 2
+    assert execucao_windows.count(aviso_execucao) >= 2
+    assert aviso_readme in readme.split("eventos-do-fluxo.jsonl", 1)[1][:500]
+    assert aviso_execucao in execucao_windows.split("eventos-do-fluxo.jsonl", 1)[1][:500]
+
+
+def test_documentacao_registra_o_sessao_json_e_o_codigo_um_do_fluxo_completo():
+    # Um operador que encontra o processo terminado precisa saber onde está o
+    # diagnóstico e o que o código de saída significa neste modo.
+    readme = " ".join(README.split())
+    execucao_windows = " ".join(EXECUCAO_WINDOWS.split())
+
+    assert "sessao.json" in readme
+    assert "sessao.json" in execucao_windows

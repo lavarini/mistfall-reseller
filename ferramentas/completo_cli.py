@@ -10,7 +10,7 @@ import dataclasses
 import sys
 from pathlib import Path
 
-from mistfall.ciclo_completo import executar_ciclo_completo
+from mistfall.ciclo_completo import DesfechoSessaoCompleta, executar_ciclo_completo
 from mistfall.config import carregar_config, validar_precos_venda
 from mistfall.piloto import RITMO_PADRAO
 from mistfall.venda import RITMO_VENDA_PADRAO
@@ -56,13 +56,25 @@ def _rodar(args: argparse.Namespace) -> int:
     )
 
     print("aperte F3 no jogo para comecar, F4 para parar", flush=True)
-    executar_ciclo_completo(
+    sessao = executar_ciclo_completo(
         TelaWindows(), MaoWindows(), config, Path(args.pasta),
         InterruptorWindows(vk_inicio=VK_F3, vk_parada=VK_F4),
         ritmo_compra, ritmo_venda,
     )
     print(f"pastas do fluxo completo em {args.pasta}")
-    return 0
+    print(
+        f"desfecho: {sessao.desfecho.value}"
+        + (f" — {sessao.motivo}" if sessao.motivo else "")
+    )
+    print(
+        f"Compras enviadas: {sessao.compras_enviadas}; "
+        f"unidades listadas: {sessao.unidades_listadas}; "
+        f"diagnostico completo em {Path(args.pasta) / 'sessao.json'}"
+    )
+    # Abortar e o codigo 1 da tabela "Codigos de saida": sem isto o operador
+    # encontrava processo terminado em 0, sem nenhum sinal de que a sessao
+    # tinha morrido.
+    return 1 if sessao.desfecho is DesfechoSessaoCompleta.ABORTOU else 0
 
 
 def main() -> int:

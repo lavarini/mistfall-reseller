@@ -228,7 +228,13 @@ Comprar, a Categoria Material de Construcao e o filtro roxo antes de continuar.
 
 Na raiz da pasta de sessao, `eventos-do-fluxo.jsonl` registra cada transicao do
 coordenador: regime, Intencoes e Resets desde a ultima, saldo estimado, unidades
-listadas e o motivo da transicao.
+listadas, o evento aplicado e o motivo da transicao. As gravacoes sao sincronas,
+portanto um erro de I/O ainda pode encerrar a execucao.
+
+Ao terminar, a mesma pasta recebe um `sessao.json` com o desfecho, o motivo, as
+Compras enviadas, as unidades listadas e o estado final do fluxo — escrito tambem
+quando a sessao aborta. O `mistfall-completo` imprime esse desfecho no fecho e sai
+com codigo 1 quando o desfecho e `abortou`: anote-o como nos outros modos.
 
 `estoque_estimado` e uma contagem interna, nunca relida do Armazem depois do estado
 inicial. Quando o Ouro sai ilegivel com uma Compra pendente, o coordenador soma uma
