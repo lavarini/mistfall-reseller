@@ -42,6 +42,7 @@ import itertools
 import random
 import time
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
 
@@ -61,6 +62,7 @@ from mistfall.navegacao import garantir_filtro_roxo, ir_para_compra, ir_para_ven
 from mistfall.perifericos.protocolos import Interruptor, Mao, Tela
 from mistfall.piloto import RITMO_PADRAO, Desfecho, Ritmo, executar
 from mistfall.reset import CategoriaAlternativa, resetar_categoria
+from mistfall.telemetria import TelemetriaSessao
 from mistfall.venda import RITMO_VENDA_PADRAO, RitmoVenda
 
 
@@ -90,9 +92,10 @@ class SessaoCompleta:
     estado: EstadoFluxo = field(default_factory=EstadoFluxo)
     compras_enviadas: int = 0
     unidades_listadas: int = 0
-    # Trilha em memoria de cada EventoFluxo aplicado nesta sessao. A
-    # telemetria persistente (JSONL) e da Task 8 — aqui fica so o
-    # acumulado que o proprio processo consegue inspecionar.
+    # Trilha em memoria de cada EventoFluxo aplicado nesta sessao, para quem
+    # inspeciona o proprio processo. A telemetria persistente (JSONL) vive em
+    # `eventos-do-fluxo.jsonl`, escrita por `TelemetriaSessao.registrar_evento_fluxo`
+    # a cada `aplicar()` — ver `executar_ciclo_completo`.
     eventos: list[EventoFluxo] = field(default_factory=list)
 
 
@@ -114,12 +117,17 @@ def executar_ciclo_completo(
 
     sessao = SessaoCompleta(estado=estado_inicial())
     estado = sessao.estado
+    telemetria = TelemetriaSessao(pasta, time.monotonic())
 
     def aplicar(evento: EventoFluxo) -> AcaoFluxo:
         nonlocal estado
         sessao.eventos.append(evento)
         estado, acao = aplicar_evento(estado, evento)
         sessao.estado = estado
+        telemetria.registrar_evento_fluxo(
+            numero_da_volta, time.monotonic(), datetime.now(),
+            estado, sessao.unidades_listadas, acao,
+        )
         return acao
 
     def encerrar(desfecho: DesfechoSessaoCompleta, motivo: str = "") -> SessaoCompleta:

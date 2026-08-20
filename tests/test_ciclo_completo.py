@@ -1,3 +1,4 @@
+import json
 import random
 from collections import deque
 
@@ -291,3 +292,48 @@ def test_um_resultado_que_nao_e_abortou_zera_o_contador_de_abortos(
     assert sessao.desfecho is DesfechoSessaoCompleta.PAROU
     assert chamadas.count("compra") == 9
     assert chamadas.count("reset") == 1
+
+
+def test_grava_eventos_do_fluxo_completo_em_jsonl_na_pasta_da_sessao(
+    monkeypatch, tmp_path,
+):
+    # Mesmo roteiro de test_venda_de_45_preserva_saldo_55_de_um_estoque_100:
+    # uma unica Volta que junta inventario cheio, Reset e uma Venda parcial de
+    # 45 unidades. Cada aplicar() dessa Volta precisa virar uma linha em
+    # eventos-do-fluxo.jsonl, na pasta da propria sessao — sem tocar em
+    # telemetria-ouro.jsonl nem tempos-do-laco.jsonl, que este coordenador
+    # nunca escreve.
+    import mistfall.ciclo_completo as completo
+
+    venda = SessaoVenda(DesfechoSessaoVenda.CAPACIDADE_CHEIA, unidades_listadas=45)
+    _preparar(
+        monkeypatch,
+        [_resultado(Desfecho.NADA_COMPRAVEL)],
+        [MensagemCompra.INVENTARIO_CHEIO],
+        venda,
+    )
+    monkeypatch.setattr(
+        completo, "estado_inicial", lambda: estado_inicial(estoque_estimado=100)
+    )
+    interruptor = InterruptorRoteirizado([False] * 2 + [True])
+
+    _executar(tmp_path, interruptor)
+
+    caminho = tmp_path / "eventos-do-fluxo.jsonl"
+    assert caminho.exists(), "coordenador nao escreveu eventos-do-fluxo.jsonl"
+    linhas = [json.loads(linha) for linha in caminho.read_text().splitlines()]
+
+    assert [linha["motivo_transicao"] for linha in linhas] == [
+        "vender_por_inventario_cheio",
+        "continuar_compra",
+        "continuar_venda",
+    ]
+    assert all(linha["volta"] == 1 for linha in linhas)
+    assert all(linha["modo"] == "rapido" for linha in linhas)
+
+    ultima = linhas[-1]
+    assert ultima["estoque_estimado"] == 55
+    assert ultima["unidades_listadas"] == 45
+
+    assert not (tmp_path / "telemetria-ouro.jsonl").exists()
+    assert not (tmp_path / "tempos-do-laco.jsonl").exists()
