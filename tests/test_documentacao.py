@@ -221,3 +221,64 @@ def test_o_readme_documenta_a_capacidade_lida_da_tela():
 def test_o_readme_diz_que_cada_bau_e_processado_uma_vez():
     assert "Cada Baú é processado uma vez" in README
     assert "avança somente para a direita" in README
+
+
+def test_o_readme_documenta_os_tres_modos_continuos():
+    # Os três comandos contínuos (Compra, Venda, coordenado) precisam estar
+    # descritos juntos, não só espalhados em seções separadas.
+    assert "mistfall-bot" in README
+    assert "mistfall-venda" in README
+    assert "mistfall-completo" in README
+    assert "alterna Compra e Venda sozinho" in README
+
+
+def test_o_readme_documenta_inicio_e_premissas_do_fluxo_completo():
+    assert "mistfall-completo --pasta sessao-completa" in README
+    assert "Item → Material de Construção" in README
+    assert "filtro roxo" in README
+    assert "estoque_estimado = 0" in README
+
+
+def test_a_documentacao_de_execucao_windows_repete_inicio_do_fluxo_completo():
+    execucao_windows = " ".join(EXECUCAO_WINDOWS.split())
+    assert "mistfall-completo --pasta sessao-completa" in execucao_windows
+    assert "Item -> Material de Construcao" in execucao_windows
+    assert "filtro roxo" in execucao_windows
+    assert "estoque_estimado = 0" in execucao_windows
+
+
+def test_o_readme_documenta_venda_parcial_no_segundo_bau_e_limite_quarenta_e_cinco():
+    readme = " ".join(README.split())
+    assert "segundo Baú" in readme
+    assert "atinge 45 unidades" in readme
+    execucao_windows = " ".join(EXECUCAO_WINDOWS.split())
+    assert "segundo Bau" in execucao_windows
+    assert "atinge 45 unidades" in execucao_windows
+
+
+def test_documentacao_registra_o_jsonl_do_fluxo_completo_sem_tocar_nos_existentes():
+    assert "eventos-do-fluxo.jsonl" in README
+    assert "eventos-do-fluxo.jsonl" in EXECUCAO_WINDOWS
+    # Os contratos históricos continuam intactos e continuam documentados.
+    assert "telemetria-ouro.jsonl" in README
+    assert "tempos-do-laco.jsonl" in README
+
+
+def test_documentacao_avisa_divergencia_do_estoque_estimado_sem_reconciliacao():
+    readme = " ".join(README.split())
+    execucao_windows = " ".join(EXECUCAO_WINDOWS.split())
+    assert "unidade otimista" in readme
+    assert "unidade otimista" in execucao_windows
+    assert "não há reconciliação persistente implementada" in readme
+    assert "nao ha reconciliacao persistente implementada" in execucao_windows
+
+
+def test_o_context_define_os_termos_do_fluxo_completo():
+    for termo in (
+        "**Filtro Roxo**", "**Intenção**", "**Regime do Fluxo**",
+        "**Estoque estimado**", "**Fluxo Completo**",
+    ):
+        assert termo in CONTEXT
+    contexto = " ".join(CONTEXT.split())
+    assert "unidade otimista" in contexto
+    assert "não há reconciliação persistente" in contexto

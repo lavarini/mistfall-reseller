@@ -100,6 +100,18 @@ tesseract --version
 
 ## Uso
 
+Três comandos rodam a versão contínua do bot, todos com **F3** para iniciar e **F4**
+para parar dentro do jogo:
+
+- `mistfall-bot` — só Compra, roda até o Inventário e o Armazém acusarem cheios ou o
+  operador parar.
+- `mistfall-venda` — só Venda, processa o Baú aberto e avança somente para a direita.
+- `mistfall-completo` — alterna Compra e Venda sozinho, adaptando o ritmo ao que
+  encontra no Leilão.
+
+`mistfall-piloto` continua sendo a ferramenta de uma Compra só, para calibrar e
+depurar sem comprometer uma sessão inteira.
+
 ### Antes de qualquer execução
 
 - Jogo em **2560×1440**, com a escala de exibição do Windows em **100%**
@@ -192,6 +204,43 @@ Janela, mas não relê os campos digitados nem usa a Tendência de Mercado.
 Para evitar repetir exatamente o mesmo movimento, o clique no stack e o clique em
 "Listar para Venda" variam dentro de áreas centrais seguras. Baús e campos de input
 continuam com coordenadas fixas.
+
+### Rodar o fluxo completo
+
+```
+mistfall-completo --pasta sessao-completa
+```
+
+O fluxo completo alterna sozinho entre Comprar e Vender, sem clique manual de aba. Ele
+sempre começa na aba Comprar, Categoria **Item → Material de Construção**, garante o
+filtro roxo e assume `estoque_estimado = 0` — comece sem stacks no Armazém, ou rode
+`mistfall-venda` antes para esvaziá-lo.
+
+Aperte **F3** dentro do jogo para começar e **F4** para parar, como nos outros modos
+contínuos.
+
+O coordenador começa no regime rápido e só entra em Venda voluntária no regime lento:
+três intervalos de três Resets entre Intenções seguidos, ou cinco Resets seguidos sem
+nenhuma Intenção. Uma Intenção é uma Listagem de Item-alvo no Preço-alvo; não depende
+de a Compra ter sido enviada nem confirmada. Em qualquer regime, a mensagem "cheios" do
+jogo dispara Venda na hora.
+
+No regime lento contínuo, uma nova Venda dispara quando `estoque_estimado` atinge 45
+unidades — 15 espaços de stacks de 3. A Venda é sempre parcial: começa no **segundo
+Baú**, ignorando o primeiro, lista os stacks exatos de 3 que couberem na Capacidade de
+Venda disponível naquele momento, relendo `X/Y` depois de cada Listagem, e volta para
+Comprar sem tentar esvaziar o Armazém inteiro. Depois de cada Venda o fluxo restaura a
+aba Comprar, a Categoria Material de Construção e o filtro roxo antes de continuar.
+
+Na raiz da pasta de sessão, `eventos-do-fluxo.jsonl` registra cada transição do
+coordenador: regime, Intenções e Resets desde a última, saldo estimado, unidades
+listadas e o motivo da transição.
+
+`estoque_estimado` é uma contagem interna, nunca relida do Armazém depois do estado
+inicial. Quando o Ouro sai ilegível com uma Compra pendente, o coordenador soma uma
+unidade otimista para não perder o sinal, e essa soma nunca é revista depois. Em
+sessões longas com OCR de Ouro instável, isso pode deixar `estoque_estimado` divergir
+do Armazém real; não há reconciliação persistente implementada.
 
 ### Códigos de saída
 

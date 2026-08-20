@@ -108,3 +108,39 @@ _Avoid_: Limite configurado, Vagas fixas.
 Uma das quatro abas do Armazém abaixo do título "Armazém". O ciclo de Venda começa no
 Baú selecionado, processa sua imagem uma vez e avança somente para a direita.
 _Avoid_: Stash, Página, Guia.
+
+**Filtro Roxo**:
+O filtro de raridade roxa da lista do Leilão, ativado por um clique fixo ao lado da
+Categoria. O Fluxo Completo garante essa ativação antes de cada Compra e depois de
+cada Venda.
+_Avoid_: Filtro de raridade, Filtro épico.
+
+**Intenção**:
+Uma Listagem de Item-alvo visível no Preço-alvo. Existe independente de a Compra ter
+sido enviada ou confirmada — é a unidade que o Fluxo Completo usa para medir ritmo.
+_Avoid_: Oportunidade, Sinal de compra.
+
+**Regime do Fluxo**:
+O ritmo — rápido ou lento — em que o Fluxo Completo está operando, medido pela
+cadência de Resets entre Intenções. Começa rápido; vira lento após três intervalos de
+três Resets entre Intenções seguidos, ou após cinco Resets seguidos sem nenhuma
+Intenção. Só o regime lento dispara Venda por saldo — o regime rápido só vende quando
+o Inventário e o Armazém acusam estar cheios.
+_Avoid_: Modo (reservado para os comandos `mistfall-bot`/`mistfall-venda`/
+`mistfall-completo`), Velocidade.
+
+**Estoque estimado**:
+A contagem interna que o Fluxo Completo mantém do que está no Armazém: soma 1 a cada
+Compra confirmada ou inconclusiva e subtrai as unidades de cada Venda. Nunca é relido
+do Armazém depois do estado inicial. Quando o Ouro sai ilegível com uma Compra
+pendente, a soma acontece do mesmo jeito — uma unidade otimista, para não perder o
+sinal — e nunca é revista depois. Em sessões longas com OCR de Ouro instável, isso
+pode deixar o Estoque estimado divergir do Armazém real; não há reconciliação
+persistente implementada.
+_Avoid_: Saldo, Inventário (o Inventário é a aba do jogo).
+
+**Fluxo Completo**:
+O modo coordenado por trás de `mistfall-completo`, que alterna Compra e Venda sozinho
+sem intervenção manual entre abas. Começa em Comprar, Item → Material de Construção,
+com o Filtro Roxo garantido e o Estoque estimado assumido em zero.
+_Avoid_: Modo automático, Modo misto.

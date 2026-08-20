@@ -197,6 +197,45 @@ duas threads, uma para Ouro e outra para Listagens, mas elas nao consultam essa 
 nem dividem a folha em 12 OCRs. Os 12 recortes continuam empilhados em uma unica chamada ao
 tesseract.
 
+## Rodar o fluxo completo
+
+Terminal como administrador, com o jogo em primeiro plano:
+
+```powershell
+mistfall-completo --pasta sessao-completa
+```
+
+O fluxo completo alterna sozinho entre Comprar e Vender, sem clique manual de aba. Ele
+sempre comeca na aba Comprar, Categoria Item -> Material de Construcao, garante o
+filtro roxo e assume `estoque_estimado = 0` — comece sem stacks no Armazem, ou rode
+`mistfall-venda` antes para esvazia-lo.
+
+Aperte **F3 dentro do jogo** para iniciar e **F4** para parar, como nos outros modos
+continuos.
+
+O coordenador comeca no regime rapido e so entra em Venda voluntaria no regime lento:
+tres intervalos de tres Resets entre Intencoes seguidos, ou cinco Resets seguidos sem
+nenhuma Intencao. Uma Intencao e uma Listagem de Item-alvo no Preco-alvo; nao depende
+de a Compra ter sido enviada nem confirmada. Em qualquer regime, a mensagem "cheios" do
+jogo dispara Venda na hora.
+
+No regime lento continuo, uma nova Venda dispara quando `estoque_estimado` atinge 45
+unidades — 15 espacos de stacks de 3. A Venda e sempre parcial: comeca no segundo Bau,
+ignorando o primeiro, lista os stacks exatos de 3 que couberem na Capacidade de Venda
+disponivel naquele momento, relendo `X/Y` depois de cada Listagem, e volta para Comprar
+sem tentar esvaziar o Armazem inteiro. Depois de cada Venda o fluxo restaura a aba
+Comprar, a Categoria Material de Construcao e o filtro roxo antes de continuar.
+
+Na raiz da pasta de sessao, `eventos-do-fluxo.jsonl` registra cada transicao do
+coordenador: regime, Intencoes e Resets desde a ultima, saldo estimado, unidades
+listadas e o motivo da transicao.
+
+`estoque_estimado` e uma contagem interna, nunca relida do Armazem depois do estado
+inicial. Quando o Ouro sai ilegivel com uma Compra pendente, o coordenador soma uma
+unidade otimista para nao perder o sinal, e essa soma nunca e revista depois. Em
+sessoes longas com OCR de Ouro instavel, isso pode deixar `estoque_estimado` divergir
+do Armazem real; nao ha reconciliacao persistente implementada.
+
 ## Benchmark que decide a concorrencia
 
 Com o jogo aberto e uma sessao trazida de volta, rode no Windows:
