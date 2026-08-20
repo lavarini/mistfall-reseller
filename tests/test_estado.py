@@ -19,6 +19,11 @@ ESTADO_ESPERADO = {
     "rede-dois-dragao-padrao": EstadoTela.LISTA,
     # Primeira captura vinda da maquina do jogo, e nao do corpus montado a mao.
     "sete-itens-ocr-227-como-297": EstadoTela.LISTA,
+    # As duas fixtures do toast de Compra: mesma tela de lista, uma com o
+    # toast "realizada" desenhado por cima e outra sem toast nenhum. Vieram da
+    # pasta de uma sessao de execucao, onde nao eram versionadas.
+    "compra-realizada": EstadoTela.LISTA,
+    "lista-sem-toast": EstadoTela.LISTA,
     "janela": EstadoTela.JANELA_CONFIRMACAO,
     # Capturada no meio da animacao de abertura: o modal esta 69 px acima da
     # posicao final, e por isso os tres campos numericos caem sobre fundo

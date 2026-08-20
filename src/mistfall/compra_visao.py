@@ -8,6 +8,8 @@ import cv2
 import numpy as np
 import pytesseract
 
+from mistfall.geometria import conferir_resolucao
+
 
 # O texto do toast fica sempre no vazio entre as duas colunas de listagens.
 REGIAO_TEXTO_TOAST = (950, 345, 1800, 385)
@@ -86,6 +88,10 @@ def detectar_mensagem_compra(img: np.ndarray) -> MensagemCompra:
 
 
 def filtro_roxo_ativo(img: np.ndarray) -> bool:
+    # Mesmo guardrail de `identificar_estado`: em resolucao errada o recorte
+    # sai vazio, `.mean()` devolve `nan` e a resposta seria um `False`
+    # silencioso. Resolucao diferente e erro, nao caso a tratar (ADR-0002).
+    conferir_resolucao(img)
     hsv = cv2.cvtColor(_recortar(img, REGIAO_ICONE_ROXO), cv2.COLOR_BGR2HSV)
     roxo = (
         (hsv[:, :, 0] >= MATIZ_ROXO[0])
