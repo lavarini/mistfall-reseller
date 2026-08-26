@@ -36,9 +36,12 @@ Espaço não há nova captura nem conferência. O Ouro do frame inicial é telem
 
 As duas esperas do passo 6 são **sorteadas** a cada Compra para o ritmo não sair sempre
 idêntico. `--espera-modal` ajusta o piso da espera entre o clique e o Espaço e conserva a
-proporção de 1,5× até o teto. Depois de uma Compra enviada, o loop espera um valor sorteado
-entre 650 e 750 ms para a lista se atualizar antes da próxima captura. Voltas sem Compra
-mantêm a espera fixa de 150 ms, evitando desacelerar a varredura comum.
+proporção de 1,5× até o teto. Depois de uma Compra enviada, os **dois** laços de Compra —
+`mistfall-bot` e o Fluxo Completo — esperam um valor sorteado entre 650 e 750 ms para a
+lista se reorganizar antes da próxima captura. Voltas sem Compra mantêm a espera fixa de
+150 ms, evitando desacelerar a varredura comum. A regra é uma só, em
+`piloto.espera_para_proxima_volta`, e os dois laços a consomem: ela já nasceu duplicada
+uma vez e divergiu.
 
 Os cliques da Compra não repetem uma coordenada fixa. A Listagem escolhida e as duas
 Categorias usadas pelo Reset recebem pontos sorteados dentro de áreas centrais seguras.
@@ -441,6 +444,18 @@ As duas morais, que valem além destes bugs:
 - **Um caso negativo sintético não é o caso negativo.** Ele prova o que você removeu,
   não o que o jogo mostra. Os dois estados que faltavam no corpus — Inventário aberto e
   filtro desligado — nunca tinham sido capturados, e por isso nenhum teste podia falhar.
+
+Um terceiro, da mesma safra e de família diferente: o Fluxo Completo comprava o Item errado
+de vez em quando, logo depois de uma Compra. A causa não era detecção nenhuma — era a
+`espera_apos_compra`. Ela existe desde 15/08 justamente para a Volta seguinte não varrer uma
+lista ainda em reorganização, mas `ciclo_completo.py` nasceu quatro dias depois e dormia
+sempre os 150 ms da espera comum. A varredura pegava a lista velha, escolhia um slot que já
+tinha mudado de dono, e o clique comprava outra Listagem. No `mistfall-bot` o mesmo código
+de Compra estava protegido, e por isso o bug parecia ser "do modo completo".
+
+Moral: **uma proteção que mora dentro de um consumidor não protege o próximo.** O segundo
+laço não reintroduziu o bug — ele só nunca soube que a proteção existia, e nenhum teste
+podia acusar a falta, porque cada laço era testado contra o que ele mesmo fazia.
 
 ## Documentação
 

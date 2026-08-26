@@ -128,6 +128,26 @@ class Desfecho(Enum):
     PAROU = "parou"
 
 
+def espera_para_proxima_volta(
+    desfecho: Desfecho,
+    ritmo: Ritmo,
+    sorteio: random.Random,
+) -> float:
+    """Quanto esperar antes da proxima Volta, dado como esta terminou.
+
+    Mora aqui, junto do `Ritmo` e do `Desfecho`, e nao em cada laco: os dois
+    lacos de Compra — `ciclo.py` e `ciclo_completo.py` — precisam da MESMA
+    regra, e ela ja divergiu uma vez. O `ciclo_completo` nasceu depois da
+    `espera_apos_compra` e dormia sempre `espera_entre_voltas`, entao a Volta
+    seguinte a uma Compra varria a lista ainda em reorganizacao, decidia um
+    slot que ja tinha mudado de dono e o clique comprava outra Listagem.
+    Duas copias da regra sao duas chances de a proxima nascer errada.
+    """
+    if desfecho is Desfecho.COMPRA_ENVIADA:
+        return sorteio.uniform(*ritmo.espera_apos_compra)
+    return ritmo.espera_entre_voltas
+
+
 @dataclass
 class Resultado:
     desfecho: Desfecho

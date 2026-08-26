@@ -62,7 +62,10 @@ from mistfall.fluxo import (
 )
 from mistfall.navegacao import garantir_filtro_roxo, ir_para_compra, ir_para_venda
 from mistfall.perifericos.protocolos import Interruptor, Mao, Tela
-from mistfall.piloto import RITMO_PADRAO, Desfecho, Ritmo, executar
+from mistfall.piloto import (
+    RITMO_PADRAO, Desfecho, Ritmo, espera_para_proxima_volta,
+    executar,
+)
 from mistfall.reset import CategoriaAlternativa, resetar_categoria
 from mistfall.telemetria import TelemetriaSessao
 from mistfall.venda import RITMO_VENDA_PADRAO, RitmoVenda
@@ -318,7 +321,9 @@ def executar_ciclo_completo(
                 acao = AcaoFluxo.CONTINUAR_COMPRA
 
             if acao not in _ACOES_DE_VENDA:
-                time.sleep(ritmo_compra.espera_entre_voltas)
+                time.sleep(espera_para_proxima_volta(
+                    resultado.desfecho, ritmo_compra, sorteio,
+                ))
                 continue
 
             nav_venda = ir_para_venda(tela, mao, ritmo_venda)

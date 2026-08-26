@@ -22,7 +22,11 @@ import numpy as np
 
 from mistfall.config import Config
 from mistfall.perifericos.protocolos import Interruptor, Mao, Tela
-from mistfall.piloto import RITMO_PADRAO, Desfecho, Resultado, Ritmo, executar
+from mistfall.piloto import (
+    RITMO_PADRAO, Desfecho, Resultado, Ritmo,
+    espera_para_proxima_volta as _espera_para_proxima_volta,
+    executar,
+)
 from mistfall.reset import CategoriaAlternativa, resetar_categoria
 from mistfall.telemetria import TelemetriaSessao
 
@@ -98,16 +102,6 @@ def linhas_do_fecho(sessao: Sessao) -> list[str]:
         f"parado. {sessao.voltas} Voltas, "
         f"{sessao.compras_enviadas} Compras enviadas",
     ]
-
-
-def _espera_para_proxima_volta(
-    desfecho: Desfecho,
-    ritmo: Ritmo,
-    sorteio: random.Random,
-) -> float:
-    if desfecho is Desfecho.COMPRA_ENVIADA:
-        return sorteio.uniform(*ritmo.espera_apos_compra)
-    return ritmo.espera_entre_voltas
 
 
 def executar_ciclo(tela: Tela, mao: Mao, config: Config, pasta: Path,

@@ -1,6 +1,9 @@
+import dataclasses
 import json
 import random
+import time
 from collections import deque
+from types import SimpleNamespace
 
 import numpy as np
 
@@ -627,3 +630,42 @@ def test_ouro_abaixo_do_piso_manda_vender_mesmo_no_regime_rapido(monkeypatch, tm
 
     assert "venda" in chamadas
     assert chamadas.index("ir_venda") < chamadas.index("venda")
+
+
+def test_compra_enviada_espera_a_lista_se_reorganizar_antes_da_proxima_volta(
+    monkeypatch, tmp_path,
+):
+    """A Volta seguinte a uma Compra le a lista DEPOIS de ela se reorganizar.
+
+    Sem isso a varredura pega a lista velha, decide um slot que ja mudou de
+    dono e o clique compra outra Listagem. E a mesma protecao que `ciclo.py`
+    ja aplica no `mistfall-bot` — ver docs/superpowers/specs/
+    2026-08-15-espera-pos-compra-design.md.
+    """
+    import mistfall.ciclo_completo as completo
+
+    esperas = []
+    monkeypatch.setattr(
+        completo,
+        "time",
+        SimpleNamespace(monotonic=time.monotonic, sleep=esperas.append),
+    )
+    _preparar(monkeypatch, [
+        _resultado(Desfecho.COMPRA_ENVIADA),
+        _resultado(Desfecho.NADA_COMPRAVEL, ouro=900),
+    ])
+    ritmo = dataclasses.replace(
+        Ritmo.instantaneo(),
+        espera_entre_voltas=0.15,
+        espera_apos_compra=(0.65, 0.75),
+    )
+
+    executar_ciclo_completo(
+        object(), object(), _config(), tmp_path,
+        InterruptorRoteirizado([False] * 2 + [True]),
+        ritmo, RITMO_VENDA, random.Random(42),
+    )
+
+    assert len(esperas) == 2
+    assert 0.65 <= esperas[0] <= 0.75
+    assert esperas[1] == 0.15
