@@ -170,8 +170,7 @@ _Avoid_: Oportunidade, Sinal de compra.
 O ritmo — rápido ou lento — em que o Fluxo Completo está operando, medido pela
 cadência de Resets entre Intenções. Começa rápido; vira lento após três intervalos de
 três Resets entre Intenções seguidos, ou após cinco Resets seguidos sem nenhuma
-Intenção. Só o regime lento dispara Venda por saldo — o regime rápido só vende quando
-o Inventário e o Armazém acusam estar cheios.
+Intenção. Só o regime lento dispara Venda por saldo, e ele tem duas: a por saldo, quando o Estoque estimado alcança o lote, e a Retomada, quando a Venda anterior saiu por Capacidade cheia deixando lote para trás. As duas passam pela Janela de Venda. O regime rápido não tem nenhuma das duas — vende quando o Inventário e o Armazém acusam estar cheios, ou quando o Ouro cai abaixo do piso.
 
 O caminho de volta existe e usa a mesma medida na direção contrária, contada em
 **Pontos de pressa**: um intervalo de zero Resets — duas Intenções coladas — vale dois
@@ -186,6 +185,32 @@ nenhuma — quem estava no regime rápido vende quando o Inventário e o Armazé
 estar cheios, e é isso que passa a valer.
 _Avoid_: Modo (reservado para os comandos `mistfall-bot`/`mistfall-venda`/
 `mistfall-completo`), Velocidade.
+
+**Janela de Venda**:
+O intervalo que o regime lento espera, depois de uma Venda, antes de poder
+voltar a vender. Vale para as duas Vendas do regime lento — a por saldo e a de
+retomada — e não vale para o toast de Inventário cheio nem para o Ouro abaixo
+do piso, que são emergência e não ritmo.
+
+Ela abre sozinha, e é isso que a distingue do trinco que substituiu: a
+supressão anterior armava quando uma Venda voltava sem listar nada e só
+destravava com uma Venda que listasse alguma coisa — que nunca acontecia,
+porque a própria supressão impedia a Venda.
+
+Na Volta em que a Janela vence, o Fluxo Completo reavalia o regime lento sem
+depender de nenhuma Compra. Sem essa reavaliação, o gatilho por saldo só era
+consultado nos ramos de Compra, e o bot resetava indefinidamente com o Armazém
+cheio e o Leilão seco.
+_Avoid_: Cooldown, Timer, Debounce.
+
+**Retomada**:
+A Venda que o regime lento faz quando a Venda anterior saiu por Capacidade
+cheia deixando um lote cheio para trás — drenagem interrompida, não terminada.
+Distingue-se da Venda por saldo por não olhar o Estoque estimado: quem responde
+se resta lote é a própria Venda, varrendo os Baús e parando assim que confirma
+quinze stacks. É o que impede a subcontagem do Estoque estimado de contaminar a
+decisão.
+_Avoid_: Retry, Reprocessamento, Segunda passada.
 
 **Estoque estimado**:
 A contagem interna que o Fluxo Completo mantém do que está no Armazém: soma a cada
