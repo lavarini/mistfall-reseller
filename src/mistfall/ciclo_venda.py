@@ -10,7 +10,7 @@ from pathlib import Path
 from mistfall.config import Config
 from mistfall.navegacao import ir_para_compra, ir_para_venda
 from mistfall.perifericos.protocolos import Interruptor, Mao, Tela
-from mistfall.tipos import BAU_INICIAL, CapacidadeVenda
+from mistfall.tipos import BAU_INICIAL, CapacidadeVenda, LOTE_DE_VENDA_EM_STACKS
 from mistfall.venda import (
     DesfechoVenda,
     RITMO_VENDA_PADRAO,
@@ -52,6 +52,11 @@ class SessaoVenda:
     # Quantos Baus o Armazem tinha nesta sessao. Contado uma vez, da
     # propria tela: o numero muda entre seasons.
     total_baus: int = 0
+    # Ha lote cheio sobrando no Armazem depois desta Venda? So a saida por
+    # Capacidade cheia responde de verdade; Armazem esgotado nao tem o que
+    # sobrar, e ABORTOU/PAROU nao sabem — e religar a retomada em cima de uma
+    # falha de visao viraria laco silencioso. Nesses tres, falso.
+    resta_lote_cheio: bool = False
 
 
 def _fechar(pasta: Path, sessao: SessaoVenda) -> None:
@@ -124,6 +129,53 @@ def _capacidade_do_armazem_do_bau(
     ):
         return None
     return ler_capacidade(frame)
+
+
+def _resta_lote_cheio(
+    tela: Tela,
+    mao: Mao,
+    interruptor: Interruptor,
+    ritmo: RitmoVenda,
+    total_baus: int,
+) -> bool:
+    """Ha ao menos um lote cheio de stacks sobrando no Armazem?
+
+    Para assim que confirma o lote: com o Armazem cheio ela sai no primeiro
+    Bau, e so fica cara quando resta pouco — que e quando a resposta importa.
+
+    Comeca do primeiro Bau, e nao do Bau onde a Venda parou: a deteccao de
+    capacidade estagnada faz a Venda voltar ao inicio, e o motivo da
+    estagnacao e nao saber se as Listagens registraram. Se nao registraram, o
+    stack continua num Bau anterior.
+
+    Qualquer Bau que nao abriu vira incerteza, e incerteza devolve verdadeiro.
+    Errar para cima custa uma ida a aba Vender; errar para baixo desliga a
+    retomada e deixa o bot sentado em cima do Armazem cheio.
+    """
+    stacks = 0
+    houve_leitura_incerta = False
+    for bau in range(total_baus):
+        if interruptor.pediram_parada():
+            return True
+        mao.clicar(*centro_bau(bau))
+        frame = _esperar_bau(tela, bau, ritmo)
+        if frame is None:
+            houve_leitura_incerta = True
+            continue
+        candidatos = _candidatos(frame)
+        if not candidatos:
+            # Leitura vazia pode ter acontecido com a tela ainda trocando de
+            # Bau. Releia antes de acreditar que o Bau esta vazio.
+            time.sleep(ritmo.intervalo_entre_perguntas)
+            releitura = tela.capturar()
+            if _capacidade_do_armazem_do_bau(releitura, bau) is None:
+                houve_leitura_incerta = True
+                continue
+            candidatos = _candidatos(releitura)
+        stacks += len(candidatos)
+        if stacks >= LOTE_DE_VENDA_EM_STACKS:
+            return True
+    return houve_leitura_incerta
 
 
 def _esperar_vaga(
@@ -323,6 +375,10 @@ def _executar_sessao_venda(
                         if motivo == "capacidade cheia":
                             _, capacidade = espera
                             sessao.capacidade_final = capacidade
+                            if parcial:
+                                sessao.resta_lote_cheio = _resta_lote_cheio(
+                                    tela, mao, interruptor, ritmo, sessao.total_baus,
+                                )
                             return encerrar(DesfechoSessaoVenda.CAPACIDADE_CHEIA)
                         if espera is None:
                             return encerrar(
@@ -389,6 +445,9 @@ def _executar_sessao_venda(
                         if motivo == "capacidade cheia":
                             _, capacidade = espera
                             sessao.capacidade_final = capacidade
+                            sessao.resta_lote_cheio = _resta_lote_cheio(
+                                tela, mao, interruptor, ritmo, sessao.total_baus,
+                            )
                             return encerrar(DesfechoSessaoVenda.CAPACIDADE_CHEIA)
                         if espera is None:
                             return encerrar(DesfechoSessaoVenda.ABORTOU, motivo)
