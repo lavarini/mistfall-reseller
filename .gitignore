@@ -21,6 +21,7 @@ venv/
 
 # Worktrees locais de desenvolvimento
 .worktrees/
+.claude/worktrees/
 
 # Saída do bot (log de Compras, capturas de depuração)
 *.log
