@@ -339,12 +339,16 @@ def test_grava_eventos_do_fluxo_completo_em_jsonl_na_pasta_da_sessao(
     assert [linha["motivo_transicao"] for linha in linhas] == [
         "vender_por_inventario_cheio",
         "continuar_compra",
+        # venda_encerrada e a Janela sendo reagendada: acao neutra que sempre
+        # devolve continuar_compra, como retorno_compra logo abaixo.
+        "continuar_compra",
         "continuar_venda",
         "continuar_compra",
     ]
     assert [linha["evento"] for linha in linhas] == [
         "mensagem_inventario_cheio",
         "reset_executado",
+        "venda_encerrada",
         "unidades_listadas",
         "retorno_compra",
     ]
@@ -384,88 +388,6 @@ def test_venda_real_com_estoque_inicial_de_producao_nao_derruba_a_sessao(
     assert sessao.unidades_listadas == 45
 
 
-def test_capacidade_cheia_sem_listar_suspende_o_gatilho_por_saldo(
-    monkeypatch, tmp_path,
-):
-    # Com a Capacidade de Venda do NPC cheia, `executar_venda_parcial` volta
-    # com CAPACIDADE_CHEIA e zero unidades: o Estoque estimado nao muda e o
-    # gatilho por saldo continua verdadeiro na Volta seguinte. Sem a
-    # supressao, cada Compra confirmada paga um ida-e-volta completo de aba
-    # para nao listar nada.
-    import mistfall.ciclo_completo as completo
-
-    venda = SessaoVenda(DesfechoSessaoVenda.CAPACIDADE_CHEIA, unidades_listadas=0)
-    # As Compras vao espacadas por tres Resets de proposito: e o que mantem o
-    # regime lento de pe. Coladas, elas devolveriam o regime ao rapido e o
-    # gatilho por saldo nem chegaria a disparar — a supressao so existe dentro
-    # do regime lento, que por definicao e um regime de Compras espacadas.
-    chamadas = _preparar(
-        monkeypatch,
-        [_resultado(Desfecho.NADA_COMPRAVEL, ouro=1000)] * 3
-        + [_resultado(Desfecho.COMPRA_ENVIADA, ouro=1000)]
-        + [_resultado(Desfecho.NADA_COMPRAVEL, ouro=900)] * 3
-        + [_resultado(Desfecho.COMPRA_ENVIADA, ouro=900)]
-        + [_resultado(Desfecho.NADA_COMPRAVEL, ouro=800)],
-        venda=venda,
-    )
-    monkeypatch.setattr(
-        completo,
-        "estado_inicial",
-        lambda: estado_inicial(modo=ModoFluxo.LENTO, estoque_estimado=45),
-    )
-    # Onze respostas, nao dez: cada Venda consome uma pergunta extra ao
-    # voltar para a Compra, alem da pergunta do topo de cada Volta.
-    interruptor = InterruptorRoteirizado([False] * 10 + [True])
-
-    sessao = _executar(tmp_path, interruptor)
-
-    assert chamadas.count("venda") == 1
-    assert chamadas.count("ir_venda") == 1
-    assert sessao.unidades_listadas == 0
-
-
-def test_uma_venda_com_unidades_reabre_o_gatilho_por_saldo(monkeypatch, tmp_path):
-    # A supressao nao pode ser definitiva: assim que uma Venda volta a listar,
-    # o gatilho por saldo tem de voltar a valer.
-    import mistfall.ciclo_completo as completo
-
-    # Como no teste da supressao, as Compras vao espacadas por tres Resets: e
-    # o que segura o regime lento, e sem regime lento nao ha gatilho por saldo
-    # para suspender nem para reabrir.
-    chamadas = _preparar(
-        monkeypatch,
-        [_resultado(Desfecho.NADA_COMPRAVEL, ouro=1000)] * 3
-        + [_resultado(Desfecho.COMPRA_ENVIADA, ouro=1000)]
-        + [_resultado(Desfecho.NADA_COMPRAVEL, ouro=900)] * 5
-        + [_resultado(Desfecho.COMPRA_ENVIADA, ouro=900)]
-        + [_resultado(Desfecho.NADA_COMPRAVEL, ouro=800)],
-        # O toast de Inventario cheio cai na Volta seguinte a primeira Venda:
-        # e o gatilho que nao depende do saldo, e por isso o unico que
-        # atravessa a supressao.
-        [MensagemCompra.NENHUMA] * 5
-        + [MensagemCompra.INVENTARIO_CHEIO]
-        + [MensagemCompra.NENHUMA] * 5,
-        vendas=[
-            SessaoVenda(DesfechoSessaoVenda.CAPACIDADE_CHEIA, unidades_listadas=0),
-            SessaoVenda(DesfechoSessaoVenda.CAPACIDADE_CHEIA, unidades_listadas=45),
-            SessaoVenda(DesfechoSessaoVenda.CAPACIDADE_CHEIA, unidades_listadas=45),
-        ],
-    )
-    monkeypatch.setattr(
-        completo,
-        "estado_inicial",
-        lambda: estado_inicial(modo=ModoFluxo.LENTO, estoque_estimado=90),
-    )
-    # Catorze respostas: onze Voltas mais a pergunta extra de cada uma das
-    # tres Vendas.
-    interruptor = InterruptorRoteirizado([False] * 13 + [True])
-
-    sessao = _executar(tmp_path, interruptor)
-
-    assert chamadas.count("venda") == 3
-    assert sessao.unidades_listadas == 90
-
-
 def test_a_volta_de_venda_registra_capacidade_observada_e_retorno_a_compra(
     monkeypatch, tmp_path,
 ):
@@ -494,6 +416,7 @@ def test_a_volta_de_venda_registra_capacidade_observada_e_retorno_a_compra(
     assert [linha["evento"] for linha in linhas] == [
         "mensagem_inventario_cheio",
         "reset_executado",
+        "venda_encerrada",
         "unidades_listadas",
         "capacidade_atualizada",
         "retorno_compra",
@@ -692,3 +615,83 @@ def test_compra_enviada_espera_a_lista_se_reorganizar_antes_da_proxima_volta(
     assert len(esperas) == 2
     assert 0.65 <= esperas[0] <= 0.75
     assert esperas[1] == 0.15
+
+
+def test_reset_com_armazem_cheio_vende_quando_a_janela_abre(monkeypatch, tmp_path):
+    # O defeito que originou tudo: em regime lento, com o Armazem cheio e o
+    # Leilao seco, o gatilho por saldo so era consultado em evento de Compra,
+    # e o bot resetava indefinidamente sem nunca ir vender.
+    import mistfall.ciclo_completo as completo
+    from mistfall.tipos import LOTE_DE_VENDA_EM_UNIDADES
+
+    chamadas = _preparar(
+        monkeypatch,
+        [_resultado(Desfecho.NADA_COMPRAVEL, ouro=1000)] * 4,
+        venda=SessaoVenda(DesfechoSessaoVenda.ARMAZEM_ESGOTADO, unidades_listadas=45),
+    )
+    monkeypatch.setattr(
+        completo,
+        "estado_inicial",
+        lambda: estado_inicial(
+            modo=ModoFluxo.LENTO, estoque_estimado=LOTE_DE_VENDA_EM_UNIDADES + 15,
+        ),
+    )
+    interruptor = InterruptorRoteirizado([False] * 5 + [True])
+
+    _executar(tmp_path, interruptor, _config(intervalo_da_janela_s=0))
+
+    assert chamadas.count("venda") >= 1
+
+
+def test_janela_fechada_segura_a_venda_do_regime_lento(monkeypatch, tmp_path):
+    import mistfall.ciclo_completo as completo
+    from mistfall.tipos import LOTE_DE_VENDA_EM_UNIDADES
+
+    chamadas = _preparar(
+        monkeypatch,
+        # Sete Voltas de Compra, nao seis: a primeira ja vende (Janela aberta
+        # na largada) e ainda assim precisa da sua propria leitura de Compra;
+        # as seis seguintes so encontram a Janela fechada.
+        [_resultado(Desfecho.NADA_COMPRAVEL, ouro=1000)] * 7,
+        venda=SessaoVenda(DesfechoSessaoVenda.CAPACIDADE_CHEIA, unidades_listadas=0),
+    )
+    monkeypatch.setattr(
+        completo,
+        "estado_inicial",
+        lambda: estado_inicial(
+            modo=ModoFluxo.LENTO, estoque_estimado=LOTE_DE_VENDA_EM_UNIDADES + 15,
+        ),
+    )
+    interruptor = InterruptorRoteirizado([False] * 8 + [True])
+
+    _executar(tmp_path, interruptor, _config(intervalo_da_janela_s=3600))
+
+    # A primeira Venda passa (Janela aberta na largada); a Janela fecha por
+    # uma hora e nenhuma outra pode acontecer, mesmo com o saldo acima do lote.
+    assert chamadas.count("venda") == 1
+
+
+def test_capacidade_cheia_nao_trava_a_venda_para_sempre(monkeypatch, tmp_path):
+    # O trinco antigo: uma Venda que voltava sem listar nada suspendia o
+    # gatilho por saldo ate uma Venda listar alguma coisa — que nunca
+    # acontecia, porque a suspensao impedia a Venda.
+    import mistfall.ciclo_completo as completo
+    from mistfall.tipos import LOTE_DE_VENDA_EM_UNIDADES
+
+    chamadas = _preparar(
+        monkeypatch,
+        [_resultado(Desfecho.NADA_COMPRAVEL, ouro=1000)] * 6,
+        venda=SessaoVenda(DesfechoSessaoVenda.CAPACIDADE_CHEIA, unidades_listadas=0),
+    )
+    monkeypatch.setattr(
+        completo,
+        "estado_inicial",
+        lambda: estado_inicial(
+            modo=ModoFluxo.LENTO, estoque_estimado=LOTE_DE_VENDA_EM_UNIDADES + 15,
+        ),
+    )
+    interruptor = InterruptorRoteirizado([False] * 12 + [True])
+
+    _executar(tmp_path, interruptor, _config(intervalo_da_janela_s=0))
+
+    assert chamadas.count("venda") >= 2

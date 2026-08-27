@@ -161,3 +161,19 @@ def test_alvo_de_ouro_abaixo_do_piso_e_recusado(tmp_path):
     )
     with pytest.raises(ValueError, match="ouro_alvo_recuperacao"):
         carregar_config(arquivo)
+
+
+def test_intervalo_da_janela_tem_padrao_e_e_configuravel(tmp_path):
+    from mistfall.config import carregar_config
+
+    arquivo = tmp_path / "config.toml"
+    arquivo.write_text(
+        "[precos_alvo]\nbroche = 188\n", encoding="utf-8",
+    )
+    assert carregar_config(arquivo).intervalo_da_janela_s == 180
+
+    arquivo.write_text(
+        "intervalo_da_janela_s = 90\n[precos_alvo]\nbroche = 188\n",
+        encoding="utf-8",
+    )
+    assert carregar_config(arquivo).intervalo_da_janela_s == 90

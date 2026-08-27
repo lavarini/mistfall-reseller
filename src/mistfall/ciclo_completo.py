@@ -80,6 +80,19 @@ _ACOES_DE_VENDA = (
     AcaoFluxo.VENDER_POR_INVENTARIO_CHEIO,
     AcaoFluxo.VENDER_POR_FLUXO_LENTO,
     AcaoFluxo.VENDER_POR_OURO_BAIXO,
+    # A Janela tambem pode mandar retomar uma Venda que saiu com lote cheio
+    # no Armazem (`fluxo.py` devolve VENDER_POR_RETOMADA nesse caso). Sem
+    # entrar aqui, o portao de saida do laco ("acao not in _ACOES_DE_VENDA")
+    # descartaria a decisao e a retomada nunca chegaria a ir_para_venda.
+    AcaoFluxo.VENDER_POR_RETOMADA,
+)
+
+# A Janela vale para as duas Vendas do regime lento. Se valesse so para a
+# pressa, o livelock voltaria pela porta dos fundos: a Venda lista zero, uma
+# Compra confirma, o saldo segue acima do lote, e a viagem se repete.
+_ACOES_DO_REGIME_LENTO = (
+    AcaoFluxo.VENDER_POR_FLUXO_LENTO,
+    AcaoFluxo.VENDER_POR_RETOMADA,
 )
 
 # Mesma ideia de `resets_consecutivos >= 5` que `fluxo.py` ja usa como
@@ -204,7 +217,14 @@ def executar_ciclo_completo(
         numero_da_volta = 0
         numero_da_venda = 0
         abortos_consecutivos = 0
-        gatilho_por_saldo_suspenso = False
+        # Zero deixa a Janela aberta na largada: nada foi vendido ainda, e nao
+        # ha o que esperar.
+        proxima_janela = 0.0
+        # Falso deixa a primeira Volta anunciar a aresta se ja encontrar a
+        # Janela aberta: um regime lento que comeca com o Armazem cheio (ou
+        # retomado por F3 depois de crescer sozinho) nao pode esperar um
+        # segundo ciclo fechar-e-abrir so para autorizar a primeira Venda.
+        janela_estava_aberta = False
 
         while True:
             if interruptor.pediram_parada():
@@ -300,6 +320,24 @@ def executar_ciclo_completo(
 
             acao = acao_confirmacao if acao_confirmacao in _ACOES_DE_VENDA else acao_propria
 
+            # Aresta da Janela: a unica reavaliacao do regime lento que nao
+            # depende de evento de Compra. Sem ela, o Fluxo Completo reseta
+            # indefinidamente com o Armazem cheio e o Leilao seco.
+            janela_aberta = time.monotonic() >= proxima_janela
+            if (
+                acao not in _ACOES_DE_VENDA
+                and janela_aberta
+                and not janela_estava_aberta
+            ):
+                acao = aplicar(EventoFluxo.JANELA_DE_VENDA_ABERTA)
+            janela_estava_aberta = janela_aberta
+
+            # Portao: nenhuma Venda do regime lento passa com a Janela
+            # fechada. O toast de Inventario cheio e o Ouro abaixo do piso
+            # atravessam — sao emergencia, nao ritmo.
+            if acao in _ACOES_DO_REGIME_LENTO and not janela_aberta:
+                acao = AcaoFluxo.CONTINUAR_COMPRA
+
             # Terceiro gatilho de Venda, e o unico alcancavel quando o Ouro
             # acaba: as Listagens no Preco-alvo continuam aparecendo, entao o
             # regime nunca vira lento, e nada e comprado, entao o Inventario
@@ -311,15 +349,6 @@ def executar_ciclo_completo(
                 and ouro_agora < config.piso_ouro
             ):
                 acao = aplicar(EventoFluxo.ouro_abaixo_do_piso())
-
-            # Livelock: com a Capacidade de Venda do NPC cheia, a Venda volta sem
-            # listar nada, o Estoque estimado nao muda e o gatilho por saldo segue
-            # verdadeiro para sempre — um ida-e-volta completo de aba a cada
-            # Compra confirmada, indefinidamente, sem nenhuma unidade listada. O
-            # toast "cheios" continua valendo: suprimido e so o gatilho por saldo,
-            # ate uma Venda voltar a listar alguma coisa.
-            if acao is AcaoFluxo.VENDER_POR_FLUXO_LENTO and gatilho_por_saldo_suspenso:
-                acao = AcaoFluxo.CONTINUAR_COMPRA
 
             if acao not in _ACOES_DE_VENDA:
                 time.sleep(espera_para_proxima_volta(
@@ -340,11 +369,16 @@ def executar_ciclo_completo(
             if venda.total_baus:
                 sessao.total_baus = venda.total_baus
             sessao.unidades_listadas += venda.unidades_listadas
+            proxima_janela = time.monotonic() + config.intervalo_da_janela_s
+            janela_estava_aberta = False
+            aplicar(EventoFluxo.venda_encerrada(venda.resta_lote_cheio))
             if venda.unidades_listadas:
-                gatilho_por_saldo_suspenso = False
                 aplicar(EventoFluxo.unidades_listadas(venda.unidades_listadas))
             elif venda.desfecho is DesfechoSessaoVenda.CAPACIDADE_CHEIA:
-                gatilho_por_saldo_suspenso = True
+                # A Capacidade cheia ja foi reportada acima, via
+                # `venda.resta_lote_cheio` dentro de `venda_encerrada`; nao ha
+                # mais nada a fazer neste ramo.
+                pass
 
             # `capacidade_final` fica None quando a Venda nem chegou a ler `X/Y`;
             # emitir o evento nesse caso registraria uma Capacidade inventada.

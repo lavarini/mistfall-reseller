@@ -6,6 +6,7 @@ from mistfall.tipos import ItemAlvo
 
 PISO_OURO_PADRAO = 300
 OURO_ALVO_RECUPERACAO_PADRAO = 10000
+INTERVALO_DA_JANELA_PADRAO = 180
 
 @dataclass(frozen=True)
 class Config:
@@ -19,6 +20,11 @@ class Config:
     # Ouro necessario para sair da recuperacao e voltar a comprar. A folga
     # sobre o piso evita o vaivem entre Compra e Venda.
     ouro_alvo_recuperacao: int = OURO_ALVO_RECUPERACAO_PADRAO
+    # Segundos que o regime lento espera, depois de uma Venda, antes de poder
+    # voltar a vender. E o que impede o ida-e-volta de aba a cada Compra
+    # quando a Capacidade do NPC esta cheia — e, ao contrario do trinco que
+    # substituiu, vence sozinho.
+    intervalo_da_janela_s: int = INTERVALO_DA_JANELA_PADRAO
 
 
 def _carregar_precos(dados: dict, secao: str, arquivo: Path) -> dict[ItemAlvo, int]:
@@ -97,6 +103,9 @@ def carregar_config(caminho: str | Path = "config.toml") -> Config:
     ouro_alvo_recuperacao = _inteiro_positivo(
         dados, "ouro_alvo_recuperacao", OURO_ALVO_RECUPERACAO_PADRAO, arquivo
     )
+    intervalo_da_janela_s = _inteiro_positivo(
+        dados, "intervalo_da_janela_s", INTERVALO_DA_JANELA_PADRAO, arquivo
+    )
     if ouro_alvo_recuperacao < piso_ouro:
         raise ValueError(
             f"{arquivo}: ouro_alvo_recuperacao = {ouro_alvo_recuperacao} e menor "
@@ -111,4 +120,5 @@ def carregar_config(caminho: str | Path = "config.toml") -> Config:
         precos_venda=precos_venda,
         piso_ouro=piso_ouro,
         ouro_alvo_recuperacao=ouro_alvo_recuperacao,
+        intervalo_da_janela_s=intervalo_da_janela_s,
     )
