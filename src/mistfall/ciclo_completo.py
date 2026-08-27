@@ -375,11 +375,6 @@ def executar_ciclo_completo(
             aplicar(EventoFluxo.venda_encerrada(venda.resta_lote_cheio))
             if venda.unidades_listadas:
                 aplicar(EventoFluxo.unidades_listadas(venda.unidades_listadas))
-            elif venda.desfecho is DesfechoSessaoVenda.CAPACIDADE_CHEIA:
-                # A Capacidade cheia ja foi reportada acima, via
-                # `venda.resta_lote_cheio` dentro de `venda_encerrada`; nao ha
-                # mais nada a fazer neste ramo.
-                pass
 
             # `capacidade_final` fica None quando a Venda nem chegou a ler `X/Y`;
             # emitir o evento nesse caso registraria uma Capacidade inventada.
