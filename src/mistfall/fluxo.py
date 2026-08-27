@@ -7,6 +7,8 @@ observados em um novo estado e na próxima ação estratégica.
 from dataclasses import dataclass, replace
 from enum import Enum
 
+from mistfall.tipos import LOTE_DE_VENDA_EM_UNIDADES
+
 
 class ModoFluxo(Enum):
     RAPIDO = "rapido"
@@ -137,7 +139,10 @@ def estado_inicial(
 
 
 def _acao_por_saldo(estado: EstadoFluxo) -> AcaoFluxo:
-    if estado.modo is ModoFluxo.LENTO and estado.estoque_estimado >= 45:
+    if (
+        estado.modo is ModoFluxo.LENTO
+        and estado.estoque_estimado >= LOTE_DE_VENDA_EM_UNIDADES
+    ):
         return AcaoFluxo.VENDER_POR_FLUXO_LENTO
     return AcaoFluxo.CONTINUAR_COMPRA
 

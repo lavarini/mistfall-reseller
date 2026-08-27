@@ -374,3 +374,16 @@ def test_primeira_intencao_da_sessao_ja_nasce_com_a_pressa_cheia():
     estado, _ = aplicar_evento(estado_inicial(), EventoFluxo.INTENCAO)
     assert estado.pontos_de_pressa == 2
     assert estado.modo is ModoFluxo.RAPIDO
+
+
+def test_limiar_de_venda_por_saldo_sai_da_constante_do_lote():
+    from mistfall.tipos import LOTE_DE_VENDA_EM_UNIDADES
+
+    estado = estado_inicial(
+        modo=ModoFluxo.LENTO,
+        estoque_estimado=LOTE_DE_VENDA_EM_UNIDADES - 1,
+    )
+    estado, _ = aplicar_evento(estado, EventoFluxo.COMPRA_ENVIADA)
+    estado, acao = aplicar_evento(estado, EventoFluxo.COMPRA_CONFIRMADA)
+    assert estado.estoque_estimado == LOTE_DE_VENDA_EM_UNIDADES
+    assert acao is AcaoFluxo.VENDER_POR_FLUXO_LENTO
