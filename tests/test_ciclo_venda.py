@@ -471,6 +471,15 @@ def test_venda_parcial_inicia_no_segundo_bau_e_lista_stacks_ate_a_capacidade(
     agora = [0.0]
     monkeypatch.setattr("mistfall.ciclo_venda.time.monotonic", lambda: agora[0])
     monkeypatch.setattr("mistfall.ciclo_venda.time.sleep", lambda _: agora.__setitem__(0, 3.0))
+    # A varredura de _resta_lote_cheio pertence ao Teste 2 (task-2); aqui o
+    # interesse e a espera de vaga, e o Bau falso nao simula a navegacao que
+    # a varredura clica. Sem o stub, a varredura clica no Bau 0, o fake de
+    # ler_bau_selecionado (preso em 1) nunca confirma, e o relogio congelado
+    # em 3.0 trava _esperar_bau num laco sem saida.
+    monkeypatch.setattr(
+        "mistfall.ciclo_venda._resta_lote_cheio",
+        lambda *args, **kwargs: False,
+    )
     interruptor = InterruptorFalso()
     mao = MaoFalsa()
 
@@ -522,6 +531,14 @@ def test_venda_parcial_aproveita_vaga_e_encerra_apos_tres_segundos_estaveis(
     )
     monkeypatch.setattr("mistfall.ciclo_venda.time.monotonic", lambda: agora[0])
     monkeypatch.setattr("mistfall.ciclo_venda.time.sleep", dormir)
+    # Idem ao teste acima: a varredura de _resta_lote_cheio e assunto do
+    # Teste 2 (task-2), nao deste teste. Sem o stub, a varredura soma os
+    # tres Baus que o fake de ler_bau_selecionado nunca confirma (10s de
+    # timeout cada) aos "esperas" que este teste mede, inflando a soma.
+    monkeypatch.setattr(
+        "mistfall.ciclo_venda._resta_lote_cheio",
+        lambda *args, **kwargs: False,
+    )
 
     sessao = executar_venda_parcial(
         TelaFalsa([STASH]), MaoFalsa(), config(), tmp_path, InterruptorFalso(),
@@ -591,3 +608,125 @@ def test_contagem_de_baus_implausivel_aborta(monkeypatch, tmp_path):
     )
     assert sessao.desfecho is DesfechoSessaoVenda.ABORTOU
     assert "implausivel" in sessao.motivo
+
+
+def test_varredura_para_assim_que_confirma_o_lote_cheio(monkeypatch):
+    from mistfall.ciclo_venda import _resta_lote_cheio
+
+    # Quinze stacks cabem no primeiro Bau: a varredura nao deve abrir o segundo.
+    slots = [SlotArmazem(0, coluna, ItemAlvo.BROCHE, 3) for coluna in range(15)]
+    baus_abertos = []
+    monkeypatch.setattr("mistfall.ciclo_venda.varrer_armazem", lambda _: slots)
+    monkeypatch.setattr(
+        "mistfall.ciclo_venda._esperar_bau",
+        lambda tela, esperado, ritmo: baus_abertos.append(esperado) or object(),
+    )
+
+    resta = _resta_lote_cheio(
+        TelaFalsa([STASH]), MaoFalsa(), InterruptorFalso(),
+        RitmoVenda.instantaneo(), total_baus=4,
+    )
+
+    assert resta is True
+    assert baus_abertos == [0]
+
+
+def test_varredura_soma_stacks_de_baus_diferentes(monkeypatch):
+    from mistfall.ciclo_venda import _resta_lote_cheio
+
+    # Oito stacks por Bau: o lote so fecha no segundo.
+    slots = [SlotArmazem(0, coluna, ItemAlvo.BROCHE, 3) for coluna in range(8)]
+    baus_abertos = []
+    monkeypatch.setattr("mistfall.ciclo_venda.varrer_armazem", lambda _: slots)
+    monkeypatch.setattr(
+        "mistfall.ciclo_venda._esperar_bau",
+        lambda tela, esperado, ritmo: baus_abertos.append(esperado) or object(),
+    )
+
+    resta = _resta_lote_cheio(
+        TelaFalsa([STASH]), MaoFalsa(), InterruptorFalso(),
+        RitmoVenda.instantaneo(), total_baus=4,
+    )
+
+    assert resta is True
+    assert baus_abertos == [0, 1]
+
+
+def test_varredura_devolve_falso_quando_o_armazem_nao_tem_lote(monkeypatch):
+    from mistfall.ciclo_venda import _resta_lote_cheio
+
+    slots = [SlotArmazem(0, 0, ItemAlvo.BROCHE, 3), SlotArmazem(0, 1, ItemAlvo.ORBE, 2)]
+    monkeypatch.setattr("mistfall.ciclo_venda.varrer_armazem", lambda _: slots)
+    monkeypatch.setattr(
+        "mistfall.ciclo_venda._esperar_bau",
+        lambda tela, esperado, ritmo: object(),
+    )
+
+    resta = _resta_lote_cheio(
+        TelaFalsa([STASH]), MaoFalsa(), InterruptorFalso(),
+        RitmoVenda.instantaneo(), total_baus=2,
+    )
+
+    assert resta is False
+
+
+def test_bau_que_nao_abre_conta_como_incerteza_e_devolve_verdadeiro(monkeypatch):
+    from mistfall.ciclo_venda import _resta_lote_cheio
+
+    # Armazem quase vazio, mas um Bau nao abriu: nao da para afirmar que
+    # acabou, e afirmar que acabou e o erro que trava a drenagem.
+    monkeypatch.setattr("mistfall.ciclo_venda.varrer_armazem", lambda _: [])
+    monkeypatch.setattr(
+        "mistfall.ciclo_venda._esperar_bau",
+        lambda tela, esperado, ritmo: None if esperado == 1 else object(),
+    )
+    monkeypatch.setattr(
+        "mistfall.ciclo_venda._capacidade_do_armazem_do_bau",
+        lambda frame, bau: CapacidadeVenda(0, 12),
+    )
+
+    resta = _resta_lote_cheio(
+        TelaFalsa([STASH]), MaoFalsa(), InterruptorFalso(),
+        RitmoVenda.instantaneo(), total_baus=2,
+    )
+
+    assert resta is True
+
+
+def test_saida_por_capacidade_cheia_registra_se_resta_lote(monkeypatch, tmp_path):
+    slots = [SlotArmazem(0, coluna, ItemAlvo.BROCHE, 3) for coluna in range(20)]
+    monkeypatch.setattr("mistfall.ciclo_venda.varrer_armazem", lambda _: slots)
+    monkeypatch.setattr("mistfall.ciclo_venda.ler_bau_selecionado", lambda _: 1)
+    monkeypatch.setattr("mistfall.ciclo_venda.contar_baus", lambda _: 4)
+    monkeypatch.setattr(
+        "mistfall.ciclo_venda.ler_capacidade", lambda _: CapacidadeVenda(12, 12),
+    )
+    monkeypatch.setattr(
+        "mistfall.ciclo_venda._resta_lote_cheio",
+        lambda *args, **kwargs: True,
+    )
+
+    sessao = executar_venda_parcial(
+        TelaFalsa([STASH]), MaoFalsa(), config(), tmp_path,
+        InterruptorFalso(), RitmoVenda.instantaneo(),
+    )
+
+    assert sessao.desfecho is DesfechoSessaoVenda.CAPACIDADE_CHEIA
+    assert sessao.resta_lote_cheio is True
+
+
+def test_armazem_esgotado_nunca_arma_a_retomada(monkeypatch, tmp_path):
+    monkeypatch.setattr("mistfall.ciclo_venda.varrer_armazem", lambda _: [])
+    monkeypatch.setattr("mistfall.ciclo_venda.ler_bau_selecionado", lambda _: 1)
+    monkeypatch.setattr("mistfall.ciclo_venda.contar_baus", lambda _: 2)
+    monkeypatch.setattr(
+        "mistfall.ciclo_venda.ler_capacidade", lambda _: CapacidadeVenda(0, 12),
+    )
+
+    sessao = executar_venda_parcial(
+        TelaFalsa([STASH]), MaoFalsa(), config(), tmp_path,
+        InterruptorFalso(), RitmoVenda.instantaneo(),
+    )
+
+    assert sessao.desfecho is DesfechoSessaoVenda.ARMAZEM_ESGOTADO
+    assert sessao.resta_lote_cheio is False
