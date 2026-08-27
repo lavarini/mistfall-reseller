@@ -428,6 +428,26 @@ def test_janela_aberta_com_saldo_acima_do_lote_manda_vender_pela_pressa():
     assert acao is AcaoFluxo.VENDER_POR_FLUXO_LENTO
 
 
+def test_janela_aberta_com_saldo_e_retomada_prioriza_o_saldo():
+    """Com os dois gatilhos armados, o saldo decide antes da Retomada.
+
+    A acao final e a mesma Venda nos dois casos, mas o motivo registrado na
+    telemetria muda — e essa distincao e o proprio ponto: a ordem dos `if`s
+    em `fluxo.py` segue a tabela de design, e nao e arbitraria.
+    """
+    from mistfall.tipos import LOTE_DE_VENDA_EM_UNIDADES
+
+    estado = replace(
+        _em_regime_lento(), estoque_estimado=LOTE_DE_VENDA_EM_UNIDADES
+    )
+    estado, _ = aplicar_evento(
+        estado, EventoFluxo.venda_encerrada(resta_lote_cheio=True)
+    )
+    assert estado.retomada_pendente is True
+    estado, acao = aplicar_evento(estado, EventoFluxo.janela_de_venda_aberta())
+    assert acao is AcaoFluxo.VENDER_POR_FLUXO_LENTO
+
+
 def test_janela_aberta_sem_saldo_e_sem_retomada_continua_comprando():
     estado = _em_regime_lento()
     estado, acao = aplicar_evento(estado, EventoFluxo.janela_de_venda_aberta())
