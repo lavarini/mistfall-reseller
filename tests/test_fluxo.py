@@ -233,3 +233,144 @@ def test_ouro_abaixo_do_piso_nao_mexe_no_regime_nem_no_estoque():
     partida = replace(estado_inicial(), estoque_estimado=7, resets_consecutivos=2)
     depois, _ = aplicar_evento(partida, EventoFluxo.ouro_abaixo_do_piso())
     assert depois == partida
+
+
+def _em_regime_lento():
+    """Leva o estado ao regime lento pelo caminho real dos cinco Resets."""
+    estado = estado_inicial()
+    for _ in range(5):
+        estado, _ = aplicar_evento(estado, EventoFluxo.RESET)
+    assert estado.modo is ModoFluxo.LENTO
+    return estado
+
+
+def test_duas_intencoes_coladas_devolvem_o_regime_ao_rapido():
+    estado = _em_regime_lento()
+    estado, _ = aplicar_evento(estado, EventoFluxo.INTENCAO)
+    estado, _ = aplicar_evento(estado, EventoFluxo.INTENCAO)
+    assert estado.modo is ModoFluxo.RAPIDO
+
+
+def test_dois_intervalos_de_um_reset_devolvem_o_regime_ao_rapido():
+    estado = _em_regime_lento()
+    for evento in (
+        EventoFluxo.INTENCAO,
+        EventoFluxo.RESET,
+        EventoFluxo.INTENCAO,
+        EventoFluxo.RESET,
+        EventoFluxo.INTENCAO,
+    ):
+        estado, _ = aplicar_evento(estado, evento)
+    assert estado.modo is ModoFluxo.RAPIDO
+
+
+def test_um_unico_intervalo_de_um_reset_nao_tira_do_regime_lento():
+    estado = _em_regime_lento()
+    for evento in (
+        EventoFluxo.INTENCAO,
+        EventoFluxo.RESET,
+        EventoFluxo.INTENCAO,
+    ):
+        estado, _ = aplicar_evento(estado, evento)
+    assert estado.pontos_de_pressa == 1
+    assert estado.modo is ModoFluxo.LENTO
+
+
+def test_intervalo_de_dois_resets_nao_soma_nem_zera_os_pontos_de_pressa():
+    estado = _em_regime_lento()
+    for evento in (
+        EventoFluxo.INTENCAO,
+        EventoFluxo.RESET,
+        EventoFluxo.INTENCAO,
+        EventoFluxo.RESET,
+        EventoFluxo.RESET,
+        EventoFluxo.INTENCAO,
+    ):
+        estado, _ = aplicar_evento(estado, evento)
+    assert estado.pontos_de_pressa == 1
+    assert estado.modo is ModoFluxo.LENTO
+
+
+def test_intervalo_de_tres_resets_zera_os_pontos_de_pressa():
+    estado = _em_regime_lento()
+    for evento in (
+        EventoFluxo.INTENCAO,
+        EventoFluxo.RESET,
+        EventoFluxo.INTENCAO,
+        EventoFluxo.RESET,
+        EventoFluxo.RESET,
+        EventoFluxo.RESET,
+        EventoFluxo.INTENCAO,
+    ):
+        estado, _ = aplicar_evento(estado, evento)
+    assert estado.pontos_de_pressa == 0
+    assert estado.modo is ModoFluxo.LENTO
+
+
+def test_pontos_de_pressa_anteriores_nao_sobrevivem_a_entrada_no_lento():
+    """Os cinco Resets que trazem o lento tambem apagam a pressa acumulada.
+
+    Sem isso, um ponto ganho no regime rapido deixaria a primeira Intencao
+    depois da entrada devolver o regime ao rapido de imediato.
+    """
+    estado = estado_inicial()
+    for evento in (
+        EventoFluxo.INTENCAO,
+        EventoFluxo.RESET,
+        EventoFluxo.RESET,
+        EventoFluxo.RESET,
+        EventoFluxo.INTENCAO,
+        EventoFluxo.RESET,
+        EventoFluxo.INTENCAO,
+    ):
+        estado, _ = aplicar_evento(estado, evento)
+    assert estado.pontos_de_pressa == 1
+    for _ in range(5):
+        estado, _ = aplicar_evento(estado, EventoFluxo.RESET)
+    assert estado.modo is ModoFluxo.LENTO
+    estado, _ = aplicar_evento(estado, EventoFluxo.INTENCAO)
+    assert estado.pontos_de_pressa == 0
+    assert estado.modo is ModoFluxo.LENTO
+
+
+def test_saida_do_lento_manda_comprar_e_nao_vender():
+    estado = _em_regime_lento()
+    estado, _ = aplicar_evento(estado, EventoFluxo.INTENCAO)
+    estado, acao = aplicar_evento(estado, EventoFluxo.INTENCAO)
+    assert estado.modo is ModoFluxo.RAPIDO
+    assert acao is AcaoFluxo.EXECUTAR_COMPRA
+
+
+def test_estoque_acima_do_limiar_nao_vende_depois_de_sair_do_lento():
+    estado = replace(_em_regime_lento(), estoque_estimado=46)
+    estado, _ = aplicar_evento(estado, EventoFluxo.INTENCAO)
+    estado, _ = aplicar_evento(estado, EventoFluxo.INTENCAO)
+    assert estado.modo is ModoFluxo.RAPIDO
+    estado, _ = aplicar_evento(estado, EventoFluxo.COMPRA_ENVIADA)
+    estado, acao = aplicar_evento(estado, EventoFluxo.COMPRA_CONFIRMADA)
+    assert estado.estoque_estimado == 47
+    assert acao is AcaoFluxo.CONTINUAR_COMPRA
+
+
+def test_ouro_abaixo_do_piso_nao_mexe_nos_pontos_de_pressa():
+    estado = _em_regime_lento()
+    estado, _ = aplicar_evento(estado, EventoFluxo.INTENCAO)
+    estado, _ = aplicar_evento(estado, EventoFluxo.RESET)
+    estado, _ = aplicar_evento(estado, EventoFluxo.INTENCAO)
+    antes = estado.pontos_de_pressa
+    estado, acao = aplicar_evento(estado, EventoFluxo.OURO_ABAIXO_DO_PISO)
+    assert estado.pontos_de_pressa == antes
+    assert acao is AcaoFluxo.VENDER_POR_OURO_BAIXO
+
+
+def test_primeira_intencao_da_sessao_ja_nasce_com_a_pressa_cheia():
+    """Sem Intencao anterior nao existe intervalo, e o intervalo lido e zero.
+
+    Isso deixa a pressa cheia desde a primeira Volta, o que e coerente com a
+    sessao comecar no regime rapido e nao adianta saida nenhuma: o lento so e
+    alcancado depois de um intervalo de tres Resets ou mais, que zera a pressa
+    no mesmo evento em que e lido, antes da conferencia de saida.
+    """
+    estado, _ = aplicar_evento(estado_inicial(), EventoFluxo.INTENCAO)
+    assert estado.pontos_de_pressa == 2
+    assert estado.modo is ModoFluxo.RAPIDO

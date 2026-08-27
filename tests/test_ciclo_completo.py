@@ -395,9 +395,17 @@ def test_capacidade_cheia_sem_listar_suspende_o_gatilho_por_saldo(
     import mistfall.ciclo_completo as completo
 
     venda = SessaoVenda(DesfechoSessaoVenda.CAPACIDADE_CHEIA, unidades_listadas=0)
+    # As Compras vao espacadas por tres Resets de proposito: e o que mantem o
+    # regime lento de pe. Coladas, elas devolveriam o regime ao rapido e o
+    # gatilho por saldo nem chegaria a disparar — a supressao so existe dentro
+    # do regime lento, que por definicao e um regime de Compras espacadas.
     chamadas = _preparar(
         monkeypatch,
-        [_resultado(Desfecho.COMPRA_ENVIADA, ouro=ouro) for ouro in (1000, 900, 800, 700)],
+        [_resultado(Desfecho.NADA_COMPRAVEL, ouro=1000)] * 3
+        + [_resultado(Desfecho.COMPRA_ENVIADA, ouro=1000)]
+        + [_resultado(Desfecho.NADA_COMPRAVEL, ouro=900)] * 3
+        + [_resultado(Desfecho.COMPRA_ENVIADA, ouro=900)]
+        + [_resultado(Desfecho.NADA_COMPRAVEL, ouro=800)],
         venda=venda,
     )
     monkeypatch.setattr(
@@ -405,7 +413,9 @@ def test_capacidade_cheia_sem_listar_suspende_o_gatilho_por_saldo(
         "estado_inicial",
         lambda: estado_inicial(modo=ModoFluxo.LENTO, estoque_estimado=45),
     )
-    interruptor = InterruptorRoteirizado([False] * 5 + [True])
+    # Onze respostas, nao dez: cada Venda consome uma pergunta extra ao
+    # voltar para a Compra, alem da pergunta do topo de cada Volta.
+    interruptor = InterruptorRoteirizado([False] * 10 + [True])
 
     sessao = _executar(tmp_path, interruptor)
 
@@ -419,15 +429,22 @@ def test_uma_venda_com_unidades_reabre_o_gatilho_por_saldo(monkeypatch, tmp_path
     # o gatilho por saldo tem de voltar a valer.
     import mistfall.ciclo_completo as completo
 
+    # Como no teste da supressao, as Compras vao espacadas por tres Resets: e
+    # o que segura o regime lento, e sem regime lento nao ha gatilho por saldo
+    # para suspender nem para reabrir.
     chamadas = _preparar(
         monkeypatch,
-        [_resultado(Desfecho.COMPRA_ENVIADA, ouro=ouro) for ouro in (1000, 900, 850, 800)],
-        [
-            MensagemCompra.NENHUMA,
-            MensagemCompra.NENHUMA,
-            MensagemCompra.INVENTARIO_CHEIO,
-            MensagemCompra.NENHUMA,
-        ],
+        [_resultado(Desfecho.NADA_COMPRAVEL, ouro=1000)] * 3
+        + [_resultado(Desfecho.COMPRA_ENVIADA, ouro=1000)]
+        + [_resultado(Desfecho.NADA_COMPRAVEL, ouro=900)] * 5
+        + [_resultado(Desfecho.COMPRA_ENVIADA, ouro=900)]
+        + [_resultado(Desfecho.NADA_COMPRAVEL, ouro=800)],
+        # O toast de Inventario cheio cai na Volta seguinte a primeira Venda:
+        # e o gatilho que nao depende do saldo, e por isso o unico que
+        # atravessa a supressao.
+        [MensagemCompra.NENHUMA] * 5
+        + [MensagemCompra.INVENTARIO_CHEIO]
+        + [MensagemCompra.NENHUMA] * 5,
         vendas=[
             SessaoVenda(DesfechoSessaoVenda.CAPACIDADE_CHEIA, unidades_listadas=0),
             SessaoVenda(DesfechoSessaoVenda.CAPACIDADE_CHEIA, unidades_listadas=45),
@@ -439,7 +456,9 @@ def test_uma_venda_com_unidades_reabre_o_gatilho_por_saldo(monkeypatch, tmp_path
         "estado_inicial",
         lambda: estado_inicial(modo=ModoFluxo.LENTO, estoque_estimado=90),
     )
-    interruptor = InterruptorRoteirizado([False] * 7 + [True])
+    # Catorze respostas: onze Voltas mais a pergunta extra de cada uma das
+    # tres Vendas.
+    interruptor = InterruptorRoteirizado([False] * 13 + [True])
 
     sessao = _executar(tmp_path, interruptor)
 
@@ -548,6 +567,10 @@ def test_grava_sessao_json_com_desfecho_e_motivo_mesmo_ao_abortar(
     assert dados["compras_enviadas"] == 0
     assert dados["estado"]["estoque_estimado"] == 0
     assert dados["estado"]["modo"] == "rapido"
+    # A pressa e o contador que devolve o regime ao rapido; sem ela no
+    # diagnostico nao da para explicar depois por que a Venda por saldo
+    # disparou (ou deixou de disparar) numa sessao sem supervisao.
+    assert dados["estado"]["pontos_de_pressa"] == 0
 
 
 def test_conta_os_baus_na_primeira_venda_e_reusa_nas_seguintes(monkeypatch, tmp_path):

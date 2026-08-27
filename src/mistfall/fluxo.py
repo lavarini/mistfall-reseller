@@ -121,6 +121,7 @@ class EstadoFluxo:
     intencoes_desde_reset: int = 0
     resets_desde_intencao: int = 0
     intervalos_lentos_consecutivos: int = 0
+    pontos_de_pressa: int = 0
     resets_consecutivos: int = 0
     modo: ModoFluxo = ModoFluxo.RAPIDO
     compra_pendente: bool = False
@@ -148,15 +149,30 @@ def aplicar_evento(
 
     tipo = evento.tipo
     if tipo is _TipoEvento.INTENCAO_DETECTADA:
-        if estado.resets_desde_intencao >= 3:
+        intervalo = estado.resets_desde_intencao
+        if intervalo >= 3:
             intervalos = estado.intervalos_lentos_consecutivos + 1
         else:
             intervalos = 0
+        # O mesmo intervalo pontua no sentido contrario. Duas Intencoes coladas
+        # (intervalo zero) valem os dois pontos sozinhas; um Reset entre elas
+        # vale um, e sao precisos dois desses. Dois Resets nao dizem nada nem a
+        # favor nem contra, entao nao somam e nao zeram.
+        pontos = estado.pontos_de_pressa
+        if intervalo == 0:
+            pontos = min(pontos + 2, 2)
+        elif intervalo == 1:
+            pontos = min(pontos + 1, 2)
+        elif intervalo >= 3:
+            pontos = 0
         modo = (
             ModoFluxo.LENTO
             if intervalos >= 3 or estado.resets_consecutivos >= 5
             else estado.modo
         )
+        if modo is ModoFluxo.LENTO and pontos >= 2:
+            modo = ModoFluxo.RAPIDO
+            pontos = 0
         transicionou_para_lento = (
             estado.modo is ModoFluxo.RAPIDO and modo is ModoFluxo.LENTO
         )
@@ -165,6 +181,7 @@ def aplicar_evento(
             intencoes_desde_reset=estado.intencoes_desde_reset + 1,
             resets_desde_intencao=0,
             intervalos_lentos_consecutivos=intervalos,
+            pontos_de_pressa=pontos,
             resets_consecutivos=0,
             modo=modo,
         )

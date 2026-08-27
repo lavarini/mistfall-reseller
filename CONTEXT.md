@@ -172,6 +172,18 @@ cadência de Resets entre Intenções. Começa rápido; vira lento após três i
 três Resets entre Intenções seguidos, ou após cinco Resets seguidos sem nenhuma
 Intenção. Só o regime lento dispara Venda por saldo — o regime rápido só vende quando
 o Inventário e o Armazém acusam estar cheios.
+
+O caminho de volta existe e usa a mesma medida na direção contrária, contada em
+**Pontos de pressa**: um intervalo de zero Resets — duas Intenções coladas — vale dois
+pontos; um intervalo de um Reset vale um; dois Resets não dizem nada e não mexem na
+conta; três ou mais zeram. Com dois pontos o regime volta a ser rápido, e a conta
+recomeça do zero.
+
+Sem essa volta o regime lento era permanente: bastava o Leilão desacelerar uma vez
+para toda Compra seguinte continuar disparando Venda por saldo, mesmo depois de o
+Leilão voltar a encher. O Estoque acumulado no momento da volta não força Venda
+nenhuma — quem estava no regime rápido vende quando o Inventário e o Armazém acusam
+estar cheios, e é isso que passa a valer.
 _Avoid_: Modo (reservado para os comandos `mistfall-bot`/`mistfall-venda`/
 `mistfall-completo`), Velocidade.
 
