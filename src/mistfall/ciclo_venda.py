@@ -140,13 +140,18 @@ def _resta_lote_cheio(
 ) -> bool:
     """Ha ao menos um lote cheio de stacks sobrando no Armazem?
 
-    Para assim que confirma o lote: com o Armazem cheio ela sai no primeiro
-    Bau, e so fica cara quando resta pouco — que e quando a resposta importa.
+    Para assim que confirma o lote: com o Armazem cheio ela sai logo no
+    BAU_INICIAL, e so fica cara quando resta pouco — que e quando a resposta
+    importa.
 
-    Comeca do primeiro Bau, e nao do Bau onde a Venda parou: a deteccao de
-    capacidade estagnada faz a Venda voltar ao inicio, e o motivo da
-    estagnacao e nao saber se as Listagens registraram. Se nao registraram, o
-    stack continua num Bau anterior.
+    Comeca em BAU_INICIAL, o mesmo Bau onde a propria Venda comeca, e nao do
+    Bau onde a Venda parou: a deteccao de capacidade estagnada faz a Venda
+    voltar para BAU_INICIAL, e o motivo da estagnacao e nao saber se as
+    Listagens registraram. Se nao registraram, o stack continua num Bau
+    anterior. O Bau antes de BAU_INICIAL nunca e varrido pelo mesmo motivo que
+    a Venda nunca o drena: e o Bau onde a ordenacao automatica do jogo
+    empurra equipamento, e contar o que esta la contaria estoque que a Venda
+    jamais consegue vender.
 
     Qualquer Bau que nao abriu vira incerteza, e incerteza devolve verdadeiro.
     Errar para cima custa uma ida a aba Vender; errar para baixo desliga a
@@ -154,7 +159,7 @@ def _resta_lote_cheio(
     """
     stacks = 0
     houve_leitura_incerta = False
-    for bau in range(total_baus):
+    for bau in range(BAU_INICIAL, total_baus):
         if interruptor.pediram_parada():
             return True
         mao.clicar(*centro_bau(bau))

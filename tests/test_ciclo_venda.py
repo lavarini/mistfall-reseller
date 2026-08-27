@@ -6,7 +6,7 @@ import pytest
 from mistfall.config import Config
 from mistfall.perifericos.falso import InterruptorFalso, MaoFalsa, TelaFalsa
 from mistfall.navegacao import ResultadoNavegacao
-from mistfall.tipos import CapacidadeVenda, ItemAlvo, SlotArmazem
+from mistfall.tipos import BAU_INICIAL, CapacidadeVenda, ItemAlvo, SlotArmazem
 from mistfall.venda import DesfechoVenda, ResultadoVenda, RitmoVenda
 from mistfall.ciclo_venda import (
     DesfechoSessaoVenda,
@@ -613,7 +613,8 @@ def test_contagem_de_baus_implausivel_aborta(monkeypatch, tmp_path):
 def test_varredura_para_assim_que_confirma_o_lote_cheio(monkeypatch):
     from mistfall.ciclo_venda import _resta_lote_cheio
 
-    # Quinze stacks cabem no primeiro Bau: a varredura nao deve abrir o segundo.
+    # Quinze stacks cabem no primeiro Bau varrido (BAU_INICIAL): a varredura
+    # nao deve abrir o seguinte.
     slots = [SlotArmazem(0, coluna, ItemAlvo.BROCHE, 3) for coluna in range(15)]
     baus_abertos = []
     monkeypatch.setattr("mistfall.ciclo_venda.varrer_armazem", lambda _: slots)
@@ -628,13 +629,13 @@ def test_varredura_para_assim_que_confirma_o_lote_cheio(monkeypatch):
     )
 
     assert resta is True
-    assert baus_abertos == [0]
+    assert baus_abertos == [BAU_INICIAL]
 
 
 def test_varredura_soma_stacks_de_baus_diferentes(monkeypatch):
     from mistfall.ciclo_venda import _resta_lote_cheio
 
-    # Oito stacks por Bau: o lote so fecha no segundo.
+    # Oito stacks por Bau: o lote so fecha no segundo Bau varrido.
     slots = [SlotArmazem(0, coluna, ItemAlvo.BROCHE, 3) for coluna in range(8)]
     baus_abertos = []
     monkeypatch.setattr("mistfall.ciclo_venda.varrer_armazem", lambda _: slots)
@@ -649,7 +650,42 @@ def test_varredura_soma_stacks_de_baus_diferentes(monkeypatch):
     )
 
     assert resta is True
-    assert baus_abertos == [0, 1]
+    assert baus_abertos == [BAU_INICIAL, BAU_INICIAL + 1]
+
+
+def test_varredura_nao_conta_o_bau_anterior_a_bau_inicial(monkeypatch):
+    from mistfall.ciclo_venda import _resta_lote_cheio
+
+    # O Bau antes de BAU_INICIAL e onde a ordenacao automatica do jogo
+    # empurra equipamento; a Venda nunca o drena, entao quinze stacks la nao
+    # podem armar a Retomada. Os Baus que a Venda de fato varre estao vazios.
+    slots_bau_anterior = [
+        SlotArmazem(0, coluna, ItemAlvo.BROCHE, 3) for coluna in range(15)
+    ]
+
+    def varrer(frame):
+        return (
+            slots_bau_anterior
+            if isinstance(frame, int) and frame == BAU_INICIAL - 1
+            else []
+        )
+
+    monkeypatch.setattr("mistfall.ciclo_venda.varrer_armazem", varrer)
+    monkeypatch.setattr(
+        "mistfall.ciclo_venda._esperar_bau",
+        lambda tela, esperado, ritmo: esperado,
+    )
+    monkeypatch.setattr(
+        "mistfall.ciclo_venda._capacidade_do_armazem_do_bau",
+        lambda frame, bau: CapacidadeVenda(0, 12),
+    )
+
+    resta = _resta_lote_cheio(
+        TelaFalsa([STASH]), MaoFalsa(), InterruptorFalso(),
+        RitmoVenda.instantaneo(), total_baus=BAU_INICIAL + 1,
+    )
+
+    assert resta is False
 
 
 def test_varredura_devolve_falso_quando_o_armazem_nao_tem_lote(monkeypatch):
