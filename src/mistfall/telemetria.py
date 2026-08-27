@@ -70,7 +70,9 @@ class TelemetriaSessao:
         Stream próprio (`eventos-do-fluxo.jsonl`), separado dos contratos
         históricos `telemetria-ouro.jsonl` e `tempos-do-laco.jsonl`, que não
         mudam. `estado` fornece o regime, as Intenções e os Resets desde a
-        última, e o saldo estimado; `acao` é o motivo da transição.
+        última, e o saldo estimado; também fornece os contadores que decidem o
+        regime — sem eles por Volta não dá para reconstruir por que a Venda não
+        disparou; `acao` é o motivo da transição.
 
         `evento` é o que foi aplicado, e não é redundante com `acao`: uma
         Compra confirmada e uma Compra inconclusiva de uma unidade chegam ao
@@ -94,6 +96,12 @@ class TelemetriaSessao:
                 "modo": estado.modo.value,
                 "intencoes_desde_reset": estado.intencoes_desde_reset,
                 "resets_desde_intencao": estado.resets_desde_intencao,
+                "resets_consecutivos": estado.resets_consecutivos,
+                "intervalos_lentos_consecutivos": (
+                    estado.intervalos_lentos_consecutivos
+                ),
+                "pontos_de_pressa": estado.pontos_de_pressa,
+                "retomada_pendente": estado.retomada_pendente,
                 "estoque_estimado": estado.estoque_estimado,
                 "unidades_listadas": unidades_listadas,
                 "capacidade_observada": capacidade,

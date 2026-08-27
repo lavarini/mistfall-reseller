@@ -129,6 +129,7 @@ def _fechar(pasta: Path, sessao: "SessaoCompleta") -> None:
                         estado.intervalos_lentos_consecutivos
                     ),
                     "pontos_de_pressa": estado.pontos_de_pressa,
+                    "retomada_pendente": estado.retomada_pendente,
                     "compra_pendente": estado.compra_pendente,
                     "capacidade_observada": (
                         list(estado.capacidade_observada)

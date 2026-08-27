@@ -494,6 +494,7 @@ def test_grava_sessao_json_com_desfecho_e_motivo_mesmo_ao_abortar(
     # diagnostico nao da para explicar depois por que a Venda por saldo
     # disparou (ou deixou de disparar) numa sessao sem supervisao.
     assert dados["estado"]["pontos_de_pressa"] == 0
+    assert dados["estado"]["retomada_pendente"] is False
 
 
 def test_conta_os_baus_na_primeira_venda_e_reusa_nas_seguintes(monkeypatch, tmp_path):

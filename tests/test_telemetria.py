@@ -76,6 +76,10 @@ def test_registra_evento_do_fluxo_completo_com_estado_e_motivo_da_transicao(tmp_
         "modo": "lento",
         "intencoes_desde_reset": 2,
         "resets_desde_intencao": 3,
+        "resets_consecutivos": 0,
+        "intervalos_lentos_consecutivos": 0,
+        "pontos_de_pressa": 0,
+        "retomada_pendente": False,
         "estoque_estimado": 48,
         "unidades_listadas": 45,
         "capacidade_observada": [12, 40],
@@ -154,3 +158,29 @@ def test_o_evento_aplicado_distingue_linhas_de_estado_identico(tmp_path):
         "compra_confirmada",
         "compra_inconclusiva",
     ]
+
+
+def test_evento_do_fluxo_registra_os_contadores_que_decidem_o_regime(tmp_path):
+    from dataclasses import replace as _replace
+
+    telemetria = TelemetriaSessao(tmp_path, 0.0)
+    estado = _replace(
+        EstadoFluxo(),
+        resets_consecutivos=4,
+        intervalos_lentos_consecutivos=2,
+        pontos_de_pressa=1,
+        retomada_pendente=True,
+    )
+    telemetria.registrar_evento_fluxo(
+        volta=7, instante=1.0, horario=datetime(2026, 8, 27, 12, 0),
+        estado=estado, unidades_listadas=0,
+        acao=AcaoFluxo.CONTINUAR_COMPRA, evento=EventoFluxo.RESET,
+    )
+
+    linha = json.loads(
+        (tmp_path / "eventos-do-fluxo.jsonl").read_text(encoding="utf-8")
+    )
+    assert linha["resets_consecutivos"] == 4
+    assert linha["intervalos_lentos_consecutivos"] == 2
+    assert linha["pontos_de_pressa"] == 1
+    assert linha["retomada_pendente"] is True
