@@ -387,3 +387,70 @@ def test_limiar_de_venda_por_saldo_sai_da_constante_do_lote():
     estado, acao = aplicar_evento(estado, EventoFluxo.COMPRA_CONFIRMADA)
     assert estado.estoque_estimado == LOTE_DE_VENDA_EM_UNIDADES
     assert acao is AcaoFluxo.VENDER_POR_FLUXO_LENTO
+
+
+def test_venda_encerrada_com_lote_restante_arma_a_retomada():
+    estado = _em_regime_lento()
+    estado, acao = aplicar_evento(
+        estado, EventoFluxo.venda_encerrada(resta_lote_cheio=True)
+    )
+    assert estado.retomada_pendente is True
+    assert acao is AcaoFluxo.CONTINUAR_COMPRA
+
+
+def test_venda_encerrada_sem_lote_restante_desarma_a_retomada():
+    estado = _em_regime_lento()
+    estado, _ = aplicar_evento(
+        estado, EventoFluxo.venda_encerrada(resta_lote_cheio=True)
+    )
+    estado, _ = aplicar_evento(
+        estado, EventoFluxo.venda_encerrada(resta_lote_cheio=False)
+    )
+    assert estado.retomada_pendente is False
+
+
+def test_janela_aberta_com_retomada_armada_manda_vender():
+    estado = _em_regime_lento()
+    estado, _ = aplicar_evento(
+        estado, EventoFluxo.venda_encerrada(resta_lote_cheio=True)
+    )
+    estado, acao = aplicar_evento(estado, EventoFluxo.janela_de_venda_aberta())
+    assert acao is AcaoFluxo.VENDER_POR_RETOMADA
+
+
+def test_janela_aberta_com_saldo_acima_do_lote_manda_vender_pela_pressa():
+    from mistfall.tipos import LOTE_DE_VENDA_EM_UNIDADES
+
+    estado = replace(
+        _em_regime_lento(), estoque_estimado=LOTE_DE_VENDA_EM_UNIDADES
+    )
+    estado, acao = aplicar_evento(estado, EventoFluxo.janela_de_venda_aberta())
+    assert acao is AcaoFluxo.VENDER_POR_FLUXO_LENTO
+
+
+def test_janela_aberta_sem_saldo_e_sem_retomada_continua_comprando():
+    estado = _em_regime_lento()
+    estado, acao = aplicar_evento(estado, EventoFluxo.janela_de_venda_aberta())
+    assert acao is AcaoFluxo.CONTINUAR_COMPRA
+
+
+def test_janela_aberta_no_regime_rapido_nunca_manda_vender():
+    from mistfall.tipos import LOTE_DE_VENDA_EM_UNIDADES
+
+    # O regime rapido vende so por Inventario cheio e por Ouro abaixo do
+    # piso. Nem saldo nem retomada valem nele.
+    estado = estado_inicial(estoque_estimado=LOTE_DE_VENDA_EM_UNIDADES * 2)
+    estado, _ = aplicar_evento(
+        estado, EventoFluxo.venda_encerrada(resta_lote_cheio=True)
+    )
+    estado, acao = aplicar_evento(estado, EventoFluxo.janela_de_venda_aberta())
+    assert estado.modo is ModoFluxo.RAPIDO
+    assert acao is AcaoFluxo.CONTINUAR_COMPRA
+
+
+def test_janela_aberta_nao_mexe_no_regime_nem_no_estoque():
+    estado = replace(_em_regime_lento(), estoque_estimado=7)
+    depois, _ = aplicar_evento(estado, EventoFluxo.janela_de_venda_aberta())
+    assert depois.modo is estado.modo
+    assert depois.estoque_estimado == estado.estoque_estimado
+    assert depois.resets_consecutivos == estado.resets_consecutivos

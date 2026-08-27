@@ -27,6 +27,8 @@ class _TipoEvento(Enum):
     RETORNO_COMPRA = "retorno_compra"
     ESTOQUE_RECONCILIADO = "estoque_reconciliado"
     OURO_ABAIXO_DO_PISO = "ouro_abaixo_do_piso"
+    VENDA_ENCERRADA = "venda_encerrada"
+    JANELA_DE_VENDA_ABERTA = "janela_de_venda_aberta"
 
 
 @dataclass(frozen=True)
@@ -40,6 +42,7 @@ class EventoFluxo:
     tipo: _TipoEvento
     unidades: int = 0
     capacidade: tuple[int, int] | None = None
+    resta_lote_cheio: bool = False
 
     @classmethod
     def intencao_detectada(cls) -> "EventoFluxo":
@@ -82,6 +85,26 @@ class EventoFluxo:
         return cls(_TipoEvento.OURO_ABAIXO_DO_PISO)
 
     @classmethod
+    def venda_encerrada(cls, resta_lote_cheio: bool) -> "EventoFluxo":
+        """Uma Venda acabou, e disse se sobrou lote cheio no Armazem.
+
+        Quem responde e a propria Venda, que le o Armazem: a resposta e
+        independente do Estoque estimado, que subconta.
+        """
+        return cls(
+            _TipoEvento.VENDA_ENCERRADA, resta_lote_cheio=resta_lote_cheio
+        )
+
+    @classmethod
+    def janela_de_venda_aberta(cls) -> "EventoFluxo":
+        """A Janela venceu e o regime lento pode voltar a vender.
+
+        O intervalo vive na configuracao e o relogio e do coordenador: a
+        politica continua pura, como no piso de Ouro.
+        """
+        return cls(_TipoEvento.JANELA_DE_VENDA_ABERTA)
+
+    @classmethod
     def retorno_compra(cls) -> "EventoFluxo":
         return cls(_TipoEvento.RETORNO_COMPRA)
 
@@ -105,6 +128,7 @@ EventoFluxo.MENSAGEM_INVENTARIO_CHEIO = EventoFluxo(
 EventoFluxo.OURO_ABAIXO_DO_PISO = EventoFluxo.ouro_abaixo_do_piso()
 EventoFluxo.RETORNO_COMPRA = EventoFluxo.retorno_compra()
 EventoFluxo.ESTOQUE_RECONCILIADO = EventoFluxo.estoque_reconciliado(0)
+EventoFluxo.JANELA_DE_VENDA_ABERTA = EventoFluxo.janela_de_venda_aberta()
 
 
 class AcaoFluxo(Enum):
@@ -112,6 +136,7 @@ class AcaoFluxo(Enum):
     EXECUTAR_COMPRA = "executar_compra"
     VENDER_POR_INVENTARIO_CHEIO = "vender_por_inventario_cheio"
     VENDER_POR_FLUXO_LENTO = "vender_por_fluxo_lento"
+    VENDER_POR_RETOMADA = "vender_por_retomada"
     VENDER_POR_OURO_BAIXO = "vender_por_ouro_baixo"
     CONTINUAR_VENDA = "continuar_venda"
     ENCERRAR = "encerrar"
@@ -128,6 +153,9 @@ class EstadoFluxo:
     modo: ModoFluxo = ModoFluxo.RAPIDO
     compra_pendente: bool = False
     capacidade_observada: tuple[int, int] | None = None
+    # A ultima Venda saiu por Capacidade cheia deixando lote cheio para tras.
+    # E o que distingue drenagem interrompida de fim de lote.
+    retomada_pendente: bool = False
 
 
 def estado_inicial(
@@ -277,6 +305,22 @@ def aplicar_evento(
         return novo, _acao_por_saldo(novo)
 
     if tipo is _TipoEvento.RETORNO_COMPRA:
+        return estado, AcaoFluxo.CONTINUAR_COMPRA
+
+    if tipo is _TipoEvento.VENDA_ENCERRADA:
+        novo = replace(estado, retomada_pendente=evento.resta_lote_cheio)
+        return novo, AcaoFluxo.CONTINUAR_COMPRA
+
+    if tipo is _TipoEvento.JANELA_DE_VENDA_ABERTA:
+        # Reavaliacao que nao depende de Compra nenhuma. Sem ela, o gatilho
+        # por saldo so e consultado nos ramos de Compra, e o Fluxo Completo
+        # reseta indefinidamente com o Armazem cheio e o Leilao seco.
+        if estado.modo is not ModoFluxo.LENTO:
+            return estado, AcaoFluxo.CONTINUAR_COMPRA
+        if estado.estoque_estimado >= LOTE_DE_VENDA_EM_UNIDADES:
+            return estado, AcaoFluxo.VENDER_POR_FLUXO_LENTO
+        if estado.retomada_pendente:
+            return estado, AcaoFluxo.VENDER_POR_RETOMADA
         return estado, AcaoFluxo.CONTINUAR_COMPRA
 
     raise ValueError(f"evento desconhecido: {tipo!r}")
