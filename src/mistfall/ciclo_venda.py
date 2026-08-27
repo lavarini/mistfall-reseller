@@ -100,6 +100,17 @@ def _candidatos(frame):
     ]
 
 
+def _capacidade_do_armazem_do_bau(
+    frame, bau: int,
+) -> CapacidadeVenda | None:
+    if (
+        ler_painel_itens(frame) is not PainelItens.ARMAZEM
+        or ler_bau_selecionado(frame) != bau
+    ):
+        return None
+    return ler_capacidade(frame)
+
+
 def _esperar_vaga(
     tela: Tela,
     interruptor: Interruptor,
@@ -249,9 +260,34 @@ def _executar_sessao_venda(
             sessao.baus_processados.append(bau + 1)
 
             candidatos = _candidatos(frame)
-            # Uma lista inicialmente não vazia já representa trabalho válido;
-            # só forçamos a troca de abas quando a leitura não encontrou alvo.
-            resetou_armazem = bool(candidatos)
+            # Uma leitura vazia pode ser legítima, mas também pode ter ocorrido
+            # enquanto a tela ainda trocava de Bau. Releia no proprio Armazem
+            # antes de considerar o Bau vazio.
+            if not candidatos:
+                time.sleep(ritmo.intervalo_entre_perguntas)
+                releitura = tela.capturar()
+                capacidade_releitura = _capacidade_do_armazem_do_bau(releitura, bau)
+                if capacidade_releitura is not None:
+                    frame = releitura
+                    capacidade = capacidade_releitura
+                    sessao.capacidade_final = capacidade
+                    candidatos = _candidatos(frame)
+                else:
+                    frame_resetado = _forcar_reset_armazem(tela, mao, bau, ritmo)
+                    capacidade_resetada = (
+                        None
+                        if frame_resetado is None
+                        else _capacidade_do_armazem_do_bau(frame_resetado, bau)
+                    )
+                    if capacidade_resetada is None:
+                        return encerrar(
+                            DesfechoSessaoVenda.ABORTOU,
+                            "nao conseguiu validar o Armazem depois de leitura inconclusiva",
+                        )
+                    frame = frame_resetado
+                    capacidade = capacidade_resetada
+                    sessao.capacidade_final = capacidade
+                    candidatos = _candidatos(frame)
             while True:
                 while candidatos:
                     if interruptor.pediram_parada():
@@ -319,24 +355,7 @@ def _executar_sessao_venda(
                         frame, capacidade = espera
                         sessao.capacidade_final = capacidade
 
-                if resetou_armazem:
-                    break
-                frame_resetado = _forcar_reset_armazem(tela, mao, bau, ritmo)
-                if frame_resetado is None:
-                    return encerrar(
-                        DesfechoSessaoVenda.ABORTOU,
-                        "nao conseguiu resetar o Armazem",
-                    )
-                frame = frame_resetado
-                capacidade = ler_capacidade(frame)
-                if capacidade is None:
-                    return encerrar(
-                        DesfechoSessaoVenda.ABORTOU,
-                        "Capacidade de Venda ilegivel depois do reset",
-                    )
-                sessao.capacidade_final = capacidade
-                candidatos = _candidatos(frame)
-                resetou_armazem = True
+                break
 
             if bau >= sessao.total_baus - 1:
                 return encerrar(DesfechoSessaoVenda.ARMAZEM_ESGOTADO)
