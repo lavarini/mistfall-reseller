@@ -1,8 +1,8 @@
-"""Roda o fluxo completo de Compra e Venda ate o operador apertar F4.
+"""Roda o fluxo completo de Compra e Venda ate o operador apertar F5.
 
 Alterna sozinho entre Comprar e Vender, seguindo o coordenador de
 `mistfall.ciclo_completo`. Como os demais lacos continuos do projeto, usa F3
-para iniciar e F4 para parar.
+para iniciar, F4 para pausar e F5 para encerrar.
 """
 
 import argparse
@@ -18,7 +18,7 @@ from mistfall.venda import RITMO_VENDA_PADRAO
 
 def montar_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        description="Alterna Compra e Venda no Leilao ate o F4.")
+        description="Alterna Compra e Venda no Leilao ate o F5.")
     p.add_argument("--pasta", default="sessao-completa",
                    help="onde salvar as pastas de cada Volta e cada Venda")
     p.add_argument("--config", default="config.toml")
@@ -55,12 +55,19 @@ def _rodar(args: argparse.Namespace) -> int:
         teto_espera_fechamento=args.teto_fechamento,
     )
 
-    print("aperte F3 no jogo para comecar, F4 para parar", flush=True)
-    sessao = executar_ciclo_completo(
-        TelaWindows(), MaoWindows(), config, Path(args.pasta),
-        InterruptorWindows(vk_inicio=VK_F3, vk_parada=VK_F4),
-        ritmo_compra, ritmo_venda,
+    print("aperte F3 no jogo para comecar, F4 para pausar, F5 para encerrar", flush=True)
+    interruptor = InterruptorWindows(
+        vk_inicio=VK_F3, vk_parada=VK_F4,
     )
+    while True:
+        sessao = executar_ciclo_completo(
+            TelaWindows(), MaoWindows(), config, Path(args.pasta), interruptor,
+            ritmo_compra, ritmo_venda,
+        )
+        pediu_encerramento = getattr(interruptor, "pediu_encerramento", None)
+        if pediu_encerramento is None or pediu_encerramento():
+            break
+        print("pausado; aguardando F3 para comecar novamente", flush=True)
     print(f"pastas do fluxo completo em {args.pasta}")
     print(
         f"desfecho: {sessao.desfecho.value}"

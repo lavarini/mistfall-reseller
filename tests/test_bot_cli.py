@@ -72,4 +72,32 @@ def test_bot_anuncia_f3_para_comecar_e_f4_para_parar(capsys, monkeypatch, tmp_pa
         pasta=str(tmp_path), config="config.toml", espera_modal=100)
     bot_cli._rodar(args)
 
-    assert "F3 no jogo para comecar, F4 para parar" in capsys.readouterr().out
+    assert "F3 no jogo para comecar, F4 para pausar, F5 para encerrar" in capsys.readouterr().out
+
+
+def test_bot_roda_nova_sessao_depois_do_f4_ate_o_f5(monkeypatch, tmp_path):
+    perifericos = types.ModuleType("mistfall.perifericos.windows")
+    perifericos.VK_F3 = 0x72
+    perifericos.VK_F4 = 0x73
+    perifericos.VK_F5 = 0x74
+
+    class InterruptorWindows:
+        def __init__(self):
+            self.sessoes = 0
+
+        def pediu_encerramento(self):
+            self.sessoes += 1
+            return self.sessoes >= 2
+
+    perifericos.InterruptorWindows = InterruptorWindows
+    perifericos.MaoWindows = type("MaoWindows", (), {})
+    perifericos.TelaWindows = type("TelaWindows", (), {})
+    monkeypatch.setitem(sys.modules, "mistfall.perifericos.windows", perifericos)
+    monkeypatch.setattr(bot_cli, "carregar_config", lambda _: None)
+    chamadas = []
+    monkeypatch.setattr(bot_cli, "executar_ciclo", lambda *args, **kwargs: chamadas.append(1))
+
+    args = argparse.Namespace(pasta=str(tmp_path), config="config.toml", espera_modal=100)
+
+    assert bot_cli._rodar(args) == 0
+    assert len(chamadas) == 2

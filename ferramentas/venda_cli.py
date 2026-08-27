@@ -46,15 +46,18 @@ def _rodar(args: argparse.Namespace) -> int:
         teto_espera_janela=args.teto_janela,
         teto_espera_fechamento=args.teto_fechamento,
     )
-    print("aperte F3 no jogo para comecar, F4 para parar", flush=True)
-    executar_ciclo_venda(
-        TelaWindows(),
-        MaoWindows(),
-        config,
-        Path(args.pasta),
-        InterruptorWindows(vk_inicio=VK_F3, vk_parada=VK_F4),
-        ritmo,
+    print("aperte F3 no jogo para comecar, F4 para pausar, F5 para encerrar", flush=True)
+    interruptor = InterruptorWindows(
+        vk_inicio=VK_F3, vk_parada=VK_F4,
     )
+    while True:
+        executar_ciclo_venda(
+            TelaWindows(), MaoWindows(), config, Path(args.pasta), interruptor, ritmo,
+        )
+        pediu_encerramento = getattr(interruptor, "pediu_encerramento", None)
+        if pediu_encerramento is None or pediu_encerramento():
+            break
+        print("pausado; aguardando F3 para comecar novamente", flush=True)
     print(f"relatorios da Venda em {args.pasta}")
     return 0
 

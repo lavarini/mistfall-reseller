@@ -60,10 +60,12 @@ class InterruptorFalso:
     vezes o laco consultou a parada, e nao so o efeito dela.
     """
 
-    def __init__(self, parar_na_pergunta: int | None = None) -> None:
+    def __init__(self, parar_na_pergunta: int | None = None,
+                 encerrar_na_pergunta: int | None = None) -> None:
         self.perguntas = 0
         self.inicios = 0
         self._parar_na = parar_na_pergunta
+        self._encerrar_na = encerrar_na_pergunta
 
     def esperar_inicio(self) -> None:
         self.inicios += 1
@@ -71,3 +73,7 @@ class InterruptorFalso:
     def pediram_parada(self) -> bool:
         self.perguntas += 1
         return self._parar_na is not None and self.perguntas >= self._parar_na
+
+    def pediu_encerramento(self) -> bool:
+        self.perguntas += 1
+        return self._encerrar_na is not None and self.perguntas >= self._encerrar_na

@@ -96,7 +96,7 @@ def test_anuncia_f3_f4_e_main_converte_erro_em_codigo_dois(
     args = montar_parser().parse_args([])
 
     assert completo_cli._rodar(args) == 0
-    assert "F3 no jogo para comecar, F4 para parar" in capsys.readouterr().out
+    assert "F3 no jogo para comecar, F4 para pausar, F5 para encerrar" in capsys.readouterr().out
 
     monkeypatch.setattr(
         completo_cli,
@@ -155,3 +155,35 @@ def test_imprime_o_desfecho_e_devolve_zero_quando_o_operador_para(monkeypatch, c
     saida = capsys.readouterr().out
     assert "parou" in saida
     assert "3" in saida and "45" in saida
+
+
+def test_completo_roda_nova_sessao_depois_do_f4_ate_o_f5(monkeypatch, tmp_path):
+    perifericos = types.ModuleType("mistfall.perifericos.windows")
+    perifericos.VK_F3 = 0x72
+    perifericos.VK_F4 = 0x73
+
+    class InterruptorWindows:
+        def __init__(self, vk_inicio, vk_parada):
+            self.sessoes = 0
+
+        def pediu_encerramento(self):
+            self.sessoes += 1
+            return self.sessoes >= 2
+
+    perifericos.InterruptorWindows = InterruptorWindows
+    perifericos.MaoWindows = type("MaoWindows", (), {})
+    perifericos.TelaWindows = type("TelaWindows", (), {})
+    monkeypatch.setitem(sys.modules, "mistfall.perifericos.windows", perifericos)
+    monkeypatch.setattr(completo_cli, "carregar_config", lambda _: _config_completo())
+    monkeypatch.setattr(completo_cli, "validar_precos_venda", lambda _: None)
+    chamadas = []
+    monkeypatch.setattr(
+        completo_cli, "executar_ciclo_completo",
+        lambda *a, **k: chamadas.append(1)
+        or SessaoCompleta(DesfechoSessaoCompleta.PAROU),
+    )
+    args = montar_parser().parse_args([])
+    args.pasta = str(tmp_path)
+
+    assert completo_cli._rodar(args) == 0
+    assert len(chamadas) == 2

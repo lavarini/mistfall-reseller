@@ -168,9 +168,9 @@ def executar_ciclo_completo(
         sorteio = random.Random()
     pasta = Path(pasta)
 
-    interruptor.esperar_inicio()
-
     sessao = SessaoCompleta(estado=estado_inicial())
+    if interruptor.esperar_inicio() is False:
+        return sessao
     estado = sessao.estado
     telemetria = TelemetriaSessao(pasta, time.monotonic())
 

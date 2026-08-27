@@ -49,6 +49,7 @@ SCANCODE_DIGITO = {"0": 0x0B, **{str(numero): numero + 1 for numero in range(1, 
 # evento no jogo — e o oposto do que o SendInput faz.
 VK_F3 = 0x72
 VK_F4 = 0x73
+VK_F5 = 0x74
 
 
 class _MOUSEINPUT(ctypes.Structure):
@@ -89,7 +90,7 @@ def _tecla_foi_pressionada(vk: int) -> bool:
     """Trinco: a tecla foi pressionada desde a chamada anterior?
 
     O bit 0x0001 do GetAsyncKeyState guarda a transicao, e nao o estado
-    atual. E o que faz o F4 ser notado mesmo quando apertado e solto durante
+    atual. E o que faz F4/F5 serem notados mesmo quando apertados e soltos durante
     um time.sleep do piloto — sem ele, so pegaria a tecla segurada no
     instante exato da pergunta.
 
@@ -101,28 +102,44 @@ def _tecla_foi_pressionada(vk: int) -> bool:
 
 
 class InterruptorWindows:
-    """Interruptor com teclas configuraveis; por padrao usa F3/F4."""
+    """Interruptor configuravel; F3 inicia, F4 pausa e F5 encerra."""
 
     def __init__(self, intervalo: float = 0.05,
-                 vk_inicio: int = VK_F3, vk_parada: int = VK_F4) -> None:
+                 vk_inicio: int = VK_F3, vk_parada: int = VK_F4,
+                 vk_encerramento: int = VK_F5) -> None:
         self._intervalo = intervalo
         self._vk_inicio = vk_inicio
         self._vk_parada = vk_parada
+        self._vk_encerramento = vk_encerramento
         self._parada_pedida = False
+        self._encerramento_pedido = False
 
-    def esperar_inicio(self) -> None:
+    def esperar_inicio(self) -> bool:
         self._parada_pedida = False
         # A primeira leitura descarta o trinco acumulado: sem ela, um F3
         # apertado antes de o bot subir faria o laco comecar sozinho.
         _tecla_foi_pressionada(self._vk_inicio)
-        while not _tecla_foi_pressionada(self._vk_inicio):
+        while True:
+            if self.pediu_encerramento():
+                return False
+            if _tecla_foi_pressionada(self._vk_inicio):
+                return True
             time.sleep(self._intervalo)
 
     def pediram_parada(self) -> bool:
         self._parada_pedida = (
-            self._parada_pedida or _tecla_foi_pressionada(self._vk_parada)
+            self._parada_pedida
+            or _tecla_foi_pressionada(self._vk_parada)
+            or self.pediu_encerramento()
         )
         return self._parada_pedida
+
+    def pediu_encerramento(self) -> bool:
+        self._encerramento_pedido = (
+            self._encerramento_pedido
+            or _tecla_foi_pressionada(self._vk_encerramento)
+        )
+        return self._encerramento_pedido
 
 
 def _mouse(dwFlags: int, dx: int = 0, dy: int = 0) -> _INPUT:

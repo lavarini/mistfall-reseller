@@ -64,3 +64,34 @@ def test_main_converte_config_invalida_em_codigo_dois(monkeypatch):
     monkeypatch.setattr(sys, "argv", ["mistfall-venda"])
     monkeypatch.setattr(venda_cli, "_rodar", lambda _: (_ for _ in ()).throw(ValueError("ruim")))
     assert venda_cli.main() == 2
+
+
+def test_venda_roda_nova_sessao_depois_do_f4_ate_o_f5(monkeypatch, tmp_path):
+    perifericos = types.ModuleType("mistfall.perifericos.windows")
+    perifericos.VK_F3 = 0x72
+    perifericos.VK_F4 = 0x73
+    perifericos.InterruptorWindows = None
+
+    class InterruptorWindows:
+        def __init__(self, vk_inicio, vk_parada):
+            self.sessoes = 0
+
+        def pediu_encerramento(self):
+            self.sessoes += 1
+            return self.sessoes >= 2
+
+    perifericos.InterruptorWindows = InterruptorWindows
+    perifericos.MaoWindows = type("MaoWindows", (), {})
+    perifericos.TelaWindows = type("TelaWindows", (), {})
+    monkeypatch.setitem(sys.modules, "mistfall.perifericos.windows", perifericos)
+    monkeypatch.setattr(venda_cli, "carregar_config", lambda _: config_completo())
+    monkeypatch.setattr(venda_cli, "validar_precos_venda", lambda _: None)
+    chamadas = []
+    monkeypatch.setattr(venda_cli, "executar_ciclo_venda", lambda *a, **k: chamadas.append(1))
+    args = argparse.Namespace(
+        pasta=str(tmp_path), config="config.toml", teto_janela=8.0,
+        teto_fechamento=12.0,
+    )
+
+    assert venda_cli._rodar(args) == 0
+    assert len(chamadas) == 2

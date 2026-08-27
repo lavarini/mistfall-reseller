@@ -46,7 +46,7 @@ uma vez e divergiu.
 Os cliques da Compra não repetem uma coordenada fixa. A Listagem escolhida e as duas
 Categorias usadas pelo Reset recebem pontos sorteados dentro de áreas centrais seguras.
 Esse sorteio só muda o ponto dentro do mesmo alvo: não muda a Listagem escolhida, a
-alternância Forja/Chave, as esperas ou as teclas Espaço/F3/F4.
+alternância Forja/Chave, as esperas ou as teclas Espaço/F3/F4/F5.
 
 ### O Fluxo Completo
 
@@ -126,8 +126,8 @@ tesseract --version
 
 ## Uso
 
-Três comandos rodam a versão contínua do bot, todos com **F3** para iniciar e **F4**
-para parar dentro do jogo:
+Três comandos rodam a versão contínua do bot, todos com **F3** para iniciar, **F4**
+para pausar e **F5** para encerrar dentro do jogo:
 
 - `mistfall-bot` — só Compra, roda até o Inventário e o Armazém acusarem cheios ou o
   operador parar.
@@ -194,12 +194,12 @@ Cada processo deve usar uma pasta nova de sessão; reutilizar uma pasta existent
 JSONL, porque a numeração das Voltas e os relógios monotônicos relativos reiniciam em cada
 processo.
 
-Aperte **F3** dentro do jogo para começar e **F4** para parar. Cada Volta imprime uma linha
+Aperte **F3** dentro do jogo para começar, **F4** para pausar e **F5** para encerrar. Cada Volta imprime uma linha
 no console e guarda a própria pasta; as Voltas sem nada comprável descartam os prints e
 mantêm só o relatório. O fecho informa `Compras enviadas`: cada uma significa apenas que o
 clique e o Espaço foram enviados, não que o jogo confirmou a Compra.
 
-Não há piso de Ouro: enquanto houver Listagem no Preço-alvo, o bot tenta; o único freio é o F4.
+Não há piso de Ouro: enquanto houver Listagem no Preço-alvo, o bot tenta; o F4 pausa e o F5 encerra.
 Ter saldo suficiente é uma limitação do jogo, não uma guarda do bot.
 
 ### Vender stacks de três
@@ -213,7 +213,7 @@ mistfall-venda --pasta sessao-venda
 python -m ferramentas.venda_cli --pasta sessao-venda
 ```
 
-Aperte **F3** dentro do jogo para começar e **F4** para parar. O comando identifica os
+Aperte **F3** dentro do jogo para começar, **F4** para pausar e **F5** para encerrar. O comando identifica os
 Itens-alvo no Baú atual e cria uma Listagem para cada stack cuja quantidade seja
 exatamente `3`. Cada Baú é processado uma vez; depois ele avança somente para a direita
 e encerra no último Baú.
@@ -247,7 +247,7 @@ sempre começa na aba Comprar, Categoria **Item → Material de Construção**, 
 filtro roxo e assume `estoque_estimado = 0` — comece sem stacks no Armazém, ou rode
 `mistfall-venda` antes para esvaziá-lo.
 
-Aperte **F3** dentro do jogo para começar e **F4** para parar, como nos outros modos
+Aperte **F3** dentro do jogo para começar, **F4** para pausar e **F5** para encerrar, como nos outros modos
 contínuos.
 
 O coordenador começa no regime rápido e só entra em Venda voluntária no regime lento:

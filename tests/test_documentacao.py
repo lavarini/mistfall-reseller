@@ -111,7 +111,8 @@ def test_o_readme_documenta_as_teclas():
     # As teclas precisam estar ligadas ao comando e ao contexto do jogo.
     assert "mistfall-bot" in README
     assert "Aperte **F3** dentro do jogo" in README
-    assert "**F4** para parar" in README
+    assert "**F4** para pausar" in README
+    assert "**F5** para encerrar" in README
 
 
 def test_a_documentacao_nao_instrui_f2_f3_para_compra():
@@ -191,7 +192,7 @@ def test_documentacao_exige_pasta_nova_por_processo_de_sessao():
 def test_o_readme_avisa_que_f4_e_o_unico_freio_do_ouro():
     # Sem este aviso o operador pode supor um piso e deixar o bot gastar Ouro.
     assert "Não há piso de Ouro" in README
-    assert "o único freio é o F4" in README
+    assert "o F4 pausa e o F5 encerra" in README
     assert "limitação do jogo, não uma guarda do bot" in README
 
 

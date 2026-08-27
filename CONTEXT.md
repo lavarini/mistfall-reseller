@@ -80,7 +80,7 @@ prints e relatório.
 _Avoid_: Iteração, Ciclo, Rodada.
 
 **Interruptor**:
-O par de teclas com que o operador liga e desliga o bot. Na Compra e na Venda, F3 começa e F4 para.
+As teclas com que o operador controla o bot. Na Compra e na Venda, F3 começa, F4 pausa e F5 encerra.
 É a terceira fronteira de IO, ao lado da Tela e da Mão. Na Compra, o F4 é consultado antes de cada clique. Não é consultado entre o clique e o
 Espaço, onde já não há o que abortar, nem existe espera pós-Espaço: o Ouro é apenas
 telemetria observacional do frame inicial. Na Venda, o F4 é consultado antes de cada Venda

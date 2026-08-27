@@ -4,7 +4,7 @@ Nao duplica nada do piloto nem do reset — compoe os dois. O piloto continua
 sendo "uma Compra e para"; quem sabe que existe uma proxima Volta e este
 modulo.
 
-So o F4 encerra o laco; o F3 inicia. Nenhuma falha o encerra, por mais que se repita:
+F3 inicia uma sessao, F4 a pausa e F5 encerra o processo. Nenhuma falha o encerra, por mais que se repita:
 decisao do dono do projeto, registrada na spec junto com o que ela deixa em
 aberto. A `espera_entre_voltas` e o que impede uma tela errada de virar um
 laco em rotacao maxima.
@@ -113,7 +113,8 @@ def executar_ciclo(tela: Tela, mao: Mao, config: Config, pasta: Path,
     if sorteio is None:
         sorteio = random.Random()
 
-    interruptor.esperar_inicio()
+    if interruptor.esperar_inicio() is False:
+        return Sessao()
 
     sessao = Sessao()
     categorias = itertools.cycle(ALTERNANCIA)

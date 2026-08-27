@@ -261,21 +261,38 @@ def test_interruptor_padrao_usa_f3_para_inicio_e_f4_para_parada():
     assert interruptor._vk_parada == windows.VK_F4
 
 
+def test_interruptor_padrao_usa_f5_para_encerramento():
+    interruptor = windows.InterruptorWindows()
+
+    assert interruptor._vk_encerramento == windows.VK_F5
+
+
+def test_pediu_encerramento_le_o_f5(monkeypatch):
+    monkeypatch.setattr(windows, "_tecla_foi_pressionada",
+                        lambda vk: vk == windows.VK_F5)
+
+    assert windows.InterruptorWindows().pediu_encerramento() is True
+
+
 def test_esperar_inicio_bloqueia_ate_o_f3(monkeypatch):
     # A primeira chamada limpa o trinco: sem isso, um F3 apertado antes de o
     # bot subir faria o laco comecar sozinho.
-    respostas = [False, False, False, True]
     vistos = []
+    leituras_f3 = iter([False, False, False, True])
 
     def falso(vk):
         vistos.append(vk)
-        return respostas.pop(0)
+        if vk == windows.VK_F3:
+            return next(leituras_f3)
+        return False
 
     monkeypatch.setattr(windows, "_tecla_foi_pressionada", falso)
     monkeypatch.setattr(windows.time, "sleep", lambda _: None)
     windows.InterruptorWindows().esperar_inicio()
-    assert vistos == [windows.VK_F3] * 4
-    assert respostas == []
+    assert vistos == [windows.VK_F3, windows.VK_F5,
+                      windows.VK_F3, windows.VK_F5,
+                      windows.VK_F3, windows.VK_F5,
+                      windows.VK_F3]
 
 
 def test_pediram_parada_le_o_f4(monkeypatch):
@@ -292,7 +309,7 @@ def test_pediram_parada_e_falso_sem_f3(monkeypatch):
 def test_a_parada_fica_pedida_depois_que_o_trinco_e_consumido(monkeypatch):
     respostas = iter([False, True, False])
     monkeypatch.setattr(windows, "_tecla_foi_pressionada",
-                        lambda vk: next(respostas))
+                        lambda vk: next(respostas) if vk == windows.VK_F4 else False)
     interruptor = windows.InterruptorWindows()
 
     assert [interruptor.pediram_parada() for _ in range(3)] == [
@@ -302,10 +319,12 @@ def test_a_parada_fica_pedida_depois_que_o_trinco_e_consumido(monkeypatch):
 
 def test_interruptor_configuravel_usa_f3_para_inicio_e_f4_para_parada(monkeypatch):
     vistos = []
-    respostas = iter([False, True, True])
+    respostas = iter([False, True])
     monkeypatch.setattr(
         windows, "_tecla_foi_pressionada",
-        lambda vk: vistos.append(vk) or next(respostas),
+        lambda vk: vistos.append(vk)
+        or (next(respostas) if vk == windows.VK_F3 else
+            (True if vk == windows.VK_F4 else False)),
     )
     monkeypatch.setattr(windows.time, "sleep", lambda _: None)
     interruptor = windows.InterruptorWindows(
@@ -314,4 +333,4 @@ def test_interruptor_configuravel_usa_f3_para_inicio_e_f4_para_parada(monkeypatc
     )
     interruptor.esperar_inicio()
     assert interruptor.pediram_parada() is True
-    assert vistos == [windows.VK_F3, windows.VK_F3, windows.VK_F4]
+    assert vistos == [windows.VK_F3, windows.VK_F5, windows.VK_F3, windows.VK_F4]

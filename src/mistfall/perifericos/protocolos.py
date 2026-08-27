@@ -33,14 +33,14 @@ class Mao(Protocol):
 
 
 class Interruptor(Protocol):
-    """O par F3/F4 visto pelo bot.
+    """As teclas F3/F4/F5 vistas pelo bot.
 
     Terceira fronteira de IO, pela mesma razao das outras duas: a decisao de
     parar e testavel no macOS, e so a leitura da tecla mora no Windows.
     """
 
-    def esperar_inicio(self) -> None:
-        """Bloqueia ate o operador pedir para comecar."""
+    def esperar_inicio(self) -> bool | None:
+        """Bloqueia ate F3; False indica que F5 pediu encerramento."""
         ...
 
     def pediram_parada(self) -> bool:
@@ -50,4 +50,8 @@ class Interruptor(Protocol):
         solta enquanto o bot dormia continua registrada na pergunta seguinte.
         Sem isso o F4 so pegaria se fosse segurado no instante da checagem.
         """
+        ...
+
+    def pediu_encerramento(self) -> bool:
+        """F5 foi pressionado e o processo deve terminar."""
         ...

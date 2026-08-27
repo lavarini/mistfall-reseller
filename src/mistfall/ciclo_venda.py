@@ -210,8 +210,8 @@ def _executar_sessao_venda(
     sessao = SessaoVenda(total_baus=total_baus)
     if sorteio is None:
         sorteio = random.Random()
-    if not parcial:
-        interruptor.esperar_inicio()
+    if not parcial and interruptor.esperar_inicio() is False:
+        return sessao
 
     def encerrar(desfecho, motivo=""):
         sessao.desfecho = desfecho

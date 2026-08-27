@@ -176,7 +176,7 @@ Cada processo deve usar uma pasta nova de sessao; reutilizar uma pasta existente
 JSONL, porque a numeracao das Voltas e os relogios monotonicos relativos reiniciam em cada
 processo.
 
-Aperte **F3 dentro do jogo** para iniciar e **F4** para parar. Ha uma espera de **150 ms
+Aperte **F3 dentro do jogo** para iniciar, **F4** para pausar e **F5** para encerrar. Ha uma espera de **150 ms
 entre Voltas**, inclusive depois de um aborto rapido. A producao usa a analise sequencial
 (`concorrente=False`).
 
@@ -210,7 +210,7 @@ sempre comeca na aba Comprar, Categoria Item -> Material de Construcao, garante 
 filtro roxo e assume `estoque_estimado = 0` — comece sem stacks no Armazem, ou rode
 `mistfall-venda` antes para esvazia-lo.
 
-Aperte **F3 dentro do jogo** para iniciar e **F4** para parar, como nos outros modos
+Aperte **F3 dentro do jogo** para iniciar, **F4** para pausar e **F5** para encerrar, como nos outros modos
 continuos.
 
 O coordenador comeca no regime rapido e so entra em Venda voluntaria no regime lento:

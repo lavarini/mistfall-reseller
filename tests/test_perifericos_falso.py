@@ -90,3 +90,11 @@ def test_o_interruptor_falso_registra_o_inicio():
     interruptor = InterruptorFalso()
     interruptor.esperar_inicio()
     assert interruptor.inicios == 1
+
+
+def test_o_interruptor_falso_reconhece_encerramento():
+    interruptor = InterruptorFalso(encerrar_na_pergunta=2)
+
+    assert interruptor.pediu_encerramento() is False
+    assert interruptor.pediu_encerramento() is True
+    assert interruptor.pediu_encerramento() is True
