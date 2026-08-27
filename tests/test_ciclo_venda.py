@@ -5,6 +5,7 @@ import pytest
 
 from mistfall.config import Config
 from mistfall.perifericos.falso import InterruptorFalso, MaoFalsa, TelaFalsa
+from mistfall.navegacao import ResultadoNavegacao
 from mistfall.tipos import CapacidadeVenda, ItemAlvo, SlotArmazem
 from mistfall.venda import DesfechoVenda, ResultadoVenda, RitmoVenda
 from mistfall.ciclo_venda import (
@@ -220,6 +221,60 @@ def test_releitura_atualiza_capacidade_antes_de_vender(monkeypatch, tmp_path):
     assert vendidos == []
     assert capacidade_recebida == [CapacidadeVenda(15, 15)]
     assert sessao.desfecho is DesfechoSessaoVenda.CAPACIDADE_CHEIA
+
+
+def test_reseta_as_abas_depois_de_tres_listagens_com_capacidade_inalterada(
+    monkeypatch, tmp_path,
+):
+    slot = SlotArmazem(0, 0, ItemAlvo.ADAGA, 3)
+    capacidades = iter([
+        CapacidadeVenda(0, 15),
+        CapacidadeVenda(0, 15),
+        CapacidadeVenda(0, 15),
+        CapacidadeVenda(0, 15),
+        CapacidadeVenda(15, 15),
+    ])
+    grades = iter([[slot, slot, slot], [slot]])
+    navegacoes = []
+    monkeypatch.setattr(
+        "mistfall.ciclo_venda.ler_capacidade", lambda _: next(capacidades)
+    )
+    monkeypatch.setattr("mistfall.ciclo_venda.ler_bau_selecionado", lambda _: 1)
+    monkeypatch.setattr("mistfall.ciclo_venda.contar_baus", lambda _: 2)
+    monkeypatch.setattr("mistfall.ciclo_venda.eh_tela_venda", lambda _: True)
+    monkeypatch.setattr(
+        "mistfall.ciclo_venda.ler_painel_itens", lambda _: PainelItens.ARMAZEM
+    )
+    monkeypatch.setattr(
+        "mistfall.ciclo_venda.varrer_armazem", lambda _: next(grades)
+    )
+    monkeypatch.setattr(
+        "mistfall.ciclo_venda.executar_venda",
+        lambda *args, **kwargs: sucesso(slot),
+    )
+    monkeypatch.setattr(
+        "mistfall.ciclo_venda.ir_para_compra",
+        lambda *args: navegacoes.append("compra")
+        or ResultadoNavegacao(True, STASH, ""),
+    )
+    monkeypatch.setattr(
+        "mistfall.ciclo_venda.ir_para_venda",
+        lambda *args: navegacoes.append("venda")
+        or ResultadoNavegacao(True, STASH, ""),
+    )
+    monkeypatch.setattr(
+        "mistfall.ciclo_venda._esperar_vaga",
+        lambda *args: ((args[0].capturar(), CapacidadeVenda(15, 15)), "capacidade cheia"),
+    )
+
+    sessao = executar_ciclo_venda(
+        TelaFalsa([STASH]), MaoFalsa(), config(), tmp_path,
+        InterruptorFalso(), RitmoVenda.instantaneo(),
+    )
+
+    assert sessao.vendas == 3
+    assert sessao.desfecho is DesfechoSessaoVenda.CAPACIDADE_CHEIA
+    assert navegacoes == ["compra", "venda"]
 
 
 def test_leitura_inconclusiva_usa_reset_como_fallback(monkeypatch, tmp_path):

@@ -8,6 +8,7 @@ from enum import Enum
 from pathlib import Path
 
 from mistfall.config import Config
+from mistfall.navegacao import ir_para_compra, ir_para_venda
 from mistfall.perifericos.protocolos import Interruptor, Mao, Tela
 from mistfall.tipos import BAU_INICIAL, CapacidadeVenda
 from mistfall.venda import (
@@ -35,6 +36,9 @@ class DesfechoSessaoVenda(Enum):
     ARMAZEM_ESGOTADO = "armazem_esgotado"
     PAROU = "parou"
     ABORTOU = "abortou"
+
+
+LEITURAS_CAPACIDADE_SUSPEITAS = 3
 
 
 @dataclass
@@ -91,6 +95,17 @@ def _forcar_reset_armazem(
         return None
     mao.clicar(*CENTRO_ABA_ARMAZEM)
     return _esperar_bau(tela, bau, ritmo)
+
+
+def _forcar_reset_tela_venda(tela: Tela, mao: Mao, ritmo: RitmoVenda):
+    """Troca de aba para descartar uma leitura persistente de capacidade."""
+    compra = ir_para_compra(tela, mao, ritmo)
+    if not compra.sucesso:
+        return None
+    venda = ir_para_venda(tela, mao, ritmo)
+    if not venda.sucesso:
+        return None
+    return venda.frame
 
 
 def _candidatos(frame):
@@ -221,6 +236,8 @@ def _executar_sessao_venda(
     try:
         frame = tela.capturar()
         bau_confirmado = None
+        capacidade_referencia = None
+        leituras_capacidade_iguais = 0
         if parcial:
             mao.clicar(*centro_bau(BAU_INICIAL))
             frame = _esperar_bau(tela, BAU_INICIAL, ritmo)
@@ -243,6 +260,8 @@ def _executar_sessao_venda(
             if capacidade is None:
                 return encerrar(DesfechoSessaoVenda.ABORTOU, "Capacidade de Venda ilegivel")
             sessao.capacidade_final = capacidade
+            if capacidade_referencia is None:
+                capacidade_referencia = capacidade
 
             bau = bau_confirmado or ler_bau_selecionado(frame)
             bau_confirmado = None
@@ -288,6 +307,7 @@ def _executar_sessao_venda(
                     capacidade = capacidade_resetada
                     sessao.capacidade_final = capacidade
                     candidatos = _candidatos(frame)
+            reiniciar_baus = False
             while True:
                 while candidatos:
                     if interruptor.pediram_parada():
@@ -340,6 +360,26 @@ def _executar_sessao_venda(
                             "Capacidade de Venda ilegivel depois da Venda",
                         )
                     sessao.capacidade_final = capacidade
+                    if capacidade == capacidade_referencia:
+                        leituras_capacidade_iguais += 1
+                    else:
+                        capacidade_referencia = capacidade
+                        leituras_capacidade_iguais = 0
+                    if leituras_capacidade_iguais >= LEITURAS_CAPACIDADE_SUSPEITAS:
+                        frame_resetado = _forcar_reset_tela_venda(
+                            tela, mao, ritmo,
+                        )
+                        if frame_resetado is None:
+                            return encerrar(
+                                DesfechoSessaoVenda.ABORTOU,
+                                "nao conseguiu resetar a tela de Venda",
+                            )
+                        frame = frame_resetado
+                        bau_confirmado = BAU_INICIAL
+                        capacidade_referencia = None
+                        leituras_capacidade_iguais = 0
+                        reiniciar_baus = True
+                        break
                     if parcial and capacidade.ocupadas >= capacidade.limite:
                         espera, motivo = _esperar_vaga_parcial(
                             tela, interruptor, capacidade, ritmo,
@@ -356,6 +396,9 @@ def _executar_sessao_venda(
                         sessao.capacidade_final = capacidade
 
                 break
+
+            if reiniciar_baus:
+                continue
 
             if bau >= sessao.total_baus - 1:
                 return encerrar(DesfechoSessaoVenda.ARMAZEM_ESGOTADO)
